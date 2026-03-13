@@ -15,8 +15,7 @@ export default function HomeScreen() {
 
       {/* POPScore Card */}
       <View style={styles.scoreCard}>
-        <Text style={styles.scoreLabel}>POPSCORE</Text>
-        <Text style={styles.scoreValue}>4.2</Text>
+        <Gauge score={4.2} />
         <View style={styles.scoreRow}>
           <View style={styles.scoreStat}>
             <Text style={styles.scoreStatLabel}>NAT'L AVG</Text>
@@ -61,8 +60,6 @@ const styles = StyleSheet.create({
   greeting:         { fontSize: 20, fontWeight: '600', color: '#F5EDD8' },
   subGreeting:      { fontSize: 11, fontWeight: '600', color: '#7DC87A', marginTop: 3 },
   scoreCard:        { margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#C9A84C22', alignItems: 'center' },
-  scoreLabel:       { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 8 },
-  scoreValue:       { fontSize: 72, fontWeight: '300', color: '#F5EDD8' },
   scoreRow:         { flexDirection: 'row', gap: 32, marginTop: 12 },
   scoreStat:        { alignItems: 'center' },
   scoreStatLabel:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 4 },
