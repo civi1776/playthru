@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   standingText:     { fontSize: 18, fontWeight: '500', color: '#F5EDD8' },
   fab: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 84,
     alignSelf: 'center',
     width: 180,
     paddingVertical: 14,
