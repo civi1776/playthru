@@ -1,55 +1,67 @@
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import Gauge from '../components/guage';
-export default function HomeScreen() {
+
+export default function HomeScreen({ navigation }) {
   return (
-    <ScrollView style={styles.container}>
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.wordmark}>PLAYTHRU</Text>
-          <Text style={styles.greeting}>Good morning, Jake</Text>
-          <Text style={styles.subGreeting}>You're playing 12% faster this season ↑</Text>
-        </View>
-      </View>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 160 }}>
 
-      {/* POPScore Card */}
-      <View style={styles.scoreCard}>
-        <Gauge score={4.2} />
-        <View style={styles.scoreRow}>
-          <View style={styles.scoreStat}>
-            <Text style={styles.scoreStatLabel}>NAT'L AVG</Text>
-            <Text style={styles.scoreStatValue}>3.9</Text>
-          </View>
-          <View style={styles.scoreStat}>
-            <Text style={styles.scoreStatLabel}>YOU</Text>
-            <Text style={styles.scoreStatValue}>4.2</Text>
-          </View>
-          <View style={styles.scoreStat}>
-            <Text style={styles.scoreStatLabel}>MONTHLY</Text>
-            <Text style={[styles.scoreStatValue, { color: '#7DC87A' }]}>↑12%</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.wordmark}>PLAYTHRU</Text>
+            <Text style={styles.greeting}>Good morning, Jake</Text>
+            <Text style={styles.subGreeting}>You're playing 12% faster this season ↑</Text>
           </View>
         </View>
-      </View>
 
-      {/* Last Round Card */}
-      <View style={styles.card}>
-        <Text style={styles.insight}>⚡ Fastest back 9 this year</Text>
-        <Text style={styles.courseName}>TPC Sawgrass</Text>
-        <Text style={styles.roundDetail}>Feb 28 · 18 holes · Cart · 4 players · 3h 22m</Text>
-        <View style={styles.row}>
-          <Text style={styles.popBadge}>4.3</Text>
-          <Text style={styles.verified}>✓ VERIFIED</Text>
+        {/* POPScore Card */}
+        <View style={styles.scoreCard}>
+          <Gauge score={4.2} />
+          <View style={styles.scoreRow}>
+            <View style={styles.scoreStat}>
+              <Text style={styles.scoreStatLabel}>NAT'L AVG</Text>
+              <Text style={styles.scoreStatValue}>3.9</Text>
+            </View>
+            <View style={styles.scoreStat}>
+              <Text style={styles.scoreStatLabel}>YOU</Text>
+              <Text style={styles.scoreStatValue}>4.2</Text>
+            </View>
+            <View style={styles.scoreStat}>
+              <Text style={styles.scoreStatLabel}>MONTHLY</Text>
+              <Text style={[styles.scoreStatValue, { color: '#7DC87A' }]}>↑12%</Text>
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* Standing Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>YOUR STANDING AT TPC SAWGRASS</Text>
-        <Text style={styles.standingText}>Faster than <Text style={{ color: '#7DC87A' }}>82%</Text> of players</Text>
-      </View>
+        {/* Last Round Card */}
+        <View style={styles.card}>
+          <Text style={styles.insight}>⚡ Fastest back 9 this year</Text>
+          <Text style={styles.courseName}>TPC Sawgrass</Text>
+          <Text style={styles.roundDetail}>Feb 28 · 18 holes · Cart · 4 players · 3h 22m</Text>
+          <View style={styles.row}>
+            <Text style={styles.popBadge}>4.3</Text>
+            <Text style={styles.verified}>✓ VERIFIED</Text>
+          </View>
+        </View>
 
-    </ScrollView>
+        {/* Standing Card */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>YOUR STANDING AT TPC SAWGRASS</Text>
+          <Text style={styles.standingText}>Faster than <Text style={{ color: '#7DC87A' }}>82%</Text> of players</Text>
+        </View>
+
+      </ScrollView>
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('Log')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.fabText}>+ LOG ROUND</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -73,4 +85,27 @@ const styles = StyleSheet.create({
   verified:         { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
   cardLabel:        { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 8 },
   standingText:     { fontSize: 18, fontWeight: '500', color: '#F5EDD8' },
+  fab: {
+    position: 'absolute',
+    bottom: 100,
+    alignSelf: 'center',
+    width: 180,
+    paddingVertical: 14,
+    borderRadius: 50,
+    backgroundColor: '#1E4825',
+    borderWidth: 1,
+    borderColor: '#C9A84C66',
+    alignItems: 'center',
+    shadowColor: '#C9A84C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  fabText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DFC07A',
+    letterSpacing: 2,
+  },
 });
