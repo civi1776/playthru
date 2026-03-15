@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen        from './screens/HomeScreen';
 import LogScreen         from './screens/LogScreen';
@@ -36,8 +36,14 @@ export default function App() {
           marginTop: 4,
         },
         tabBarIcon: ({ color }) => {
-          const icons = { Home: '⛳', Log: '＋', Courses: '🗺', Profile: '◎', Leaderboard: '◈' };
-          return <Text style={{ fontSize: 28, color }}>{icons[route.name]}</Text>;
+          const icons = {
+            Home: 'flag',
+            Log: 'add-circle',
+            Courses: 'map',
+            Profile: 'person-circle',
+            Leaderboard: 'trophy',
+          };
+          return <Ionicons name={icons[route.name]} size={28} color={color} />;
         },
       })}>
         <Tab.Screen name="Home"        component={HomeScreen} />
