@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
@@ -7,10 +8,13 @@ import LogScreen         from './screens/LogScreen';
 import CoursesScreen     from './screens/CoursesScreen';
 import ProfileScreen     from './screens/ProfileScreen';
 import LeaderboardScreen from './screens/LeaderboardScreen';
+import SplashScreen      from './screens/SplashScreen';
 
 const Tab = createBottomTabNavigator();
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <NavigationContainer>
       <Tab.Navigator screenOptions={({ route }) => ({
@@ -42,6 +46,7 @@ export default function App() {
         <Tab.Screen name="Profile"     component={ProfileScreen} />
         <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
       </Tab.Navigator>
+      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
     </NavigationContainer>
   );
 }
