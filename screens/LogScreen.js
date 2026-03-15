@@ -132,59 +132,98 @@ function StepDetails({ data, onChange }) {
   );
 }
 
-function TimePicker({ label, value, onChange }) {
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  const [hm, period] = timeStr.split(' ');
+  const [h, m] = hm.split(':').map(Number);
+  let total = (h % 12) * 60 + m;
+  if (period === 'PM') total += 12 * 60;
+  return total;
+}
+
+function formatElapsed(teeTime, finishTime) {
+  let start = parseTimeToMinutes(teeTime);
+  let end = parseTimeToMinutes(finishTime);
+  if (end <= start) end += 24 * 60; // midnight crossing
+  const diff = end - start;
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
+function TimePickerControls({ value, onChange }) {
   const hours = Array.from({ length: 13 }, (_, i) => i + 6); // 6am–6pm
   const mins = ['00', '15', '30', '45'];
   const [h, m, period] = value ? value.split(/[: ]/) : ['7', '00', 'AM'];
 
   return (
+    <View style={s.timeRow}>
+      <View style={s.timeCol}>
+        <Text style={s.groupLabel}>HOUR</Text>
+        <ScrollView style={s.timeScroll} showsVerticalScrollIndicator={false}>
+          {hours.map(hr => {
+            const display = hr > 12 ? hr - 12 : hr;
+            const per = hr >= 12 ? 'PM' : 'AM';
+            const selected = parseInt(h) === display && period === per;
+            return (
+              <TouchableOpacity
+                key={hr}
+                style={[s.timeItem, selected && s.timeItemActive]}
+                onPress={() => onChange(`${display}:${m} ${per}`)}
+              >
+                <Text style={[s.timeText, selected && s.timeTextActive]}>{display}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+      <Text style={s.timeColon}>:</Text>
+      <View style={s.timeCol}>
+        <Text style={s.groupLabel}>MIN</Text>
+        {mins.map(mn => (
+          <TouchableOpacity
+            key={mn}
+            style={[s.timeItem, m === mn && s.timeItemActive]}
+            onPress={() => onChange(`${h}:${mn} ${period}`)}
+          >
+            <Text style={[s.timeText, m === mn && s.timeTextActive]}>{mn}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={s.timeCol}>
+        <Text style={s.groupLabel}>  </Text>
+        {['AM', 'PM'].map(p => (
+          <TouchableOpacity
+            key={p}
+            style={[s.timeItem, period === p && s.timeItemActive]}
+            onPress={() => onChange(`${h}:${m} ${p}`)}
+          >
+            <Text style={[s.timeText, period === p && s.timeTextActive]}>{p}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function TimePicker({ label, value, onChange }) {
+  return (
     <View style={s.stepContent}>
       <Text style={s.stepTitle}>{label}</Text>
-      <View style={s.timeRow}>
-        <View style={s.timeCol}>
-          <Text style={s.groupLabel}>HOUR</Text>
-          <ScrollView style={s.timeScroll} showsVerticalScrollIndicator={false}>
-            {hours.map(hr => {
-              const display = hr > 12 ? hr - 12 : hr;
-              const per = hr >= 12 ? 'PM' : 'AM';
-              const selected = parseInt(h) === display && period === per;
-              return (
-                <TouchableOpacity
-                  key={hr}
-                  style={[s.timeItem, selected && s.timeItemActive]}
-                  onPress={() => onChange(`${display}:${m} ${per}`)}
-                >
-                  <Text style={[s.timeText, selected && s.timeTextActive]}>{display}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-        <Text style={s.timeColon}>:</Text>
-        <View style={s.timeCol}>
-          <Text style={s.groupLabel}>MIN</Text>
-          {mins.map(mn => (
-            <TouchableOpacity
-              key={mn}
-              style={[s.timeItem, m === mn && s.timeItemActive]}
-              onPress={() => onChange(`${h}:${mn} ${period}`)}
-            >
-              <Text style={[s.timeText, m === mn && s.timeTextActive]}>{mn}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <View style={s.timeCol}>
-          <Text style={s.groupLabel}>  </Text>
-          {['AM', 'PM'].map(p => (
-            <TouchableOpacity
-              key={p}
-              style={[s.timeItem, period === p && s.timeItemActive]}
-              onPress={() => onChange(`${h}:${m} ${p}`)}
-            >
-              <Text style={[s.timeText, period === p && s.timeTextActive]}>{p}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      <TimePickerControls value={value} onChange={onChange} />
+    </View>
+  );
+}
+
+function StepFinishTime({ teeTime, finishTime, onChange }) {
+  const elapsed = formatElapsed(teeTime, finishTime);
+  return (
+    <View style={s.stepContent}>
+      <Text style={s.stepTitle}>What time did you finish?</Text>
+      <TimePickerControls value={finishTime} onChange={onChange} />
+      <View style={s.elapsedCard}>
+        <Text style={s.elapsedValue}>{elapsed}</Text>
+        <Text style={s.elapsedLabel}>ROUND DURATION</Text>
       </View>
     </View>
   );
@@ -263,7 +302,7 @@ export default function LogScreen() {
         {step === 1 && <StepDate data={data} onChange={setData} />}
         {step === 2 && <StepDetails data={data} onChange={setData} />}
         {step === 3 && <TimePicker label="What time did you tee off?" value={data.teeTime} onChange={v => setData({ ...data, teeTime: v })} />}
-        {step === 4 && <TimePicker label="What time did you finish?" value={data.finishTime} onChange={v => setData({ ...data, finishTime: v })} />}
+        {step === 4 && <StepFinishTime teeTime={data.teeTime} finishTime={data.finishTime} onChange={v => setData({ ...data, finishTime: v })} />}
         {step === 5 && <StepSummary data={data} />}
       </ScrollView>
       <View style={s.navRow}>
@@ -327,6 +366,9 @@ const s = StyleSheet.create({
   timeItemActive:     { borderColor: '#C9A84C', backgroundColor: '#C9A84C22' },
   timeText:           { fontSize: 18, color: '#B8A882', fontWeight: '300' },
   timeTextActive:     { color: '#F5EDD8' },
+  elapsedCard:        { alignItems: 'center', marginTop: 32, paddingVertical: 28, borderTopWidth: 1, borderTopColor: '#C9A84C22' },
+  elapsedValue:       { fontSize: 72, fontWeight: '400', color: '#C9A84C', fontFamily: 'monospace', lineHeight: 80 },
+  elapsedLabel:       { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginTop: 8, opacity: 0.6 },
   summaryCard:        { backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#C9A84C22', overflow: 'hidden', marginBottom: 20 },
   summaryRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#C9A84C11' },
   summaryLabel:       { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
