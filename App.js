@@ -71,19 +71,20 @@ const nav = StyleSheet.create({
 });
 
 export default function App() {
-  const [session, setSession]       = useState(undefined); // undefined = loading
-  const [showSplash, setShowSplash] = useState(true);
+  const [session, setSession]             = useState(undefined); // undefined = loading
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showSplash, setShowSplash]       = useState(true);
   useFonts({ Montserrat_700Bold });
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+      if (data.session) setIsAuthenticated(true);
+      setSession(data.session ?? null);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
+        if (newSession) setIsAuthenticated(true);
         setSession(newSession);
       }
     );
@@ -91,8 +92,15 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Callback passed to auth screens — called after successful signup/signin
+  // regardless of whether a Supabase session was established (handles email confirmation)
+  const onAuthSuccess = () => {
+    setIsAuthenticated(true);
+    setSession('authenticated'); // truthy non-null value
+  };
+
   // Loading state — session not yet determined
-  if (session === undefined) {
+  if (session === undefined && !isAuthenticated) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#C9A84C" />
@@ -102,7 +110,7 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      {session ? (
+      {(session || isAuthenticated) ? (
         <>
           <Tab.Navigator
             tabBar={props => <BottomNav {...props} />}
@@ -122,8 +130,12 @@ export default function App() {
       ) : (
         <AuthStack.Navigator screenOptions={{ headerShown: false }}>
           <AuthStack.Screen name="Welcome" component={WelcomeScreen} />
-          <AuthStack.Screen name="SignUp"  component={SignUpScreen} />
-          <AuthStack.Screen name="SignIn"  component={SignInScreen} />
+          <AuthStack.Screen name="SignUp">
+            {props => <SignUpScreen {...props} onAuthSuccess={onAuthSuccess} />}
+          </AuthStack.Screen>
+          <AuthStack.Screen name="SignIn">
+            {props => <SignInScreen {...props} onAuthSuccess={onAuthSuccess} />}
+          </AuthStack.Screen>
         </AuthStack.Navigator>
       )}
     </NavigationContainer>

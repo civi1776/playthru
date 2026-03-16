@@ -4,10 +4,10 @@
     "slug": "playthru",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/PlayThru_AppIcon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/PlayThru_AppIcon.png",
       "resizeMode": "contain",
       "backgroundColor": "#090F0A"
     },

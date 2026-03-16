@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 
-export default function SignInScreen({ navigation }) {
+export default function SignInScreen({ navigation, onAuthSuccess }) {
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,6 +33,8 @@ export default function SignInScreen({ navigation }) {
     setLoading(false);
     if (signInError) {
       setError(signInError.message);
+    } else {
+      if (onAuthSuccess) onAuthSuccess();
     }
   };
 

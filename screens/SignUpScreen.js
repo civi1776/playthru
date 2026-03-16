@@ -58,7 +58,7 @@ const POP_FROM_TIME = {
 const ITEM_HEIGHT = 72;
 const TOTAL_STEPS = 6;
 
-export default function SignUpScreen({ navigation }) {
+export default function SignUpScreen({ navigation, onAuthSuccess }) {
   // Navigation / UI state
   const [step, setStep]               = useState(0);
   const [loading, setLoading]         = useState(false);
@@ -164,6 +164,10 @@ export default function SignUpScreen({ navigation }) {
     setLoading(false);
   };
 
+  const handleLetsPlay = () => {
+    if (onAuthSuccess) onAuthSuccess();
+  };
+
   // ============================================================
   // CONGRATULATIONS SCREEN
   // ============================================================
@@ -182,7 +186,7 @@ export default function SignUpScreen({ navigation }) {
           </Text>
           <TouchableOpacity
             style={styles.btnPrimary}
-            onPress={() => {/* App.js handles navigation via onAuthStateChange */}}
+            onPress={handleLetsPlay}
             activeOpacity={0.8}
           >
             <Text style={styles.btnPrimaryText}>LET'S PLAY →</Text>
