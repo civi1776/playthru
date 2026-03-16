@@ -1,5 +1,37 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import Gauge from '../components/guage';
+
+const PRO_FEATURES = [
+  { emoji: '🗺️', title: 'Round Heatmaps',  subtitle: 'Hole-by-hole pace' },
+  { emoji: '🤖', title: 'AI Pace Coach',   subtitle: 'Weekly insights' },
+  { emoji: '👥', title: 'Private Groups',  subtitle: 'Club leaderboards' },
+];
+
+function ProCard() {
+  return (
+    <View style={styles.proCard}>
+      <View style={styles.proBadge}>
+        <Text style={styles.proBadgeText}>✦ PRO MEMBER</Text>
+      </View>
+      <Text style={styles.proSubtitle}>Unlock your full performance profile</Text>
+      <View style={styles.proFeatureRow}>
+        {PRO_FEATURES.map(f => (
+          <TouchableOpacity
+            key={f.title}
+            style={styles.proFeature}
+            onPress={() => Alert.alert('Upgrade to Pro', 'Coming Soon')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.proLock}>🔒</Text>
+            <Text style={styles.proEmoji}>{f.emoji}</Text>
+            <Text style={styles.proFeatureTitle}>{f.title}</Text>
+            <Text style={styles.proFeatureSub}>{f.subtitle}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
 
 export default function HomeScreen({ navigation }) {
   return (
@@ -51,6 +83,9 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.standingText}>Faster than <Text style={{ color: '#7DC87A' }}>82%</Text> of players</Text>
         </View>
 
+        {/* Pro Member Teaser */}
+        <ProCard />
+
       </ScrollView>
 
       {/* FAB */}
@@ -85,9 +120,19 @@ const styles = StyleSheet.create({
   verified:         { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
   cardLabel:        { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 8 },
   standingText:     { fontSize: 18, fontWeight: '500', color: '#F5EDD8' },
+  proCard:        { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#1A2E1C', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(201,168,76,0.25)' },
+  proBadge:       { alignSelf: 'flex-start', backgroundColor: '#0D1A0F', borderRadius: 6, paddingHorizontal: 9, paddingVertical: 3, marginBottom: 10 },
+  proBadgeText:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  proSubtitle:    { fontSize: 12, color: '#B8A882', marginBottom: 14 },
+  proFeatureRow:  { flexDirection: 'row', gap: 8 },
+  proFeature:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(201,168,76,0.1)' },
+  proLock:        { fontSize: 10, alignSelf: 'flex-end', marginBottom: 6 },
+  proEmoji:       { fontSize: 22, marginBottom: 6 },
+  proFeatureTitle:{ fontSize: 11, fontWeight: '600', color: '#B8A882', marginBottom: 2 },
+  proFeatureSub:  { fontSize: 10, color: '#7A6E58' },
   fab: {
     position: 'absolute',
-    bottom: 88,
+    bottom: 16,
     alignSelf: 'center',
     width: 180,
     paddingVertical: 14,

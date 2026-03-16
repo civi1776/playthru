@@ -40,8 +40,8 @@ function popColor(score) {
 }
 
 function trendColor(t) {
-  if (t.startsWith('+')) return '#7DC87A';
-  if (t.startsWith('-')) return '#C07A6A';
+  if (t && t.startsWith('+')) return '#7DC87A';
+  if (t && t.startsWith('-')) return '#C07A6A';
   return '#B8A882';
 }
 
