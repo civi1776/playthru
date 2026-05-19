@@ -10,14 +10,19 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
-export default function SignInScreen({ navigation, onAuthSuccess }) {
-  const [email, setEmail]             = useState('');
-  const [password, setPassword]       = useState('');
+export default function SignInScreen({ navigation }) {
+  const { refreshProfile } = useAuth();
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState('');
+  const [loading, setLoading]           = useState(false);
+  const [error, setError]               = useState('');
 
   const handleSignIn = async () => {
     setError('');
@@ -30,27 +35,46 @@ export default function SignInScreen({ navigation, onAuthSuccess }) {
       email: email.trim(),
       password,
     });
-    setLoading(false);
     if (signInError) {
+      setLoading(false);
       setError(signInError.message);
-    } else {
-      if (onAuthSuccess) onAuthSuccess();
+      return;
+    }
+    // Wait for profile to load into AuthContext, then navigate to Main
+    await refreshProfile();
+    setLoading(false);
+    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+
+    // One-time Face ID setup prompt — only shown if user has never decided
+    const existing = await AsyncStorage.getItem('faceIdEnabled');
+    if (existing === null) {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled  = await LocalAuthentication.isEnrolledAsync();
+      if (hasHardware && isEnrolled) {
+        Alert.alert(
+          'Use Face ID?',
+          'Would you like to use Face ID to log in faster next time?',
+          [
+            {
+              text: 'Enable Face ID',
+              onPress: async () => AsyncStorage.setItem('faceIdEnabled', 'true'),
+            },
+            {
+              text: 'Not Now',
+              style: 'cancel',
+              onPress: async () => AsyncStorage.setItem('faceIdEnabled', 'false'),
+            },
+          ]
+        );
+      } else {
+        // No biometric hardware — mark as decided so we never ask again
+        await AsyncStorage.setItem('faceIdEnabled', 'false');
+      }
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert('Email required', 'Enter your email address above first.');
-      return;
-    }
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim()
-    );
-    if (resetError) {
-      Alert.alert('Error', resetError.message);
-    } else {
-      Alert.alert('Email sent', 'Check your inbox for a reset link');
-    }
+  const handleForgotPassword = () => {
+    navigation.navigate('ForgotPassword');
   };
 
   return (
@@ -105,7 +129,7 @@ export default function SignInScreen({ navigation, onAuthSuccess }) {
               style={styles.eyeBtn}
               activeOpacity={0.7}
             >
-              <Text style={styles.eyeIcon}>{showPassword ? '👁' : '🙈'}</Text>
+              <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={18} color="#B8A882" />
             </TouchableOpacity>
           </View>
 
@@ -180,7 +204,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: '#0D1A0F',
     borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.2)',
+    borderColor: 'rgba(125,200,122,0.2)',
     borderRadius: 12,
     padding: 16,
     color: '#F5EDD8',
@@ -191,7 +215,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0D1A0F',
     borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.2)',
+    borderColor: 'rgba(125,200,122,0.2)',
     borderRadius: 12,
   },
   passwordInput: {

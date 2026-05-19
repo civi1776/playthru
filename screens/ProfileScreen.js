@@ -1,39 +1,47 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Share } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import { getReferralStats } from '../lib/referrals';
 import Gauge from '../components/guage';
+import SkeletonLoader from '../components/SkeletonLoader';
+import CourseAvatar from '../components/CourseAvatar';
+import InitialsAvatar from '../components/InitialsAvatar';
+import VerificationBadge from '../components/VerificationBadge';
 
-const STATS = {
-  pop: 4.2,
-  trend: '+0.3',
-  rounds: 47,
-  roundsThisYear: 12,
-  avgTime18: '3h 28m',
-  avgTime9: '1h 41m',
-  fastestRound: '3h 02m',
-  slowestRound: '4h 44m',
-  walkingPct: 34,
-  cartPct: 66,
-  nationalRank: 2841,
-  fasterThan: 82,
-};
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const ROUNDS = [
-  { course: 'TPC Sawgrass', date: 'Feb 28', holes: 18, time: '3h 22m', pop: 4.3, transport: 'Cart', players: 4, verified: true },
-  { course: 'Pinehurst No. 2', date: 'Feb 14', holes: 18, time: '3h 45m', pop: 4.2, transport: 'Cart', players: 2, verified: true },
-  { course: 'Pebble Beach', date: 'Jan 30', holes: 18, time: '3h 58m', pop: 3.9, transport: 'Walking', players: 4, verified: false },
-  { course: 'TPC Sawgrass', date: 'Jan 12', holes: 18, time: '3h 31m', pop: 4.1, transport: 'Cart', players: 4, verified: true },
-  { course: 'Pinehurst No. 2', date: 'Dec 28', holes: 9, time: '1h 48m', pop: 4.0, transport: 'Cart', players: 2, verified: true },
-  { course: 'Medinah CC', date: 'Dec 10', holes: 18, time: '3h 55m', pop: 3.8, transport: 'Cart', players: 4, verified: true },
-  { course: 'Riviera CC', date: 'Nov 22', holes: 18, time: '3h 48m', pop: 4.0, transport: 'Walking', players: 3, verified: false },
-];
+function getInitials(fullName) {
+  if (!fullName) return '?';
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
-const FRIENDS = [
-  { name: 'Marcus Webb', handle: '@marcuswebb', pop: 4.8, rounds: 58, trend: '+0.1', mutual: true },
-  { name: 'Lena Park', handle: '@lenapark', pop: 4.7, rounds: 44, trend: '+0.4', mutual: true },
-  { name: 'Diego Flores', handle: '@dflores', pop: 4.1, rounds: 31, trend: '-0.1', mutual: true },
-  { name: 'Amy Chen', handle: '@amychen', pop: 3.9, rounds: 19, trend: '+0.2', mutual: false },
-  { name: 'Raj Patel', handle: '@rajpatel', pop: 4.3, rounds: 22, trend: '0.0', mutual: false },
-];
+function formatMemberSince(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `Member since ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function formatDuration(minutes) {
+  if (!minutes) return '—';
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
+function formatShortDate(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
+}
 
 function popColor(score) {
   if (score >= 4.0) return '#7DC87A';
@@ -41,61 +49,283 @@ function popColor(score) {
   return '#C07A6A';
 }
 
-function trendColor(t) {
-  if (t.startsWith('+')) return '#7DC87A';
-  if (t.startsWith('-')) return '#C07A6A';
-  return '#B8A882';
+function paceTier(score) {
+  if (score == null) return null;
+  if (score >= 5.0) return 'Elite Pacer';
+  if (score >= 4.0) return 'Fast Golfer';
+  if (score >= 3.0) return 'Average Pace';
+  if (score >= 2.0) return 'Slow Player';
+  return 'Pace Improvement Needed';
 }
 
-function StatTab() {
+const DELAY_DOT = {
+  none:     { color: '#7DC87A', label: 'No delay'       },
+  few:      { color: '#D4B86A', label: 'Some delay'     },
+  many:     { color: '#E8924C', label: 'Course delay'   },
+  constant: { color: '#C07A6A', label: 'Constant delay' },
+};
+
+// ─── Skeletons ────────────────────────────────────────────────────────────────
+
+function StatTabSkeleton() {
   return (
     <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-      <View style={s.gaugeCard}>
-        <Gauge score={STATS.pop} />
-        <View style={s.trendRow}>
-          <Text style={s.trendLabel}>THIS SEASON</Text>
-          <Text style={[s.trendValue, { color: popColor(STATS.pop) }]}>{STATS.trend}</Text>
+      <View style={{ margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center', gap: 12 }}>
+        <SkeletonLoader width={220} height={220} style={{ borderRadius: 110 }} />
+        <SkeletonLoader width={80} height={14} />
+      </View>
+      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <SkeletonLoader width={80} height={10} style={{ marginBottom: 10 }} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {[...Array(4)].map((_, i) => (
+            <View key={i} style={{ width: '47%', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, alignItems: 'center', gap: 8 }}>
+              <SkeletonLoader width="60%" height={10} />
+              <SkeletonLoader width="40%" height={26} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+// ─── Handicap helpers ─────────────────────────────────────────────────────────
+
+const HCP_COUNT_MAP = {
+  3:1, 4:1, 5:1, 6:2, 7:2, 8:2, 9:3, 10:3,
+  11:4, 12:4, 13:5, 14:5, 15:6, 16:6, 17:7, 18:8, 19:9, 20:10,
+};
+
+function computeHandicapHistory(rounds) {
+  const withDiff = [...rounds]
+    .filter(r => r.differential != null)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  const history = [];
+  for (let i = 2; i < withDiff.length; i++) {
+    const window = withDiff.slice(Math.max(0, i - 19), i + 1);
+    const n = Math.min(window.length, 20);
+    const count = HCP_COUNT_MAP[n] || 10;
+    const sorted = [...window].sort((a, b) => a.differential - b.differential);
+    const best = sorted.slice(0, count);
+    const avg = best.reduce((sum, r) => sum + r.differential, 0) / best.length;
+    history.push(Math.max(0, Math.min(54, Math.round(avg * 0.96 * 10) / 10)));
+  }
+  return history.slice(-10);
+}
+
+function formatHandicap(hcp) {
+  if (hcp == null) return '—';
+  if (hcp < 0) return `+${Math.abs(hcp).toFixed(1)}`;
+  return hcp.toFixed(1);
+}
+
+// ─── Handicap Line Chart ──────────────────────────────────────────────────────
+
+function HandicapLineChart({ data }) {
+  const [chartWidth, setChartWidth] = useState(0);
+  if (!data || data.length < 2) return null;
+  const H = 52;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 0.5;
+  const n = data.length;
+
+  return (
+    <View
+      style={{ height: H + 16, marginTop: 12 }}
+      onLayout={e => setChartWidth(e.nativeEvent.layout.width)}
+    >
+      {chartWidth > 0 && data.map((val, i) => {
+        if (i === 0) return null;
+        const prev = data[i - 1];
+        const x1 = ((i - 1) / (n - 1)) * chartWidth;
+        const y1 = 8 + ((val  - min) / range) * (H - 8); // higher value = lower on chart (worse)
+        const x2 = (i / (n - 1)) * chartWidth;
+        const y2 = 8 + ((val  - min) / range) * (H - 8);
+        const py1 = 8 + ((prev - min) / range) * (H - 8);
+        const dx = x2 - x1;
+        const dy = y2 - py1;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        const improving = val <= prev;
+        return (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              left: (x1 + x2) / 2 - len / 2,
+              top: (py1 + y2) / 2 - 1,
+              width: len,
+              height: 2,
+              borderRadius: 1,
+              backgroundColor: improving ? '#7DC87A' : '#C07A6A',
+              transform: [{ rotate: `${angle}deg` }],
+            }}
+          />
+        );
+      })}
+      {chartWidth > 0 && data.map((val, i) => {
+        const x = (i / (n - 1)) * chartWidth;
+        const y = 8 + ((val - min) / range) * (H - 8);
+        return (
+          <View
+            key={`dot-${i}`}
+            style={{
+              position: 'absolute',
+              left: x - 4,
+              top: y - 4,
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: '#7DC87A',
+              borderWidth: 1.5,
+              borderColor: '#090F0A',
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Stat Tab ─────────────────────────────────────────────────────────────────
+
+function StatTab({ stats, roundCount, rounds, navigation }) {
+  const { profile, user } = useAuth();
+  const pop  = profile?.pop_score ?? null;
+  const tier = paceTier(pop);
+  const hcpIndex = profile?.handicap_index ?? null;
+  const hcpTrend = profile?.handicap_trend ?? null;
+  const hcpHistory = computeHandicapHistory(rounds ?? []);
+  const roundsWithDiff = (rounds ?? []).filter(r => r.differential != null).length;
+
+  const trendIcon = hcpTrend === 'improving' ? 'arrow-down'
+    : hcpTrend === 'rising' ? 'arrow-up'
+    : 'remove';
+  const trendColor = hcpTrend === 'improving' ? '#7DC87A'
+    : hcpTrend === 'rising' ? '#C07A6A'
+    : '#B8A882';
+
+  const [referralCode, setReferralCode]   = useState(null);
+  const [referralCount, setReferralCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getReferralStats(user.id).then(({ code, count }) => {
+      setReferralCode(code);
+      setReferralCount(count);
+    }).catch(() => {});
+  }, [user?.id]);
+
+  return (
+    <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      {/* Compact gauge header row */}
+      <View style={s.gaugeRow}>
+        <View style={s.gaugeCompact}>
+          {pop != null
+            ? <Gauge score={pop} size={132} />
+            : <View style={{ width: 132, height: 132, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 36, fontWeight: '100', color: '#C9A84C44' }}>—</Text>
+              </View>
+          }
+        </View>
+        <View style={s.gaugeInfo}>
+          {tier
+            ? <Text style={s.tierLabel}>{tier.toUpperCase()}</Text>
+            : <Text style={s.tierLabelMuted}>LOG A ROUND TO{'\n'}EARN YOUR SCORE</Text>
+          }
+          <TouchableOpacity onPress={() => navigation.navigate('POPScoreInfo')} activeOpacity={0.7} style={{ marginTop: 6 }}>
+            <Text style={s.popInfoLink}>What is my POPScore?</Text>
+          </TouchableOpacity>
+          <View style={{ marginTop: 10, gap: 8 }}>
+            <View>
+              <Text style={s.scoreStatLabel}>YOUR SCORE</Text>
+              <Text style={s.scoreStatValueLg}>{pop != null ? pop.toFixed(1) : '—'}</Text>
+            </View>
+            <View>
+              <Text style={s.scoreStatLabel}>NAT'L AVG</Text>
+              <Text style={s.scoreStatValue}>3.9</Text>
+            </View>
+          </View>
         </View>
       </View>
 
+      {/* Handicap Index card */}
+      <View style={s.hcpCard}>
+        <View style={s.hcpTopRow}>
+          <View>
+            <Text style={s.hcpLabel}>HANDICAP INDEX</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
+              <Text style={s.hcpValue}>{formatHandicap(hcpIndex)}</Text>
+              {hcpIndex != null && (
+                <View style={[s.hcpTrendBadge, { backgroundColor: trendColor + '22', borderColor: trendColor + '44' }]}>
+                  <Ionicons name={trendIcon} size={12} color={trendColor} />
+                  <Text style={[s.hcpTrendText, { color: trendColor }]}>
+                    {hcpTrend === 'improving' ? 'IMPROVING' : hcpTrend === 'rising' ? 'RISING' : 'STABLE'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+        <Text style={s.hcpSub}>
+          {hcpIndex != null
+            ? `Based on last ${roundsWithDiff} round${roundsWithDiff !== 1 ? 's' : ''}`
+            : 'Log 3 rounds to calculate your handicap'}
+        </Text>
+        {hcpHistory.length >= 2 && (
+          <>
+            <Text style={[s.hcpLabel, { marginTop: 16, marginBottom: 4 }]}>TREND</Text>
+            <HandicapLineChart data={hcpHistory} />
+          </>
+        )}
+      </View>
+
+      {/* Dominant stats grid */}
       <View style={s.statSection}>
-        <Text style={s.sectionLabel}>OVERVIEW</Text>
+        <Text style={s.sectionLabel}>STATS</Text>
         <View style={s.statGrid}>
-          <StatBox label="TOTAL ROUNDS" value={STATS.rounds} />
-          <StatBox label="THIS YEAR" value={STATS.roundsThisYear} />
-          <StatBox label="FASTER THAN" value={`${STATS.fasterThan}%`} />
-          <StatBox label="NAT'L RANK" value={`#${STATS.nationalRank.toLocaleString()}`} />
+          <StatBox label="POPSCORE"       value={pop != null ? pop.toFixed(1) : '—'} />
+          <StatBox label="ROUNDS LOGGED"  value={roundCount ?? 0} />
+          <StatBox label="AVG ROUND TIME" value={stats?.avgTime ? formatDuration(Math.round(stats.avgTime)) : '—'} />
+          <StatBox label="BEST POPSCORE"  value={stats?.bestScore > 0 ? stats.bestScore.toFixed(1) : '—'} />
+          <StatBox label="FASTEST ROUND"  value={stats?.fastestRound && stats.fastestRound < 999 ? formatDuration(stats.fastestRound) : '—'} />
+          <StatBox label="AVG GROUP SIZE" value={stats?.avgGroupSize != null ? stats.avgGroupSize.toFixed(1) : '—'} />
+          <StatBox label="CART VS WALK"   value={roundCount > 0 ? `${stats?.cartRounds ?? 0}C · ${stats?.walkRounds ?? 0}W` : '—'} />
+          <StatBox label="COURSES PLAYED" value={stats?.uniqueCourses ?? 0} />
+          <StatBox label="MEMBER SINCE"   value={profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'} />
         </View>
       </View>
 
-      <View style={s.statSection}>
-        <Text style={s.sectionLabel}>PACE AVERAGES</Text>
-        <View style={s.infoCard}>
-          <StatRow label="18 HOLES AVG" value={STATS.avgTime18} />
-          <StatRow label="9 HOLES AVG" value={STATS.avgTime9} />
-          <StatRow label="FASTEST ROUND" value={STATS.fastestRound} color="#7DC87A" />
-          <StatRow label="SLOWEST ROUND" value={STATS.slowestRound} color="#C07A6A" last />
+      {/* Referral card */}
+      <View style={s.referralCard}>
+        <View style={s.referralCardHeader}>
+          <Ionicons name="gift-outline" size={18} color="#C9A84C" />
+          <Text style={s.referralCardTitle}>REFER A FRIEND</Text>
         </View>
-      </View>
-
-      <View style={s.statSection}>
-        <Text style={s.sectionLabel}>TRANSPORT BREAKDOWN</Text>
-        <View style={s.infoCard}>
-          <View style={s.barRow}>
-            <Text style={s.barLabel}>CART</Text>
-            <View style={s.barTrack}>
-              <View style={[s.barFill, { width: `${STATS.cartPct}%`, backgroundColor: '#C9A84C' }]} />
-            </View>
-            <Text style={s.barValue}>{STATS.cartPct}%</Text>
-          </View>
-          <View style={s.barRow}>
-            <Text style={s.barLabel}>WALK</Text>
-            <View style={s.barTrack}>
-              <View style={[s.barFill, { width: `${STATS.walkingPct}%`, backgroundColor: '#7DC87A' }]} />
-            </View>
-            <Text style={s.barValue}>{STATS.walkingPct}%</Text>
-          </View>
+        <Text style={s.referralCardSub}>
+          Share your code and help grow the PlayThru community.
+        </Text>
+        <View style={s.referralCodeRow}>
+          <Text style={s.referralCodeText}>{referralCode ?? '——————'}</Text>
+          {referralCode && (
+            <TouchableOpacity
+              style={s.referralShareBtn}
+              activeOpacity={0.8}
+              onPress={() => Share.share({
+                message: `Join me on PlayThru — the app that tracks pace of play. Use my referral code ${referralCode} when you sign up! https://playthrugolf.app/join?ref=${referralCode}`,
+              })}
+            >
+              <Ionicons name="share-outline" size={16} color="#090F0A" />
+              <Text style={s.referralShareBtnText}>SHARE</Text>
+            </TouchableOpacity>
+          )}
         </View>
+        {referralCount > 0 && (
+          <Text style={s.referralCountText}>
+            {referralCount} {referralCount === 1 ? 'person' : 'people'} joined with your code
+          </Text>
+        )}
       </View>
     </ScrollView>
   );
@@ -119,141 +349,583 @@ function StatRow({ label, value, color, last }) {
   );
 }
 
-function RoundsTab() {
-  return (
-    <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 }}>
-      <Text style={s.sectionLabel}>{ROUNDS.length} ROUNDS LOGGED</Text>
-      {ROUNDS.map((r, i) => (
-        <View key={i} style={s.roundCard}>
-          <View style={s.roundTop}>
-            <View style={s.roundInfo}>
-              <Text style={s.roundCourse}>{r.course}</Text>
-              <Text style={s.roundMeta}>{r.date} · {r.holes} holes · {r.transport} · {r.players}P</Text>
-            </View>
-            <View style={s.roundScoreCol}>
-              <Text style={[s.roundPop, { color: popColor(r.pop) }]}>{r.pop}</Text>
-              <Text style={s.roundTime}>{r.time}</Text>
+// ─── Rounds Tab ───────────────────────────────────────────────────────────────
+
+function RoundsTab({ navigation, rounds = [], loading }) {
+  const safeRounds = Array.isArray(rounds) ? rounds : [];
+
+  if (loading) {
+    return (
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 }}>
+        {[...Array(3)].map((_, i) => (
+          <View key={i} style={[s.roundCard, { paddingVertical: 22 }]}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <SkeletonLoader width={36} height={36} style={{ borderRadius: 8 }} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <SkeletonLoader width="65%" height={14} />
+                <SkeletonLoader width="50%" height={11} />
+              </View>
+              <SkeletonLoader width={40} height={36} />
             </View>
           </View>
-          {r.verified && (
-            <View style={s.verifiedBadge}>
-              <Text style={s.verifiedText}>✓ VERIFIED</Text>
+        ))}
+      </ScrollView>
+    );
+  }
+
+  if (safeRounds.length === 0) {
+    return (
+      <View style={s.emptyState}>
+        <Ionicons name="golf" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+        <Text style={s.emptyText}>No rounds logged yet.</Text>
+        <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('Log')} activeOpacity={0.8}>
+          <Text style={s.emptyBtnText}>LOG YOUR FIRST ROUND</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 }}>
+      <Text style={s.sectionLabel}>{safeRounds.length} ROUND{safeRounds.length !== 1 ? 'S' : ''} LOGGED</Text>
+      {safeRounds.map((r, i) => {
+        if (!r) return null;
+        const delayInfo = r.pace_delay ? DELAY_DOT[r.pace_delay] : null;
+        return (
+          <View key={i} style={s.roundCard}>
+            <View style={s.roundTop}>
+              <CourseAvatar courseName={r.course_name || ''} size={36} />
+              <View style={s.roundInfo}>
+                <Text style={s.roundCourse}>{r.course_name || '—'}</Text>
+                <Text style={s.roundMeta}>
+                  {formatShortDate(r.created_at)} · {r.holes} holes · {r.transport || '—'} · {r.players ?? '?'}P
+                </Text>
+              </View>
+              <View style={s.roundScoreCol}>
+                {r.flagged ? (
+                  <View style={s.underReviewBadge}>
+                    <Text style={s.underReviewText}>Under Review</Text>
+                  </View>
+                ) : (
+                  <Text style={[s.roundPop, { color: popColor(r.pop_score || 0) }]}>
+                    {r.pop_score != null ? r.pop_score.toFixed(1) : '—'}
+                  </Text>
+                )}
+                <Text style={s.roundTime}>{formatDuration(r.duration_minutes)}</Text>
+              </View>
             </View>
-          )}
-        </View>
-      ))}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 10, gap: 8 }}>
+              <VerificationBadge level={r.verification_level} />
+              {r.caddy_id ? (
+                <View style={s.caddyLoggedBadge}>
+                  <Ionicons name="person" size={8} color="#090F0A" style={{ marginRight: 3 }} />
+                  <Text style={s.caddyLoggedText}>CADDY LOGGED</Text>
+                </View>
+              ) : null}
+              {delayInfo ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: delayInfo.color }} />
+                  <Text style={[s.delayLabel, { color: delayInfo.color }]}>
+                    {delayInfo.label.toUpperCase()}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
     </ScrollView>
   );
 }
 
-function FriendsTab() {
+// ─── Caddy helpers ────────────────────────────────────────────────────────────
+
+function teeWindowLabel(teeTimeStr) {
+  if (!teeTimeStr) return null;
+  const [hm, period] = teeTimeStr.split(' ');
+  const [h] = hm.split(':').map(Number);
+  let hour = h % 12;
+  if (period === 'PM' && h !== 12) hour += 12;
+  if (period === 'AM' && h === 12) hour = 0;
+  if (hour < 10) return 'morning';
+  if (hour < 14) return 'midday';
+  return 'afternoon';
+}
+
+function getBestWindow(rounds) {
+  const windows = { morning: [], midday: [], afternoon: [] };
+  for (const r of rounds) {
+    const w = teeWindowLabel(r.tee_time);
+    if (w && r.caddy_rating != null) windows[w].push(r.caddy_rating);
+  }
+  let best = null, bestAvg = -1;
+  for (const [w, ratings] of Object.entries(windows)) {
+    if (ratings.length === 0) continue;
+    const avg = ratings.reduce((s, v) => s + v, 0) / ratings.length;
+    if (avg > bestAvg) { bestAvg = avg; best = w; }
+  }
+  return best;
+}
+
+// ─── Caddy Dashboard ──────────────────────────────────────────────────────────
+
+function CaddyDashboard({ caddyCourse, navigation }) {
+  const { user } = useAuth();
+  const [caddyRounds, setCaddyRounds] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [avgRating, setAvgRating]     = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const uid = user?.id;
+        if (!uid) { setLoading(false); return; }
+        const { data } = await supabase
+          .from('rounds')
+          .select('course_name, tee_time, holes, players, caddy_rating, created_at')
+          .eq('caddy_id', uid)
+          .order('created_at', { ascending: false })
+          .limit(20);
+        const rounds = data || [];
+        setCaddyRounds(rounds);
+        const rated = rounds.filter(r => r.caddy_rating != null);
+        if (rated.length > 0) {
+          setAvgRating(parseFloat((rated.reduce((sum, r) => sum + r.caddy_rating, 0) / rated.length).toFixed(1)));
+        }
+      } catch (e) {
+        // silent fail
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const totalRounds = caddyRounds.length;
+  const bestWindow  = getBestWindow(caddyRounds);
+  const bestWindowLabel = bestWindow === 'morning'   ? 'Best at morning rounds'
+    : bestWindow === 'midday'     ? 'Best at midday rounds'
+    : bestWindow === 'afternoon'  ? 'Best at afternoon rounds'
+    : null;
+
   return (
     <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 }}>
-      <Text style={s.sectionLabel}>{FRIENDS.length} FRIENDS</Text>
-      {FRIENDS.map((f, i) => (
-        <View key={i} style={s.friendCard}>
-          <View style={s.friendAvatar}>
-            <Text style={s.friendInitial}>{f.name[0]}</Text>
+      {caddyCourse ? (
+        <TouchableOpacity
+          style={s.caddyCourseCard}
+          onPress={() => navigation.navigate('CourseProfile', { course: { name: caddyCourse } })}
+          activeOpacity={0.8}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={s.caddyCourseLabel}>MY COURSE</Text>
+            <Text style={s.caddyCourseName}>{caddyCourse}</Text>
           </View>
-          <View style={s.friendInfo}>
-            <Text style={s.friendName}>{f.name}</Text>
-            <Text style={s.friendHandle}>{f.handle} · {f.rounds} rounds</Text>
+          <Ionicons name="chevron-forward" size={16} color="#C9A84C" />
+        </TouchableOpacity>
+      ) : null}
+
+      {!loading && avgRating != null && (
+        <View style={s.gaugeCard}>
+          <Gauge score={avgRating} />
+          <View style={s.trendRow}>
+            <Text style={s.trendLabel}>CADDY RATING</Text>
           </View>
-          <View style={s.friendScore}>
-            <Text style={[s.friendPop, { color: popColor(f.pop) }]}>{f.pop}</Text>
-            <Text style={[s.friendTrend, { color: trendColor(f.trend) }]}>{f.trend}</Text>
-          </View>
+          {bestWindowLabel && (
+            <Text style={{ fontSize: 11, color: '#7DC87A', fontWeight: '600', marginTop: 6 }}>
+              {bestWindowLabel.toUpperCase()}
+            </Text>
+          )}
         </View>
+      )}
+
+      <View style={s.statGrid}>
+        <StatBox label="ROUNDS CADDIED" value={loading ? '—' : totalRounds} />
+        <StatBox label="CADDY RATING"   value={loading ? '—' : avgRating != null ? avgRating.toFixed(1) : '—'} />
+      </View>
+
+      {!loading && caddyRounds.length > 0 && (
+        <>
+          <Text style={[s.sectionLabel, { marginTop: 16 }]}>RECENT ROUNDS CADDIED</Text>
+          {caddyRounds.slice(0, 10).map((r, i) => (
+            <View key={i} style={s.roundCard}>
+              <View style={s.roundTop}>
+                <View style={s.roundInfo}>
+                  <Text style={s.roundCourse}>{r.course_name}</Text>
+                  <Text style={s.roundMeta}>{r.holes} holes · {r.players}P · {r.tee_time}</Text>
+                </View>
+                <View style={s.roundScoreCol}>
+                  <Text style={[s.roundPop, { color: popColor(r.caddy_rating || 0) }]}>
+                    {r.caddy_rating != null ? r.caddy_rating.toFixed(1) : '—'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+
+      {!loading && caddyRounds.length === 0 && (
+        <View style={[s.emptyState, { paddingVertical: 40 }]}>
+          <Ionicons name="person" size={40} color="rgba(201,168,76,0.3)" style={{ marginBottom: 12 }} />
+          <Text style={[s.emptyText, { fontSize: 16 }]}>No rounds caddied yet.</Text>
+          <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('Log')} activeOpacity={0.8}>
+            <Text style={s.emptyBtnText}>LOG A ROUND</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+// ─── Friends Tab ──────────────────────────────────────────────────────────────
+
+function FriendsTab({ navigation }) {
+  const { user } = useAuth();
+  const [friends, setFriends] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
+
+  const fetchFriends = async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const uid = user?.id;
+      if (!uid) { setLoading(false); return; }
+      const { data, error: err } = await supabase
+        .from('follows')
+        .select('following_id, profiles!follows_following_id_fkey(id, full_name, username, home_course, pop_score)')
+        .eq('follower_id', uid);
+      if (err) throw err;
+      setFriends((data || []).map(r => r.profiles).filter(Boolean));
+    } catch (e) {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(useCallback(() => { fetchFriends(); }, []));
+
+  const unfollow = async (userId) => {
+    setFriends(prev => prev.filter(f => f.id !== userId));
+    const uid = user?.id;
+    if (!uid) return;
+    await supabase.from('follows').delete()
+      .eq('follower_id', uid)
+      .eq('following_id', userId);
+  };
+
+  if (loading) {
+    return (
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 }}>
+        {[...Array(4)].map((_, i) => (
+          <View key={i} style={[s.friendCard, { paddingVertical: 18 }]}>
+            <SkeletonLoader width={40} height={40} style={{ borderRadius: 20, marginRight: 12 }} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <SkeletonLoader width="55%" height={14} />
+              <SkeletonLoader width="40%" height={11} />
+            </View>
+            <SkeletonLoader width={36} height={28} />
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={s.emptyState}>
+        <Ionicons name="cloud-offline-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+        <Text style={s.emptyText}>Could not load your friends.</Text>
+        <TouchableOpacity style={s.emptyBtn} onPress={fetchFriends} activeOpacity={0.8}>
+          <Text style={s.emptyBtnText}>RETRY</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (friends.length === 0) {
+    return (
+      <View style={s.emptyState}>
+        <Image
+          source={require('../assets/PlayThru_Logo.png')}
+          style={{ width: 80, height: 80, marginBottom: 16, opacity: 0.35 }}
+          resizeMode="contain"
+        />
+        <Text style={s.emptyText}>No friends added yet.</Text>
+        <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('SearchUsers')} activeOpacity={0.8}>
+          <Text style={s.emptyBtnText}>FIND GOLFERS</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 }}>
+      <Text style={s.sectionLabel}>{friends.length} FOLLOWING</Text>
+      {friends.map((f) => (
+        <TouchableOpacity
+          key={f.id}
+          style={s.friendCard}
+          onPress={() => navigation.navigate('PublicProfile', { userId: f.id })}
+          activeOpacity={0.8}
+        >
+          <InitialsAvatar name={f.full_name} size={40} />
+          <View style={s.friendInfo}>
+            <Text style={s.friendName}>{f.full_name || '—'}</Text>
+            <Text style={s.friendHandle}>@{f.username}{f.home_course ? ` · ${f.home_course}` : ''}</Text>
+          </View>
+          <View style={s.friendRight}>
+            <Text style={[s.friendPop, { color: popColor(f.pop_score) }]}>
+              {f.pop_score != null ? f.pop_score.toFixed(1) : '—'}
+            </Text>
+            <TouchableOpacity style={s.unfollowBtn} onPress={(e) => { e.stopPropagation?.(); unfollow(f.id); }} activeOpacity={0.7}>
+              <Text style={s.unfollowText}>UNFOLLOW</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       ))}
-      <TouchableOpacity style={s.addFriendBtn}>
-        <Text style={s.addFriendText}>+ ADD FRIENDS</Text>
+      <TouchableOpacity style={s.addFriendBtn} onPress={() => navigation.navigate('SearchUsers')}>
+        <Text style={s.addFriendText}>+ FIND PLAYERS</Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
-export default function ProfileScreen() {
-  const [tab, setTab] = useState('stats');
+// ─── Main ProfileScreen ───────────────────────────────────────────────────────
+
+export default function ProfileScreen({ navigation }) {
+  const { profile, user, refreshProfile } = useAuth();
+
+  const [tab, setTab]           = useState('stats');
+
+  // On focus: pull fresh profile from DB
+  useFocusEffect(useCallback(() => {
+    refreshProfile();
+  }, []));
+  const [loading, setLoading]   = useState(true);
+  const [rounds, setRounds]     = useState([]);
+  const [roundCount, setRoundCount] = useState(0);
+  const [stats, setStats]       = useState({});
+
+  useEffect(() => {
+    if (!user) navigation.replace('Welcome');
+  }, [user]);
+
+  useFocusEffect(useCallback(() => {
+    if (!profile?.id) {
+      setLoading(false);
+      return;
+    }
+
+    if (profile?.account_type === 'caddy') setTab('caddy');
+
+    const loadData = async () => {
+      setLoading(true);
+
+      const { data: roundsData } = await supabase
+        .from('rounds')
+        .select('*')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false });
+      setRounds(roundsData ?? []);
+      setRoundCount(roundsData?.length ?? 0);
+
+      if (roundsData && roundsData.length > 0) {
+        const avgTime      = roundsData.reduce((sum, r) => sum + (r.duration_minutes || 0), 0) / roundsData.length;
+        const bestScore    = Math.max(...roundsData.map(r => r.pop_score || 0));
+        const fastestRound = Math.min(...roundsData.map(r => r.duration_minutes || 999));
+        const avgGroupSize = roundsData.reduce((sum, r) => sum + (r.players || 0), 0) / roundsData.length;
+        const cartRounds   = roundsData.filter(r => r.transport === 'Cart').length;
+        const walkRounds   = roundsData.filter(r => r.transport === 'Walk' || r.transport === 'Walking').length;
+        const uniqueCourses = [...new Set(roundsData.map(r => r.course_name))].length;
+        const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const memberSince  = profile?.created_at
+          ? (() => { const d = new Date(profile.created_at); return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`; })()
+          : null;
+        const newStats = { avgTime, bestScore, fastestRound, avgGroupSize, cartRounds, walkRounds, uniqueCourses, memberSince };
+        setStats(newStats);
+      }
+
+      setLoading(false);
+    };
+
+    loadData();
+  }, [profile?.id]));
+
+  const isCaddy  = profile?.account_type === 'caddy';
+  const tabs     = isCaddy ? ['caddy', 'rounds', 'friends'] : ['stats', 'rounds', 'friends'];
+  const tabLabel = (t) => t === 'caddy' ? 'CADDY' : t.toUpperCase();
+
+  const handleSettings = () => navigation.navigate('Settings');
+
   return (
     <SafeAreaView style={s.container}>
+      {/* Header */}
       <View style={s.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={s.wordmark}>PLAYTHRU</Text>
-          <Text style={s.name}>Jake Harmon</Text>
-          <Text style={s.handle}>@jakeharmon · Member since 2023</Text>
+          {loading
+            ? <>
+                <SkeletonLoader width={140} height={14} style={{ marginTop: 6, marginBottom: 6 }} />
+                <SkeletonLoader width={180} height={20} style={{ marginBottom: 4 }} />
+                <SkeletonLoader width={120} height={11} />
+              </>
+            : <>
+                <Text style={s.username}>{'@' + (profile?.username ?? '')}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                  <Text style={s.name}>{profile?.full_name ?? ''}</Text>
+                  {isCaddy && (
+                    <View style={s.caddyBadge}>
+                      <Text style={s.caddyBadgeText}>CADDY</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={s.handle}>
+                  {isCaddy && profile?.caddy_course
+                    ? profile.caddy_course
+                    : profile?.created_at
+                      ? 'Member since ' + new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                      : ''}
+                </Text>
+              </>
+          }
         </View>
-        <View style={s.avatarLarge}>
-          <Text style={s.avatarLargeText}>J</Text>
+        <View style={s.headerRight}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={s.iconBtn} onPress={() => navigation.navigate('SearchUsers')} activeOpacity={0.7}>
+              <Ionicons name="search" size={18} color="#C9A84C" />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.iconBtn} onPress={handleSettings} activeOpacity={0.7}>
+              <Ionicons name="settings-outline" size={18} color="#C9A84C" />
+            </TouchableOpacity>
+          </View>
+          <InitialsAvatar name={profile?.full_name} size={52} />
         </View>
       </View>
 
+      {/* Account under review banner */}
+      {(rounds.filter(r => r.flagged).length >= 3) && (
+        <View style={s.reviewBanner}>
+          <Ionicons name="warning-outline" size={14} color="#C07A6A" style={{ marginRight: 6 }} />
+          <Text style={s.reviewBannerText}>Account under review — contact hello@playthrugolf.app</Text>
+        </View>
+      )}
+
+      {/* Tab bar */}
       <View style={s.tabBar}>
-        {['stats', 'rounds', 'friends'].map(t => (
+        {tabs.map(t => (
           <TouchableOpacity key={t} style={[s.tabBtn, tab === t && s.tabBtnActive]} onPress={() => setTab(t)}>
-            <Text style={[s.tabBtnText, tab === t && s.tabBtnTextActive]}>{t.toUpperCase()}</Text>
+            <Text style={[s.tabBtnText, tab === t && s.tabBtnTextActive]}>{tabLabel(t)}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {tab === 'stats' && <StatTab />}
-      {tab === 'rounds' && <RoundsTab />}
-      {tab === 'friends' && <FriendsTab />}
+      {tab === 'stats'   && (loading ? <StatTabSkeleton /> : <StatTab stats={stats} roundCount={roundCount} rounds={rounds} navigation={navigation} />)}
+      {tab === 'caddy'   && <CaddyDashboard caddyCourse={profile?.caddy_course || ''} navigation={navigation} />}
+      {tab === 'rounds'  && <RoundsTab navigation={navigation} rounds={rounds} loading={loading} />}
+      {tab === 'friends' && <FriendsTab navigation={navigation} />}
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   container:        { flex: 1, backgroundColor: '#090F0A' },
-  header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 22, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: '#C9A84C22' },
-  wordmark:         { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 6 },
+  header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 22, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
+  headerRight:      { alignItems: 'flex-end', gap: 8 },
+  iconBtn:          { width: 36, height: 36, borderRadius: 18, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
+  wordmark:         { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 2 },
+  username:         { fontSize: 11, color: '#C9A84C', fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },
   name:             { fontSize: 22, fontWeight: '600', color: '#F5EDD8' },
   handle:           { fontSize: 11, color: '#B8A882', marginTop: 3 },
-  avatarLarge:      { width: 52, height: 52, borderRadius: 26, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C', alignItems: 'center', justifyContent: 'center' },
-  avatarLargeText:  { fontSize: 22, fontWeight: '600', color: '#C9A84C' },
+  avatarLarge:       { width: 52, height: 52, borderRadius: 26, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarLargeText:   { fontSize: 20, fontWeight: '600', color: '#C9A84C' },
+  avatarCameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: 9, backgroundColor: '#C9A84C', alignItems: 'center', justifyContent: 'center' },
   tabBar:           { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
-  tabBtn:           { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#C9A84C22' },
+  tabBtn:           { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A22' },
   tabBtnActive:     { borderColor: '#C9A84C', backgroundColor: '#C9A84C22' },
   tabBtnText:       { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
   tabBtnTextActive: { color: '#C9A84C' },
-  gaugeCard:        { margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#C9A84C22', alignItems: 'center' },
-  trendRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  trendLabel:       { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
-  trendValue:       { fontSize: 16, fontWeight: '600' },
-  statSection:      { paddingHorizontal: 16, marginBottom: 16 },
-  sectionLabel:     { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 10 },
-  statGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statBox:          { width: '47%', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#C9A84C22', padding: 16, alignItems: 'center' },
-  statBoxLabel:     { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5, marginBottom: 8, textAlign: 'center' },
-  statBoxValue:     { fontSize: 26, fontWeight: '300', color: '#F5EDD8' },
-  infoCard:         { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#C9A84C22', overflow: 'hidden' },
+  gaugeCard:           { margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center' },
+  gaugeRow:            { flexDirection: 'row', alignItems: 'center', margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#7DC87A22', gap: 16 },
+  gaugeCompact:        { alignItems: 'center', justifyContent: 'center' },
+  gaugeInfo:           { flex: 1, justifyContent: 'center' },
+  scoreRow:            { flexDirection: 'row', gap: 32, marginTop: 12 },
+  scoreStat:           { alignItems: 'center' },
+  scoreStatLabel:      { fontSize: 9, fontWeight: '700', color: '#C9A84C66', letterSpacing: 2, marginBottom: 2 },
+  scoreStatValue:      { fontSize: 16, fontWeight: '400', color: '#B8A882' },
+  scoreStatValueLg:    { fontSize: 32, fontWeight: '300', color: '#F5EDD8' },
+  tierLabel:           { fontSize: 11, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
+  tierLabelMuted:      { fontSize: 9, fontWeight: '700', color: '#C9A84C44', letterSpacing: 1.5, lineHeight: 16 },
+  popInfoLink:         { fontSize: 11, color: '#C9A84C', textDecorationLine: 'underline' },
+  trendRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  trendLabel:          { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+statSection:         { paddingHorizontal: 16, marginBottom: 16 },
+  sectionLabel:        { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 10 },
+  statGrid:            { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statBox:             { width: '47%', backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 20, paddingHorizontal: 16, alignItems: 'center' },
+  statBoxLabel:        { fontSize: 10, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginBottom: 8, textAlign: 'center' },
+  statBoxValue:        { fontSize: 28, fontWeight: '300', color: '#F5EDD8' },
+  infoCard:         { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', overflow: 'hidden' },
   statRow:          { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
-  statRowBorder:    { borderBottomWidth: 1, borderBottomColor: '#C9A84C11' },
+  statRowBorder:    { borderBottomWidth: 1, borderBottomColor: '#7DC87A11' },
   statRowLabel:     { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
   statRowValue:     { fontSize: 15, fontWeight: '500', color: '#F5EDD8' },
   barRow:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   barLabel:         { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 1, width: 32 },
-  barTrack:         { flex: 1, height: 6, backgroundColor: '#C9A84C22', borderRadius: 3, overflow: 'hidden' },
+  barTrack:         { flex: 1, height: 6, backgroundColor: '#7DC87A22', borderRadius: 3, overflow: 'hidden' },
   barFill:          { height: 6, borderRadius: 3 },
   barValue:         { fontSize: 12, color: '#B8A882', width: 36, textAlign: 'right' },
-  roundCard:        { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#C9A84C22', padding: 16, marginBottom: 10 },
-  roundTop:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  roundCard:        { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, marginBottom: 10 },
+  roundTop:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   roundInfo:        { flex: 1 },
   roundCourse:      { fontSize: 16, fontWeight: '600', color: '#F5EDD8', marginBottom: 4 },
   roundMeta:        { fontSize: 11, color: '#B8A882' },
   roundScoreCol:    { alignItems: 'flex-end' },
   roundPop:         { fontSize: 28, fontWeight: '300' },
   roundTime:        { fontSize: 11, color: '#B8A882' },
-  verifiedBadge:    { marginTop: 10 },
-  verifiedText:     { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
-  friendCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#C9A84C22', padding: 14, marginBottom: 10 },
+  delayLabel:       { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
+  friendCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10 },
   friendAvatar:     { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   friendInitial:    { fontSize: 16, fontWeight: '600', color: '#C9A84C' },
   friendInfo:       { flex: 1 },
   friendName:       { fontSize: 15, fontWeight: '500', color: '#F5EDD8' },
   friendHandle:     { fontSize: 11, color: '#B8A882', marginTop: 2 },
-  friendScore:      { alignItems: 'flex-end' },
+  friendRight:      { alignItems: 'flex-end', gap: 6 },
   friendPop:        { fontSize: 24, fontWeight: '300' },
-  friendTrend:      { fontSize: 11, fontWeight: '600' },
+  unfollowBtn:      { borderWidth: 1, borderColor: '#C9A84C33', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
+  unfollowText:     { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 1.5 },
   addFriendBtn:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 14, borderStyle: 'dashed', paddingVertical: 18, alignItems: 'center', marginTop: 4 },
   addFriendText:    { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  emptyState:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingVertical: 60 },
+  emptyText:        { fontSize: 20, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', marginBottom: 20, lineHeight: 28 },
+  emptyBtn:         { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24 },
+  emptyBtnText:     { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  // Handicap card
+  hcpCard:          { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#7DC87A22', padding: 20 },
+  hcpTopRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  hcpLabel:         { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  hcpValue:         { fontSize: 44, fontWeight: '200', color: '#F5EDD8' },
+  hcpTrendBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  hcpTrendText:     { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
+  hcpSub:           { fontSize: 11, color: '#7A6E58', marginTop: 6 },
+  caddyBadge:       { backgroundColor: '#C9A84C', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
+  caddyBadgeText:   { fontSize: 8, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
+  caddyLoggedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#7DC87A', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3 },
+  caddyLoggedText:  { fontSize: 7, fontWeight: '700', color: '#090F0A', letterSpacing: 1 },
+  underReviewBadge: { backgroundColor: 'rgba(192,122,106,0.15)', borderWidth: 1, borderColor: 'rgba(192,122,106,0.4)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3 },
+  underReviewText:  { fontSize: 9, fontWeight: '700', color: '#C07A6A', letterSpacing: 0.5 },
+  reviewBanner:     { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(192,122,106,0.1)', borderBottomWidth: 1, borderBottomColor: 'rgba(192,122,106,0.25)', paddingHorizontal: 16, paddingVertical: 10 },
+  reviewBannerText: { fontSize: 11, color: '#C07A6A', flex: 1, fontWeight: '500' },
+  caddyCourseCard:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#C9A84C33', padding: 16, marginBottom: 12 },
+  caddyCourseLabel: { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 4 },
+  caddyCourseName:  { fontSize: 16, fontWeight: '600', color: '#F5EDD8' },
+  referralCard:         { marginHorizontal: 16, marginBottom: 24, backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(201,168,76,0.25)', padding: 20, gap: 10 },
+  referralCardHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  referralCardTitle:    { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  referralCardSub:      { fontSize: 12, color: '#B8A882', lineHeight: 18 },
+  referralCodeRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(201,168,76,0.06)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(201,168,76,0.2)', paddingHorizontal: 16, paddingVertical: 12 },
+  referralCodeText:     { fontSize: 22, fontWeight: '600', color: '#C9A84C', letterSpacing: 4 },
+  referralShareBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#C9A84C', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  referralShareBtnText: { fontSize: 10, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
+  referralCountText:    { fontSize: 11, color: '#7DC87A', fontWeight: '500' },
 });

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
+import { View, Text, Image, Animated, StyleSheet } from 'react-native';
 
 export default function SplashScreen({ onFinish }) {
-  const logoOpacity   = useRef(new Animated.Value(0)).current;
-  const logoScale     = useRef(new Animated.Value(0.88)).current;
+  const logoOpacity    = useRef(new Animated.Value(0)).current;
+  const logoScale      = useRef(new Animated.Value(0.88)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const screenOpacity = useRef(new Animated.Value(1)).current;
+  const screenOpacity  = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.sequence([
@@ -34,11 +34,15 @@ export default function SplashScreen({ onFinish }) {
   return (
     <Animated.View style={[s.container, { opacity: screenOpacity }]}>
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], alignItems: 'center' }}>
-        <Text style={s.flag}>⛳</Text>
-        <Text style={s.wordmark}>PLAYTHRU</Text>
+        <Image
+          source={require('../assets/PlayThru_AppIcon.png')}
+          style={s.logo}
+          resizeMode="contain"
+        />
+        <Text style={s.wordmark}>PlayThru</Text>
         <View style={s.divider} />
         <Animated.Text style={[s.tagline, { opacity: taglineOpacity }]}>
-          PACE OF PLAY HANDICAP
+          SPEED HANDICAP
         </Animated.Text>
       </Animated.View>
     </Animated.View>
@@ -53,21 +57,23 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 999,
   },
-  flag: {
-    fontSize: 48,
-    marginBottom: 20,
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 24,
   },
   wordmark: {
-    fontSize: 36,
-    fontWeight: '700',
+    fontSize: 38,
+    fontWeight: '400',
     color: '#C9A84C',
-    letterSpacing: 12,
+    letterSpacing: 8,
+    fontFamily: 'serif',
     marginBottom: 20,
   },
   divider: {
     width: 40,
     height: 1,
-    backgroundColor: '#C9A84C44',
+    backgroundColor: '#7DC87A44',
     marginBottom: 16,
   },
   tagline: {

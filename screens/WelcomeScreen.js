@@ -1,12 +1,16 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 
 export default function WelcomeScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.emoji}>⛳</Text>
+        <Image
+          source={require('../assets/PlayThru_AppIcon.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={styles.wordmark}>PLAYTHRU</Text>
-        <Text style={styles.subtitle}>PACE OF PLAY HANDICAP</Text>
+        <Text style={styles.subtitle}>SPEED HANDICAP</Text>
         <View style={styles.divider} />
         <View style={styles.buttons}>
           <TouchableOpacity
@@ -22,6 +26,13 @@ export default function WelcomeScreen({ navigation }) {
             activeOpacity={0.8}
           >
             <Text style={styles.btnSecondaryText}>SIGN IN</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.btnExplore}
+            onPress={() => navigation.navigate('PreviewMode')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.btnExploreText}>EXPLORE THE APP →</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -41,9 +52,10 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  emoji: {
-    fontSize: 56,
-    marginBottom: 16,
+  logo: {
+    width: 360,
+    height: 360,
+    marginBottom: -40,
   },
   wordmark: {
     fontSize: 32,
@@ -61,7 +73,7 @@ const styles = StyleSheet.create({
   divider: {
     width: '100%',
     height: 1,
-    backgroundColor: 'rgba(201,168,76,0.3)',
+    backgroundColor: 'rgba(125,200,122,0.3)',
     marginBottom: 40,
   },
   buttons: {
@@ -94,5 +106,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#C9A84C',
     letterSpacing: 2,
+  },
+  btnExplore: {
+    marginTop: 4,
+    padding: 12,
+    alignItems: 'center',
+  },
+  btnExploreText: {
+    color: '#B8A882',
+    fontSize: 13,
+    letterSpacing: 1,
   },
 });

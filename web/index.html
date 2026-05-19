@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PlayThru</title>
+
+  <!--
+    Deep link redirect script.
+    Supabase sends password reset emails to https://playthrugolf.app with a
+    token_hash and type=recovery in the URL fragment or query string.
+    On iOS/Android, this script rewrites the URL to the playthru:// scheme
+    so the operating system opens the app instead of the browser.
+    Desktop users see the website normally (redirect is skipped).
+  -->
+  <script>
+    (function () {
+      var href = window.location.href;
+      var isRecovery =
+        window.location.hash.includes('type=recovery') ||
+        window.location.search.includes('type=recovery');
+
+      if (isRecovery) {
+        // Redirect into the app on iOS / Android
+        var appUrl = href.replace('https://playthrugolf.app', 'playthru:/');
+        window.location.href = appUrl;
+      }
+    })();
+  </script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #090F0A;
+      color: #F5EDD8;
+      font-family: Georgia, serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h1 { font-size: 48px; font-weight: 300; color: #C9A84C; letter-spacing: 8px; margin-bottom: 16px; }
+    p  { font-size: 18px; color: #B8A882; text-align: center; max-width: 480px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <h1>PLAYTHRU</h1>
+  <p>Track your pace. Improve your game.</p>
+</body>
+</html>
