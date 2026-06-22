@@ -11,6 +11,9 @@ import ChallengeButton from '../components/ChallengeButton';
 import Gauge from '../components/guage';
 import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
+import ClockedScoreCard from '../components/ClockedScoreCard';
+import RecentRoundsList from '../components/RecentRoundsList';
+import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +111,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [activityItems, setActivityItems]   = useState([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [challengerBestScore, setChallengerBestScore] = useState(null);
+  const [clockedRating, setClockedRating] = useState({ clockedScore: null, game: null, teammate: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
 
   useEffect(() => {
     const load = async () => {
@@ -116,7 +120,7 @@ export default function PublicProfileScreen({ navigation, route }) {
       const [{ data: profileData }, { data: roundsData }, { data: followData }, { data: caddyRoundsData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
         supabase.from('rounds')
-          .select('course_name, created_at, holes, duration_minutes, pop_score')
+          .select('id, course_name, created_at, holes, duration_minutes, pop_score, round_format, active_game, hole_scores')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(20),
@@ -135,6 +139,20 @@ export default function PublicProfileScreen({ navigation, route }) {
       setRounds(roundsData ?? []);
       setCaddyRounds(caddyRoundsData ?? []);
       setFollowing(!!followData);
+
+      // Compute Clocked Score for this user
+      const clockedRounds = (roundsData ?? []).filter(r => r.round_format === 'clocked' && r.hole_scores);
+      const playerName = profileData?.full_name || profileData?.username || 'Player';
+      const roundStats = clockedRounds
+        .map(r => extractPlayerRoundStats(r.hole_scores, playerName))
+        .filter(Boolean);
+      const rating = computeFullRating({
+        roundStats,
+        startedRounds: clockedRounds.length,
+        handicapIndex: profileData?.handicap_index,
+      });
+      setClockedRating(rating);
+
       setLoading(false);
 
       // Fetch challenger's best score at this user's most recent course
@@ -339,33 +357,35 @@ export default function PublicProfileScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Gauge row — golfers only */}
-        {!isCaddy && <View style={s.gaugeCard}>
-          <View style={s.gaugeLeft}>
-            {pop != null
-              ? <Gauge score={pop} size={120} />
-              : <View style={{ width: 120, height: 120, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 32, fontWeight: '100', color: '#C9A84C44' }}>—</Text>
-                </View>
-            }
-          </View>
-          <View style={s.gaugeRight}>
-            {tier
-              ? <Text style={s.tierLabel}>{tier.toUpperCase()}</Text>
-              : <Text style={s.tierLabelMuted}>NO SCORE YET</Text>
-            }
-            <View style={{ marginTop: 10, gap: 8 }}>
-              <View>
-                <Text style={s.scoreLabel}>CLOCKED SCORE</Text>
-                <Text style={s.scoreValue}>{pop != null ? pop.toFixed(1) : '—'}</Text>
+        {/* Clocked Score card — golfers only */}
+        {!isCaddy && (
+          <ClockedScoreCard
+            clockedScore={clockedRating.clockedScore}
+            game={clockedRating.game}
+            teammate={clockedRating.teammate}
+            isProvisional={clockedRating.isProvisional}
+            roundsUsed={clockedRating.roundsUsed}
+            roundsNeeded={clockedRating.roundsNeeded}
+          />
+        )}
+
+        {/* Handicap + pace credential row */}
+        {!isCaddy && (
+          <View style={s.credentialRow}>
+            {profile.handicap_index != null && (
+              <View style={s.credentialCard}>
+                <Text style={s.credentialLabel}>HANDICAP</Text>
+                <Text style={s.credentialValue}>{Math.round(profile.handicap_index * 10) / 10}</Text>
               </View>
-              <View>
-                <Text style={s.scoreLabel}>NAT'L AVG</Text>
-                <Text style={[s.scoreValue, { fontSize: 16 }]}>3.9</Text>
+            )}
+            {pop != null && (
+              <View style={s.credentialCard}>
+                <Text style={s.credentialLabel}>PACE RATING</Text>
+                <Text style={[s.credentialValue, { color: popColor(pop) }]}>{pop.toFixed(1)}</Text>
               </View>
-            </View>
+            )}
           </View>
-        </View>}
+        )}
 
         {/* Stat cards — golfers */}
         {!isCaddy && <View style={s.statRow}>
@@ -403,26 +423,8 @@ export default function PublicProfileScreen({ navigation, route }) {
           </View>
         </View>}
 
-        {/* Recent rounds */}
-        {rounds.length > 0 && (
-          <View style={s.section}>
-            <Text style={s.sectionLabel}>RECENT ROUNDS</Text>
-            {rounds.map((r, i) => (
-              <View key={i} style={s.roundCard}>
-                <CourseAvatar courseName={r.course_name || ''} size={32} />
-                <View style={s.roundInfo}>
-                  <Text style={s.roundCourse}>{r.course_name || '—'}</Text>
-                  <Text style={s.roundMeta}>
-                    {formatShortDate(r.created_at)} · {r.holes} holes · {formatDuration(r.duration_minutes)}
-                  </Text>
-                </View>
-                <Text style={[s.roundPop, { color: popColor(r.pop_score ?? 0) }]}>
-                  {r.pop_score != null ? r.pop_score.toFixed(1) : '—'}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
+        {/* Recent rounds — format-aware */}
+        <RecentRoundsList rounds={rounds} navigation={navigation} limit={10} />
 
         {rounds.length === 0 && (
           <View style={s.emptyRounds}>
@@ -517,6 +519,10 @@ const s = StyleSheet.create({
   gaugeCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 20, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, gap: 16, marginBottom: 14 },
   gaugeLeft:      { alignItems: 'center', justifyContent: 'center' },
   gaugeRight:     { flex: 1 },
+  credentialRow:  { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 14 },
+  credentialCard: { flex: 1, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
+  credentialLabel:{ fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
+  credentialValue:{ fontSize: 22, fontWeight: '300', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
   tierLabel:      { fontSize: 11, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
   tierLabelMuted: { fontSize: 9, fontWeight: '700', color: '#C9A84C44', letterSpacing: 1.5 },
   scoreLabel:     { fontSize: 9, fontWeight: '700', color: '#C9A84C66', letterSpacing: 2, marginBottom: 2 },

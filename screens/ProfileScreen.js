@@ -15,6 +15,7 @@ import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
 import VerificationBadge from '../components/VerificationBadge';
 import ClockedScoreCard from '../components/ClockedScoreCard';
+import RecentRoundsList from '../components/RecentRoundsList';
 import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1163,6 +1164,11 @@ export default function ProfileScreen({ navigation }) {
           roundsUsed={clockedRating.roundsUsed}
           roundsNeeded={clockedRating.roundsNeeded}
         />
+      )}
+
+      {/* Recent rounds (compact, above tabs) */}
+      {!loading && rounds.length > 0 && (
+        <RecentRoundsList rounds={rounds.slice(0, 10)} navigation={navigation} />
       )}
 
       {/* Tab bar */}
