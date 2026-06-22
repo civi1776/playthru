@@ -308,9 +308,9 @@ export default function RulesScreen({ navigation }) {
         <ShotClockDemo />
 
         {/* Scoring */}
-        <SectionHead icon="flash-outline" title="Scoring — Modified Stableford" />
+        <SectionHead icon="flash-outline" title="Clocked Scoring" />
         <View style={s.card}>
-          <Text style={s.cardIntro}>Points per player, per hole:</Text>
+          <Text style={s.cardIntro}>Our points system. Earn points per hole against par:</Text>
 
           <View style={s.tableWrap}>
             <View style={s.tableHeaderRow}>

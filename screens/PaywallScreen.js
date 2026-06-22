@@ -34,7 +34,7 @@ const PRO_FEATURES = [
   {
     icon: 'layers-outline',
     label: 'All Side Games',
-    desc: 'Nassau, Wolf, Skins, Match Play, Stableford, 9 Point — all unlocked.',
+    desc: 'Nassau, Wolf, Skins, Match Play, 9 Point — all unlocked.',
   },
   {
     icon: 'trophy-outline',
