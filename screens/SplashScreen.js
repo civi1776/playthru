@@ -39,10 +39,10 @@ export default function SplashScreen({ onFinish }) {
           style={s.logo}
           resizeMode="contain"
         />
-        <Text style={s.wordmark}>PlayThru</Text>
+        <Text style={s.wordmark}>Clocked</Text>
         <View style={s.divider} />
         <Animated.Text style={[s.tagline, { opacity: taglineOpacity }]}>
-          SPEED HANDICAP
+          ON THE CLOCK
         </Animated.Text>
       </Animated.View>
     </Animated.View>
@@ -79,7 +79,7 @@ const s = StyleSheet.create({
   tagline: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#B8A882',
+    color: '#C9A84C',
     letterSpacing: 4,
   },
 });

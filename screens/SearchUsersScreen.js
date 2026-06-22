@@ -23,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { sendLocalNotification } from '../lib/notifications';
+import { sendLocalNotification, sendPushToUser } from '../lib/notifications';
 import SkeletonLoader from '../components/SkeletonLoader';
 import InitialsAvatar from '../components/InitialsAvatar';
 
@@ -81,7 +81,7 @@ export default function SearchUsersScreen({ navigation }) {
     try {
       const { data, error: err } = await supabase
         .from('profiles')
-        .select('id, full_name, username, pop_score, home_course, account_type')
+        .select('id, full_name, username, pop_score, home_course, account_type, avatar_url')
         .or(`username.ilike.%${text}%,full_name.ilike.%${text}%`)
         .neq('id', myUid ?? '')
         .limit(20);
@@ -114,16 +114,9 @@ export default function SearchUsersScreen({ navigation }) {
         follower_id: myUid,
         following_id: userId,
       });
-      // Notify the followed user if they have a push token
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('push_token')
-        .eq('id', userId)
-        .single();
-      if (profile?.push_token) {
-        const name = myUsername ? `@${myUsername}` : 'Someone';
-        await sendLocalNotification('New Follower', `${name} started following you`);
-      }
+      // Notify the followed user
+      const name = myUsername ? `@${myUsername}` : 'Someone';
+      await sendPushToUser(userId, 'New Follower', `${name} started following you`, 'new_follower');
     }
   };
 
@@ -189,7 +182,7 @@ export default function SearchUsersScreen({ navigation }) {
               onPress={() => navigation.navigate('PublicProfile', { userId: result.id })}
               activeOpacity={0.8}
             >
-              <InitialsAvatar name={result.full_name} size={42} />
+              <InitialsAvatar name={result.full_name} size={42} avatarUrl={result.avatar_url} />
               <View style={s.info}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={s.name} numberOfLines={1}>{result.full_name || '—'}</Text>

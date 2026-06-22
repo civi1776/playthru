@@ -16,17 +16,17 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, Animated, TouchableOpacity, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Animated, TouchableOpacity, TextInput, StyleSheet, Alert, AccessibilityInfo } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { searchCourses as fetchCourseSearch } from '../lib/courses';
 import { useAuth } from '../context/AuthContext';
-import { sendLocalNotification, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder } from '../lib/notifications';
+import { sendLocalNotification, sendPushToUser, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder } from '../lib/notifications';
 import * as Notifications from 'expo-notifications';
 import { sendCaddyNotifications } from '../lib/caddy';
 import CourseAvatar from '../components/CourseAvatar';
-import { estimateGrossScore, updateHandicapAfterRound } from '../lib/handicap';
+import { updateHandicapAfterRound } from '../lib/handicap';
 import { isFraudulent, calcPOPScoreCore, calcPOPScorePreview, recalculateProfilePopScore, isPar3Course, getCoursePar } from '../lib/popScore';
 
 // Retries a rounds insert, stripping any column that PostgREST's schema cache
@@ -47,26 +47,27 @@ async function roundsInsert(payload, selectCols) {
   return { data: null, error: new Error('Schema cache: too many stale columns') };
 }
 
-const GOLFER_STEPS = ['Course', 'DateTime', 'Details', 'ScorePace', 'Summary'];
+const GOLFER_STEPS = ['Course', 'Date', 'Time', 'Details', 'Pace', 'Score', 'Summary'];
 const CADDY_STEPS  = ['Course', 'Date', 'Details', 'Group', 'Tee Time', 'Finish', 'Summary'];
 
 const STEP_DISPLAY = {
-  Course: 'COURSE', DateTime: 'DATE & TIMES', Details: 'ABOUT YOUR ROUND',
-  ScorePace: 'SCORE & PACE', Summary: 'SUMMARY',
-  Date: 'DATE', Group: 'GROUP', 'Tee Time': 'TEE TIME', Finish: 'FINISH',
+  Course: 'COURSE', Date: 'WHEN?', Time: 'TIMES', Details: 'DETAILS',
+  Pace: 'PACE', Score: 'SCORE', Summary: 'SUMMARY',
+  RoundInfo: 'YOUR ROUND', DateTime: 'DATE & TIMES', ScorePace: 'SCORE & PACE',
+  Group: 'GROUP', 'Tee Time': 'TEE TIME', Finish: 'FINISH',
 };
 
 // Short keys stored in DB; labels shown in UI
 const SCORE_VS_HCP_LABELS = {
-  over_5:      'More than 5 over handicap',
-  within_5:    'Within 5 of handicap',
-  to_handicap: 'Played to handicap',
-  beat:        'Beat handicap',
+  over_5:      '5+ Over',
+  within_5:    'Within 5',
+  to_handicap: 'To Handicap',
+  beat:        'Beat It',
   // Legacy verbose labels (backward compat display)
-  'More than 5 over my handicap': 'More than 5 over handicap',
-  'Within 5 of my handicap':      'Within 5 of handicap',
-  'Played to my handicap':        'Played to handicap',
-  'Beat my handicap':             'Beat handicap',
+  'More than 5 over my handicap': '5+ Over',
+  'Within 5 of my handicap':      'Within 5',
+  'Played to my handicap':        'To Handicap',
+  'Beat my handicap':             'Beat It',
 };
 
 const PACE_DELAY_OPTIONS = [
@@ -197,8 +198,14 @@ function minutesToTimeStr(totalMinutes) {
 
 function parseTimeToMinutes(timeStr) {
   if (!timeStr) return 0;
-  const [hm, period] = timeStr.split(' ');
-  const [h, m] = hm.split(':').map(Number);
+  const parts = timeStr.split(' ');
+  if (parts.length < 2) return 0;
+  const [hm, period] = parts;
+  const hmParts = hm.split(':');
+  if (hmParts.length < 2) return 0;
+  const h = parseInt(hmParts[0], 10);
+  const m = parseInt(hmParts[1], 10);
+  if (isNaN(h) || isNaN(m)) return 0;
   let total = (h % 12) * 60 + m;
   if (period === 'PM') total += 12 * 60;
   return total;
@@ -341,7 +348,13 @@ function StepCourse({ data, onChange, onNext }) {
           key={course.name}
           style={[s.optionRow, data.course === course.name && s.optionSelected]}
           onPress={() => {
-            onChange({ ...data, course: course.name, isPar3: isPar3Course(course) });
+            onChange({
+              ...data,
+              course:       course.name,
+              isPar3:       isPar3Course(course),
+              courseRating: course.course_rating ?? null,
+              slopeRating:  course.slope_rating  ?? null,
+            });
             onNext();
           }}
         >
@@ -362,7 +375,7 @@ function StepCourse({ data, onChange, onNext }) {
                     ? `Avg ${Math.floor(course.avg_time / 60)}h ${Math.round(course.avg_time % 60)}m`
                     : null,
                   course.pop_score != null
-                    ? `POPScore ${course.pop_score.toFixed(1)}`
+                    ? `Clocked Score ${course.pop_score.toFixed(1)}`
                     : null,
                 ].filter(Boolean).join(' · ')}
               </Text>
@@ -375,7 +388,7 @@ function StepCourse({ data, onChange, onNext }) {
   );
 }
 
-function StepDate({ data, onChange }) {
+function StepDate({ data, onChange, onNext }) {
   const today = new Date();
   const days = Array.from({ length: 14 }, (_, i) => {
     const d = new Date(today);
@@ -393,7 +406,10 @@ function StepDate({ data, onChange }) {
           <TouchableOpacity
             key={val}
             style={[s.optionRow, data.date === val && s.optionSelected]}
-            onPress={() => onChange({ ...data, date: val })}
+            onPress={() => {
+              onChange({ ...data, date: val });
+              if (onNext) setTimeout(onNext, 180);
+            }}
           >
             <Text style={[s.optionText, data.date === val && s.optionTextSelected]}>{label}</Text>
             {data.date === val && <Ionicons name="checkmark" size={14} color="#C9A84C" />}
@@ -418,11 +434,8 @@ function StepDateTime({ data, onChange }) {
   const elapsed = formatElapsed(liveTee, liveFinish);
 
   const handleTeeCommit = (v) => {
-    const newFinishMin = Math.min(parseTimeToMinutes(v) + 240, 1380);
-    const newFinish = minutesToTimeStr(newFinishMin);
     setLiveTee(v);
-    setLiveFinish(newFinish);
-    onChange({ ...data, teeTime: v, finishTime: newFinish });
+    onChange({ ...data, teeTime: v });
   };
 
   const handleFinishCommit = (v) => {
@@ -484,11 +497,114 @@ function StepDateTime({ data, onChange }) {
   );
 }
 
-function StepDetails({ data, onChange }) {
+function StepTime({ data, onChange }) {
+  const [liveTee,    setLiveTee]    = useState(data.teeTime);
+  const [liveFinish, setLiveFinish] = useState(data.finishTime);
+  const elapsed = formatElapsed(liveTee, liveFinish);
+
   return (
     <View style={s.stepContent}>
-      <Text style={s.stepTitle}>About your round</Text>
+      <Text style={s.stepTitle}>Tee time and finish time</Text>
 
+      <Text style={[s.sectionQuestion, { marginBottom: 4 }]}>Tee time</Text>
+      <SlotTimePicker
+        times={TEE_TIMES}
+        value={data.teeTime}
+        onChange={v => { setLiveTee(v); onChange({ ...data, teeTime: v }); }}
+        onLive={setLiveTee}
+        visibleItems={3}
+      />
+
+      <Text style={[s.sectionQuestion, { marginTop: 16, marginBottom: 4 }]}>Finish time</Text>
+      <SlotTimePicker
+        times={FINISH_TIMES}
+        value={data.finishTime}
+        onChange={v => { setLiveFinish(v); onChange({ ...data, finishTime: v }); }}
+        onLive={setLiveFinish}
+        visibleItems={3}
+      />
+
+      <View style={s.elapsedCard}>
+        <Text style={s.elapsedValue}>{elapsed}</Text>
+        <Text style={s.elapsedLabel}>ROUND TIME</Text>
+      </View>
+    </View>
+  );
+}
+
+function StepRoundInfo({ data, onChange, handicap }) {
+  const today = new Date();
+  const days = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    return d;
+  });
+
+  const [liveTee,    setLiveTee]    = useState(data.teeTime);
+  const [liveFinish, setLiveFinish] = useState(data.finishTime);
+  const elapsed = formatElapsed(liveTee, liveFinish);
+
+  const par      = getCoursePar(data.holes, data.isPar3);
+  const minScore = data.holes === '9' ? 9 : 18;
+  const maxScore = data.holes === '9' ? (data.isPar3 ? 60 : 99) : (data.isPar3 ? 90 : 150);
+  const scores   = Array.from({ length: maxScore - minScore + 1 }, (_, i) => String(minScore + i));
+  const [liveScore, setLiveScore] = useState(data.grossScore ?? par);
+  const diff = liveScore - par;
+  const diffLabel = diff === 0 ? 'E' : diff > 0 ? `+${diff}` : `${diff}`;
+  const diffColor = diff < 0 ? '#7DC87A' : diff === 0 ? '#F5EDD8' : '#D4B86A';
+
+  return (
+    <View style={s.stepContent}>
+      {/* ── Date ── */}
+      <Text style={[s.stepTitle, { marginBottom: 8 }]}>When did you play?</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 16 }}
+        contentContainerStyle={{ gap: 6, paddingRight: 16 }}
+        nestedScrollEnabled
+      >
+        {days.map((d, i) => {
+          const label = i === 0 ? 'Today' : i === 1 ? 'Yesterday'
+            : `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+          const val = d.toDateString();
+          return (
+            <TouchableOpacity
+              key={val}
+              style={[s.dateChip, data.date === val && s.dateChipActive]}
+              onPress={() => onChange({ ...data, date: val })}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.dateChipText, data.date === val && s.dateChipTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* ── Times ── */}
+      <Text style={[s.sectionQuestion, { marginBottom: 4 }]}>Tee time</Text>
+      <SlotTimePicker
+        times={TEE_TIMES}
+        value={data.teeTime}
+        onChange={v => { setLiveTee(v); onChange({ ...data, teeTime: v }); }}
+        onLive={setLiveTee}
+        visibleItems={3}
+      />
+      <Text style={[s.sectionQuestion, { marginTop: 8, marginBottom: 4 }]}>Finish time</Text>
+      <SlotTimePicker
+        times={FINISH_TIMES}
+        value={data.finishTime}
+        onChange={v => { setLiveFinish(v); onChange({ ...data, finishTime: v }); }}
+        onLive={setLiveFinish}
+        visibleItems={3}
+      />
+      <View style={[s.elapsedCard, { marginTop: 10, paddingVertical: 10, marginBottom: 16 }]}>
+        <Text style={s.elapsedValue}>{elapsed}</Text>
+        <Text style={s.elapsedLabel}>ROUND TIME</Text>
+      </View>
+
+      {/* ── Details ── */}
+      <View style={s.scorePaceDivider} />
       <Text style={s.sectionQuestion}>How many holes?</Text>
       <View style={s.buttonGroup}>
         {[{ label: '9 Holes', value: '9' }, { label: '18 Holes', value: '18' }].map(({ label, value }) => (
@@ -501,7 +617,6 @@ function StepDetails({ data, onChange }) {
           </TouchableOpacity>
         ))}
       </View>
-
       <Text style={s.sectionQuestion}>How did you get around?</Text>
       <View style={s.buttonGroup}>
         {['Walking', 'Cart'].map(t => (
@@ -514,6 +629,97 @@ function StepDetails({ data, onChange }) {
           </TouchableOpacity>
         ))}
       </View>
+      <Text style={s.sectionQuestion}>How many players?</Text>
+      <View style={[s.buttonGroup, { marginBottom: 16 }]}>
+        {['1', '2', '3', '4', '5'].map(p => (
+          <TouchableOpacity
+            key={p}
+            style={[s.groupBtn, data.players === p && s.groupBtnActive]}
+            onPress={() => onChange({ ...data, players: p })}
+          >
+            <Text style={[s.groupBtnText, data.players === p && s.groupBtnTextActive]}>{p}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ── Pace & Score ── */}
+      <View style={s.scorePaceDivider} />
+      <Text style={s.scorePaceTitle}>How often were you waiting on the group ahead?</Text>
+      <Text style={s.scorePaceHelper}>This affects your Clocked Score calculation</Text>
+      {PACE_DELAY_OPTIONS.map(opt => {
+        const selected = data.paceDelay === opt.value;
+        return (
+          <View key={opt.value}>
+            <TouchableOpacity
+              style={[s.paceBtn, { borderLeftColor: opt.color, backgroundColor: selected ? opt.color + '33' : opt.bgTint }]}
+              onPress={() => onChange({ ...data, paceDelay: opt.value })}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.paceBtnText, selected && { color: '#F5EDD8' }]}>{opt.label}</Text>
+              {selected && <Ionicons name="checkmark-circle" size={18} color={opt.color} />}
+            </TouchableOpacity>
+            {opt.value === 'constant' && (
+              <Text style={s.paceDelayWarning}>This will significantly reduce your time penalty</Text>
+            )}
+          </View>
+        );
+      })}
+
+      <View style={s.scorePaceDivider} />
+      <Text style={s.sectionQuestion}>What did you shoot?</Text>
+      <SlotTimePicker
+        times={scores}
+        value={String(data.grossScore ?? par)}
+        onChange={v => {
+          const n = parseInt(v, 10);
+          setLiveScore(n);
+          onChange({ ...data, grossScore: n, scoreVsHandicap: deriveScoreVsHandicap(n, handicap, data.holes, data.isPar3) });
+        }}
+        onLive={v => setLiveScore(parseInt(v, 10))}
+      />
+      <Text style={[s.grossDiff, { color: diffColor, marginTop: 12 }]}>{diffLabel}</Text>
+      <Text style={s.grossParLabel}>Par {par}</Text>
+    </View>
+  );
+}
+
+function StepDetails({ data, onChange, onNext }) {
+  const handleChange = (newData) => {
+    onChange(newData);
+    if (onNext && newData.holes && newData.transport && newData.players) {
+      setTimeout(onNext, 280);
+    }
+  };
+
+  return (
+    <View style={s.stepContent}>
+      <Text style={s.stepTitle}>About your round</Text>
+
+      <Text style={s.sectionQuestion}>How many holes?</Text>
+      <View style={s.buttonGroup}>
+        {[{ label: '9 Holes', value: '9' }, { label: '18 Holes', value: '18' }].map(({ label, value }) => (
+          <TouchableOpacity
+            key={value}
+            style={[s.groupBtn, data.holes === value && s.groupBtnActive]}
+            onPress={() => handleChange({ ...data, holes: value })}
+          >
+            <Text style={[s.groupBtnText, data.holes === value && s.groupBtnTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={s.sectionQuestion}>How did you get around?</Text>
+      <View style={s.buttonGroup}>
+        {['Walking', 'Cart'].map(t => (
+          <TouchableOpacity
+            key={t}
+            style={[s.groupBtn, data.transport === t && s.groupBtnActive]}
+            onPress={() => handleChange({ ...data, transport: t })}
+          >
+            <Text style={[s.groupBtnText, data.transport === t && s.groupBtnTextActive]}>{t}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <Text style={s.sectionQuestion}>How many players?</Text>
       <View style={s.buttonGroup}>
@@ -521,7 +727,7 @@ function StepDetails({ data, onChange }) {
           <TouchableOpacity
             key={p}
             style={[s.groupBtn, data.players === p && s.groupBtnActive]}
-            onPress={() => onChange({ ...data, players: p })}
+            onPress={() => handleChange({ ...data, players: p })}
           >
             <Text style={[s.groupBtnText, data.players === p && s.groupBtnTextActive]}>{p}</Text>
           </TouchableOpacity>
@@ -606,7 +812,7 @@ function StepGroup({ caddyGroup, setCaddyGroup }) {
           onPress={() => setMode('search')}
           activeOpacity={0.8}
         >
-          <Text style={[s.toggleBtnText, mode === 'search' && s.toggleBtnTextActive]}>PlayThru Users</Text>
+          <Text style={[s.toggleBtnText, mode === 'search' && s.toggleBtnTextActive]}>Clocked Users</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.toggleBtn, mode === 'manual' && s.toggleBtnActive]}
@@ -729,10 +935,10 @@ function StepFinishTime({ teeTime, finishTime, onChange }) {
   );
 }
 
-function StepPaceDelay({ data, onChange }) {
+function StepPaceDelay({ data, onChange, onNext }) {
   return (
     <View style={s.stepContent}>
-      <Text style={s.stepTitle}>During your round, how often were you waiting on the group ahead?</Text>
+      <Text style={s.stepTitle}>How often were you waiting on the group ahead?</Text>
       {PACE_DELAY_OPTIONS.map(opt => {
         const selected = data.paceDelay === opt.value;
         const bgColor  = selected
@@ -743,7 +949,10 @@ function StepPaceDelay({ data, onChange }) {
           <View key={opt.value}>
             <TouchableOpacity
               style={[s.optionRow, { backgroundColor: bgColor, borderColor }]}
-              onPress={() => onChange({ ...data, paceDelay: opt.value })}
+              onPress={() => {
+                onChange({ ...data, paceDelay: opt.value });
+                if (onNext) setTimeout(onNext, 220);
+              }}
               activeOpacity={0.8}
             >
               <Text style={[s.optionText, selected && s.optionTextSelected]}>
@@ -785,7 +994,7 @@ function StepScorePace({ data, onChange, handicap }) {
     <View style={s.stepContent}>
       {/* ── Pace delay FIRST ── */}
       <Text style={s.scorePaceTitle}>How often were you waiting on the group ahead?</Text>
-      <Text style={s.scorePaceHelper}>This affects your POPScore calculation</Text>
+      <Text style={s.scorePaceHelper}>This affects your Clocked Score calculation</Text>
 
       {PACE_DELAY_OPTIONS.map(opt => {
         const selected = data.paceDelay === opt.value;
@@ -896,7 +1105,7 @@ function StepSummary({ data, caddyGroup, isCaddy }) {
         {!isCaddy && <Row label="VS HANDICAP" value={SCORE_VS_HCP_LABELS[data.scoreVsHandicap] || data.scoreVsHandicap || '—'} />}
       </View>
       <View style={s.scorePreview}>
-        <Text style={s.scorePreviewLabel}>{isCaddy ? 'ESTIMATED CADDY RATING' : 'ESTIMATED POPSCORE'}</Text>
+        <Text style={s.scorePreviewLabel}>{isCaddy ? 'ESTIMATED CADDY RATING' : 'ESTIMATED CLOCKED SCORE'}</Text>
         <Text style={s.scorePreviewValue}>{estimatedScore}</Text>
         <Text style={s.scorePreviewNote}>
           {isCaddy ? 'Final rating uses course pace baseline' : 'Final score uses course baseline comparison'}
@@ -942,12 +1151,15 @@ export default function LogScreen({ navigation }) {
     const stepName = STEPS[step];
     switch (stepName) {
       case 'Course':    return !!data.course;
-      case 'DateTime':  return !!data.date;
       case 'Date':      return !!data.date;
+      case 'Time':      return true;
       case 'Details':   return !!data.holes && !!data.transport && !!data.players;
+      case 'Pace':      return !!data.paceDelay;
+      case 'Score':     return true;
+      case 'RoundInfo': return !!data.date && !!data.holes && !!data.transport && !!data.players && !!data.paceDelay;
+      case 'DateTime':  return !!data.date;
       case 'Group':     return true;
       case 'ScorePace': return !!data.paceDelay;
-      case 'Pace':      return !!data.paceDelay;
       default:          return true;
     }
   };
@@ -1006,6 +1218,7 @@ export default function LogScreen({ navigation }) {
 
         await sendLocalNotification('Caddy Rating Updated', `Your new Caddy Rating is ${rating.toFixed(1)} — great pace.`);
         setPopScore(rating);
+        AccessibilityInfo.announceForAccessibility(`Your Caddy Rating is ${rating.toFixed(1)}`);
         setSubmitted(true);
         navigation.navigate('Share', { popScore: rating, courseName: data.course, date: data.date, holes: data.holes, transport: data.transport, durationMinutes });
         return;
@@ -1050,7 +1263,7 @@ export default function LogScreen({ navigation }) {
         });
 
         const flagMsg = flaggedCount >= 3
-          ? 'Your round time was flagged as unusually fast. This account has been flagged 3 or more times and is under review. Contact hello@playthrugolf.app'
+          ? 'Your round time was flagged as unusually fast. This account has been flagged 3 or more times and is under review. Contact hello@clocked.golf'
           : 'Your round time was flagged as unusually fast. Your score has been submitted but is pending review.';
         Alert.alert('Round Flagged', flagMsg);
         setSubmitted(true);
@@ -1128,32 +1341,55 @@ export default function LogScreen({ navigation }) {
         scheduleInactivityReminder().catch(() => {});
       })();
 
-      // Calculate WHS handicap differential and update handicap index
-      if (newRoundId) {
-        const adjustedGrossScore = data.grossScore ?? estimateGrossScore(data.scoreVsHandicap, authProfile?.handicap, data.holes);
-        await updateHandicapAfterRound(userId, newRoundId, adjustedGrossScore);
-      }
+      // Update handicap index from last 20 rounds
+      await updateHandicapAfterRound(userId, supabase);
 
       // Update course pop_score + total_rounds, then notify course followers
       const { data: courseRow } = await supabase.from('courses').select('id').eq('name', data.course).maybeSingle();
       if (courseRow) {
-        const { data: courseRounds } = await supabase.from('rounds').select('pop_score, duration_minutes').eq('course_name', data.course).eq('flagged', false);
+        const { data: courseRounds } = await supabase.from('rounds').select('pop_score, duration_minutes, pace_delay, holes').eq('course_name', data.course).eq('flagged', false);
         if (courseRounds && courseRounds.length > 0) {
           const scored = courseRounds.filter(r => r.pop_score != null);
-          const courseAvg      = scored.length > 0 ? scored.reduce((s, r) => s + r.pop_score, 0) / scored.length : null;
-          const newCourseScore = courseAvg != null ? parseFloat(courseAvg.toFixed(2)) : null;
+          const courseAvg = scored.length > 0 ? scored.reduce((s, r) => s + parseFloat(r.pop_score), 0) / scored.length : null;
+          const constantCount     = courseRounds.filter(r => r.pace_delay === 'constant').length;
+          const managementPenalty = parseFloat((constantCount / courseRounds.length * 0.5).toFixed(2));
+          const newCourseScore    = courseAvg != null
+            ? parseFloat(Math.max(1.0, Math.min(5.0, courseAvg - managementPenalty)).toFixed(2))
+            : null;
           const timed = courseRounds.filter(r => r.duration_minutes != null);
-          const newAvgTime = timed.length > 0 ? parseFloat((timed.reduce((s, r) => s + r.duration_minutes, 0) / timed.length).toFixed(1)) : null;
-          const courseUpdate = { total_rounds: courseRounds.length };
-          if (newCourseScore != null) courseUpdate.pop_score = newCourseScore;
-          if (newAvgTime != null) courseUpdate.avg_time = newAvgTime;
-          await supabase.from('courses').update(courseUpdate).eq('id', courseRow.id);
+          const newAvgTime = timed.length > 0 ? parseFloat((timed.reduce((s, r) => s + parseFloat(r.duration_minutes), 0) / timed.length).toFixed(1)) : null;
+          const fullRounds = courseRounds.filter(r => r.duration_minutes != null && (r.holes === '18' || r.holes === 18));
+          const fastestTime = fullRounds.length > 0 ? Math.min(...fullRounds.map(r => parseFloat(r.duration_minutes))) : null;
+          const courseUpdate = { total_rounds: courseRounds.length, management_penalty: managementPenalty };
+          if (newCourseScore != null && !isNaN(newCourseScore)) courseUpdate.pop_score = newCourseScore;
+          if (newAvgTime != null && !isNaN(newAvgTime)) courseUpdate.avg_time = newAvgTime;
+          if (fastestTime != null && !isNaN(fastestTime)) courseUpdate.fastest_time = fastestTime;
+          await supabase.from('courses').update(courseUpdate).eq('id', String(courseRow.id));
+
+          // Feature 4 — Course #1 check
+          if (pop != null && newRoundId) {
+            try {
+              const { data: prevBest } = await supabase
+                .from('rounds').select('user_id, pop_score')
+                .eq('course_name', data.course).eq('flagged', false)
+                .not('pop_score', 'is', null).neq('id', newRoundId)
+                .order('pop_score', { ascending: false }).limit(1).maybeSingle();
+              const beatsAll        = !prevBest || pop > (prevBest.pop_score ?? 0);
+              const wasAlreadyLeader = prevBest?.user_id === userId;
+              if (beatsAll && !wasAlreadyLeader) {
+                const handle = authProfile?.username ? `@${authProfile.username}` : 'a player';
+                await sendPushToUser(userId, `You're the fastest at ${data.course} 🏆`, `Your Clocked Score of ${pop.toFixed(1)} is now #1 at ${data.course}. Own it.`, 'course_leader');
+                supabase.from('activity_feed').insert({ user_id: userId, type: 'course_leader', content: { description: `${handle} is now the fastest player at ${data.course} 🏆`, course_name: data.course, pop_score: pop } }).then(() => {});
+              }
+            } catch (e) { /* silent fail */ }
+          }
+
           const { data: courseFollowers } = await supabase
-            .from('course_follows').select('profiles!course_follows_user_id_fkey(push_token)').eq('course_id', courseRow.id);
+            .from('course_follows').select('profiles!course_follows_user_id_fkey(id)').eq('course_id', courseRow.id);
           if (courseFollowers && courseFollowers.length > 0) {
-            const body = newCourseScore != null ? `${data.course} POPScore just updated to ${newCourseScore.toFixed(1)} based on ${courseRounds.length} rounds logged.` : `${data.course} now has ${courseRounds.length} rounds on PlayThru.`;
+            const body = newCourseScore != null ? `${data.course} Clocked Score just updated to ${newCourseScore.toFixed(1)} based on ${courseRounds.length} rounds logged.` : `${data.course} now has ${courseRounds.length} rounds on Clocked.`;
             for (const cf of courseFollowers) {
-              if (cf.profiles?.push_token) await sendLocalNotification('Course Update', body);
+              if (cf.profiles?.id) await sendPushToUser(cf.profiles.id, 'Course Update', body, 'course_update');
             }
           }
 
@@ -1162,13 +1398,12 @@ export default function LogScreen({ navigation }) {
           if (milestones.includes(courseRounds.length)) {
             const { data: homeCourseUsers } = await supabase
               .from('profiles')
-              .select('push_token')
-              .eq('home_course', data.course)
-              .not('push_token', 'is', null);
+              .select('id')
+              .eq('home_course', data.course);
             if (homeCourseUsers && homeCourseUsers.length > 0) {
-              const milestoneBody = `${data.course} just hit ${courseRounds.length} rounds on PlayThru.${newCourseScore != null ? ` Current POPScore: ${newCourseScore.toFixed(1)}` : ''}`;
+              const milestoneBody = `${data.course} just hit ${courseRounds.length} rounds on Clocked.${newCourseScore != null ? ` Current Clocked Score: ${newCourseScore.toFixed(1)}` : ''}`;
               for (const p of homeCourseUsers) {
-                if (p.push_token) await sendLocalNotification('Course Milestone', milestoneBody);
+                await sendPushToUser(p.id, 'Course Milestone', milestoneBody, 'course_update');
               }
             }
           }
@@ -1180,21 +1415,53 @@ export default function LogScreen({ navigation }) {
       if (followers && followers.length > 0) {
         const followerIds = followers.map(f => f.follower_id);
         const { data: followerProfiles } = await supabase
-          .from('profiles').select('push_token').in('id', followerIds).not('push_token', 'is', null);
+          .from('profiles').select('id').in('id', followerIds);
         const name      = authProfile?.username ? `@${authProfile.username}` : 'A friend';
-        const notifBody = `${name} just logged a round at ${data.course} — POPScore ${pop.toFixed(1)}. See how you compare.`;
+        const notifBody = `${name} just logged a round at ${data.course} — Clocked Score ${pop.toFixed(1)}. See how you compare.`;
         for (const fp of (followerProfiles || [])) {
-          if (fp.push_token) await sendLocalNotification('Friend Activity', notifBody);
+          await sendPushToUser(fp.id, 'Friend Activity', notifBody, 'friend_round');
         }
+      }
+
+      // Challenge auto-settlement
+      if (pop != null && newRoundId) {
+        try {
+          const { data: activeChallenges } = await supabase
+            .from('challenges')
+            .select('id, challenger_id, challenged_id, challenger_score, challenged_score')
+            .or(`challenger_id.eq.${userId},challenged_id.eq.${userId}`)
+            .eq('course_name', data.course)
+            .eq('status', 'accepted');
+          for (const ch of (activeChallenges ?? [])) {
+            const isChallenger = ch.challenger_id === userId;
+            const opponentId   = isChallenger ? ch.challenged_id : ch.challenger_id;
+            const otherScore   = isChallenger ? ch.challenged_score : ch.challenger_score;
+            const updateField  = isChallenger ? 'challenger_score' : 'challenged_score';
+            const roundField   = isChallenger ? 'challenger_round_id' : 'challenged_round_id';
+            if (otherScore != null) {
+              const iWin     = pop > otherScore;
+              const winnerId = iWin ? userId : opponentId;
+              await supabase.from('challenges').update({ [updateField]: pop, [roundField]: newRoundId, status: 'completed', winner_id: winnerId }).eq('id', ch.id);
+              const { data: opp } = await supabase.from('profiles').select('username').eq('id', opponentId).maybeSingle();
+              const myHandle  = authProfile?.username ? `@${authProfile.username}` : 'a player';
+              const oppHandle = opp?.username ? `@${opp.username}` : 'their opponent';
+              await sendPushToUser(userId, iWin ? `You won the challenge at ${data.course} 🏆` : `You lost the challenge at ${data.course}`, iWin ? `Your ${pop.toFixed(1)} beat the ${otherScore.toFixed(1)}. Own it.` : `${oppHandle} had a better score. Rematch?`, 'challenge_result');
+              await sendPushToUser(opponentId, iWin ? `You lost the challenge at ${data.course}` : `You won the challenge at ${data.course} 🏆`, iWin ? `${myHandle} had a better score. Rematch?` : `Your score held up! ${myHandle} couldn't beat it.`, 'challenge_result');
+              supabase.from('activity_feed').insert({ user_id: winnerId, type: 'challenge_won', content: { description: `${iWin ? myHandle : oppHandle} beat ${iWin ? oppHandle : myHandle}'s challenge at ${data.course}`, course_name: data.course, winner_score: iWin ? pop : otherScore } }).then(() => {}).catch(() => {});
+            } else {
+              await supabase.from('challenges').update({ [updateField]: pop, [roundField]: newRoundId }).eq('id', ch.id);
+            }
+          }
+        } catch { /* silent fail */ }
       }
 
       // Schedule POPScore notification for 1h 45m after round (6300 seconds)
       Notifications.scheduleNotificationAsync({
         content: {
           title: 'Your round has been scored!',
-          body: 'Tap to see your updated POPScore →',
+          body: 'Tap to see your updated Clocked Score →',
         },
-        trigger: { seconds: 6300, repeats: false },
+        trigger: { seconds: 18000, repeats: false },
       }).catch(() => {});
       // Auto-post to activity feed — fire and forget, never block round save
       try {
@@ -1215,6 +1482,7 @@ export default function LogScreen({ navigation }) {
       } catch (e) { /* silent fail */ }
 
       setPopScore(pop);
+      AccessibilityInfo.announceForAccessibility(`Your Clocked Score is ${pop.toFixed(1)}`);
       setSubmitted(true);
       navigation.navigate('Share', {
         popScore:         pop,
@@ -1250,12 +1518,12 @@ export default function LogScreen({ navigation }) {
           <Text style={s.successTitle}>Round Logged!</Text>
           {popScore !== null && (
             <View style={s.popScoreCard}>
-              <Text style={s.popScoreLabel}>{accountType === 'caddy' ? 'YOUR CADDY RATING' : 'YOUR POPSCORE'}</Text>
+              <Text style={s.popScoreLabel}>{accountType === 'caddy' ? 'YOUR CADDY RATING' : 'YOUR CLOCKED SCORE'}</Text>
               <Text style={s.popScoreValue}>{popScore.toFixed(1)}</Text>
             </View>
           )}
           <Text style={s.successSub}>
-            {accountType === 'caddy' ? 'Your Caddy Rating has been updated.' : 'Your profile POPScore has been updated.'}
+            {accountType === 'caddy' ? 'Your Caddy Rating has been updated.' : 'Your profile Clocked Score has been updated.'}
           </Text>
           <TouchableOpacity style={s.primaryBtn} onPress={resetAll}>
             <Text style={s.primaryBtnText}>LOG ANOTHER ROUND</Text>
@@ -1276,15 +1544,17 @@ export default function LogScreen({ navigation }) {
       <StepIndicator current={step} steps={STEPS} />
       <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 120 }}>
         {stepName === 'Course'    && <StepCourse data={data} onChange={setData} onNext={() => setStep(1)} />}
+        {stepName === 'Date'      && <StepDate data={data} onChange={setData} onNext={() => setStep(step + 1)} />}
+        {stepName === 'Time'      && <StepTime data={data} onChange={setData} />}
+        {stepName === 'Details'   && <StepDetails data={data} onChange={setData} onNext={() => setStep(step + 1)} />}
+        {stepName === 'Pace'      && <StepPaceDelay data={data} onChange={setData} onNext={() => setStep(step + 1)} />}
+        {stepName === 'Score'     && <StepGrossScore data={data} onChange={setData} handicap={authProfile?.handicap} />}
+        {stepName === 'RoundInfo' && <StepRoundInfo data={data} onChange={setData} handicap={authProfile?.handicap} />}
         {stepName === 'DateTime'  && <StepDateTime data={data} onChange={setData} />}
-        {stepName === 'Date'      && <StepDate data={data} onChange={setData} />}
-        {stepName === 'Details'   && <StepDetails data={data} onChange={setData} />}
         {stepName === 'Group'     && <StepGroup caddyGroup={caddyGroup} setCaddyGroup={setCaddyGroup} />}
         {stepName === 'Tee Time'  && <StepTeeTime value={data.teeTime} onChange={v => setData({ ...data, teeTime: v })} />}
         {stepName === 'Finish'    && <StepFinishTime teeTime={data.teeTime} finishTime={data.finishTime} onChange={v => setData({ ...data, finishTime: v })} />}
-        {stepName === 'Pace'      && <StepPaceDelay data={data} onChange={setData} />}
         {stepName === 'ScorePace' && <StepScorePace data={data} onChange={setData} handicap={authProfile?.handicap} />}
-        {stepName === 'Score'     && <StepGrossScore data={data} onChange={setData} handicap={authProfile?.handicap} />}
         {stepName === 'Summary'   && <StepSummary data={data} caddyGroup={caddyGroup} isCaddy={accountType === 'caddy'} />}
       </ScrollView>
       <View style={s.navRow}>

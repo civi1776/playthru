@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import InitialsAvatar from '../components/InitialsAvatar';
+import ChallengeButton from '../components/ChallengeButton';
 import { sendPushToUser } from '../lib/notifications';
 
 const PAGE_SIZE = 20;
@@ -71,9 +72,15 @@ function RoundContentCard({ content, navigation }) {
     content?.duration_minutes ? formatTime(content.duration_minutes) : null,
   ].filter(Boolean);
 
+  const leftBorderColor = pop != null
+    ? pop >= 4.0 ? '#7DC87A'
+    : pop >= 3.0 ? '#C9A84C'
+    : '#5A5A5A'
+    : '#7DC87A33';
+
   return (
     <TouchableOpacity
-      style={s.roundCard}
+      style={[s.roundCard, { borderLeftWidth: 3, borderLeftColor: leftBorderColor }]}
       onPress={() => navigation?.navigate('CourseProfile', { course: { name: content?.course_name } })}
       activeOpacity={0.85}
     >
@@ -83,9 +90,9 @@ function RoundContentCard({ content, navigation }) {
           {parts.length > 0 && <Text style={s.roundDetails}>{parts.join(' · ')}</Text>}
         </View>
         {pop != null && (
-          <View style={[s.popBadge, { borderColor: popColor(pop) }]}>
+          <View style={[s.popBadge, { borderColor: popColor(pop) + '88', backgroundColor: popColor(pop) + '12' }]}>
             <Text style={[s.popScore, { color: popColor(pop) }]}>{pop.toFixed(1)}</Text>
-            <Text style={[s.popLabel, { color: popColor(pop) }]}>POP</Text>
+            <Text style={[s.popLabel, { color: popColor(pop) }]}>CLK</Text>
           </View>
         )}
       </View>
@@ -113,11 +120,11 @@ function RoundContentCard({ content, navigation }) {
 function ActionBar({ item, liked, commentCount, onLike, onComment }) {
   return (
     <View style={s.actionBar}>
-      <TouchableOpacity style={s.actionBtn} onPress={onLike} activeOpacity={0.7}>
+      <TouchableOpacity style={s.actionBtn} onPress={onLike} activeOpacity={0.7} accessibilityLabel={liked ? 'Unlike' : 'Like'} accessibilityRole="button">
         <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={16} color={liked ? '#7DC87A' : '#7A6E58'} />
         {item.likes > 0 && <Text style={[s.actionCount, liked && { color: '#7DC87A' }]}>{item.likes}</Text>}
       </TouchableOpacity>
-      <TouchableOpacity style={s.actionBtn} onPress={onComment} activeOpacity={0.7}>
+      <TouchableOpacity style={s.actionBtn} onPress={onComment} activeOpacity={0.7} accessibilityLabel={commentCount > 0 ? `Comment, ${commentCount} comments` : 'Comment'} accessibilityRole="button">
         <Ionicons name="chatbubble-outline" size={15} color="#7A6E58" />
         {commentCount > 0 && <Text style={s.actionCount}>{commentCount}</Text>}
       </TouchableOpacity>
@@ -126,34 +133,56 @@ function ActionBar({ item, liked, commentCount, onLike, onComment }) {
 }
 
 // ─── Feed Item ────────────────────────────────────────────────────────────────
-function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, onComment }) {
+function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, onComment, myBestScore }) {
   const handle = item.username ? `@${item.username}` : (item.full_name?.split(' ')[0] ?? 'Golfer');
   const liked  = likedIds.has(item.id);
   const cCount = commentCounts[item.id] ?? 0;
 
   const actionLabel = (() => {
     switch (item.type) {
-      case 'round_logged':  return `logged a round at ${item.content?.course_name ?? '—'}`;
-      case 'milestone':     return null;
-      case 'course_review': return `reviewed ${item.content?.course_name ?? 'a course'}`;
-      case 'leaderboard':   return null;
-      case 'user_post':     return null;
-      default:              return 'posted an update';
+      case 'round_logged':       return 'logged a round';
+      case 'live_round_started': return null;
+      case 'milestone':          return null;
+      case 'course_review':      return `reviewed ${item.content?.course_name ?? 'a course'}`;
+      case 'leaderboard':        return null;
+      case 'user_post':          return null;
+      case 'course_leader':      return null;
+      case 'challenge_won':      return null;
+      default:                   return 'posted an update';
     }
   })();
 
+  const isLive = item.type === 'live_round_started';
+  const isCourseLeader = item.type === 'course_leader';
+  const isChallengeWon = item.type === 'challenge_won';
   return (
-    <View style={s.feedCard}>
+    <View style={[
+      s.feedCard,
+      isLive         && s.feedCardLive,
+      isCourseLeader && s.feedCardCourseLeader,
+      isChallengeWon && s.feedCardChallengeWon,
+    ]}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
         <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: item.user_id })} activeOpacity={0.8}>
-          <InitialsAvatar name={item.full_name} size={40} />
+          <View>
+            <InitialsAvatar name={item.full_name} size={40} />
+            {isLive && <View style={s.avatarLiveDot} />}
+          </View>
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
             <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: item.user_id })} activeOpacity={0.8}>
               <Text style={s.handle}>{handle}</Text>
             </TouchableOpacity>
-            <Text style={s.timestamp}>{timeAgo(item.created_at)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {isLive && (
+                <View style={s.liveNowBadge}>
+                  <View style={s.liveNowDot} />
+                  <Text style={s.liveNowText}>LIVE</Text>
+                </View>
+              )}
+              <Text style={s.timestamp}>{timeAgo(item.created_at)}</Text>
+            </View>
           </View>
 
           {actionLabel && <Text style={s.actionLabel}>{actionLabel}</Text>}
@@ -171,12 +200,29 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
             </>
           )}
 
-          {item.type === 'milestone' && (
-            <View style={s.milestoneBanner}>
-              <Text style={s.milestoneEmoji}>🏆</Text>
-              <Text style={s.milestoneText}>{item.content?.description ?? 'Reached a milestone'}</Text>
+          {isLive && (
+            <View style={s.liveBanner}>
+              <View style={s.liveDot} />
+              <Ionicons name="golf" size={14} color="#7DC87A" style={{ marginRight: 6 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.liveLabel}>Playing live at {item.content?.course_name ?? 'a course'}</Text>
+                {(item.content?.holes || item.content?.transport) && (
+                  <Text style={s.liveMeta}>{[item.content?.holes && `${item.content.holes} holes`, item.content?.transport].filter(Boolean).join(' · ')}</Text>
+                )}
+              </View>
             </View>
           )}
+
+          {item.type === 'milestone' && (() => {
+            const milestoneText = item.content?.title || item.content?.description || null;
+            if (!milestoneText) return null;
+            return (
+              <View style={s.milestoneBanner}>
+                <Ionicons name="star" size={18} color="#C9A84C" />
+                <Text style={s.milestoneText}>{milestoneText}</Text>
+              </View>
+            );
+          })()}
 
           {item.type === 'leaderboard' && (
             <View style={s.leaderBanner}>
@@ -192,13 +238,43 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
             </View>
           )}
 
-          <ActionBar
-            item={item}
-            liked={liked}
-            commentCount={cCount}
-            onLike={() => onLike(item, liked)}
-            onComment={() => onComment(item)}
-          />
+          {isCourseLeader && (
+            <View style={s.courseLeaderBanner}>
+              <Text style={s.courseLeaderEmoji}>🏆</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.courseLeaderText}>{item.content?.description ?? `${handle} is the fastest here`}</Text>
+                {item.content?.pop_score != null && (
+                  <Text style={s.courseLeaderScore}>{item.content.pop_score.toFixed(1)} CLK</Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {isChallengeWon && (
+            <View style={s.challengeWonBanner}>
+              <Text style={s.challengeWonEmoji}>⚡</Text>
+              <Text style={s.challengeWonText}>{item.content?.description ?? 'Won a challenge'}</Text>
+            </View>
+          )}
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+            <ActionBar
+              item={item}
+              liked={liked}
+              commentCount={cCount}
+              onLike={() => onLike(item, liked)}
+              onComment={() => onComment(item)}
+            />
+            {item.type === 'round_logged' && (
+              <ChallengeButton
+                targetUserId={item.user_id}
+                targetUsername={item.username ?? item.full_name?.split(' ')[0] ?? 'player'}
+                courseName={item.content?.course_name}
+                challengerScore={myBestScore}
+                variant="inline"
+              />
+            )}
+          </View>
         </View>
       </View>
     </View>
@@ -253,7 +329,7 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
       if (activity.user_id !== userId) {
         const { data: me } = await supabase.from('profiles').select('username, full_name').eq('id', userId).maybeSingle();
         const name = me?.username ? `@${me.username}` : (me?.full_name?.split(' ')[0] ?? 'Someone');
-        await sendPushToUser(activity.user_id, `${name} commented`, `"${body.slice(0, 60)}${body.length > 60 ? '…' : ''}"`);
+        await sendPushToUser(activity.user_id, `${name} commented`, `"${body.slice(0, 60)}${body.length > 60 ? '…' : ''}"`, 'comment');
       }
     } catch (e) {
       // silent fail
@@ -450,10 +526,25 @@ export default function ActivityFeedScreen({ navigation }) {
   const [commentCounts, setCommentCounts] = useState({});
   const [commentSheet,  setCommentSheet]  = useState(null);
   const [composeOpen,   setComposeOpen]   = useState(false);
+  const [myScoreMap,    setMyScoreMap]    = useState({});
 
   const offsetRef      = useRef(0);
   const followingRef   = useRef([]);
   const activeTabRef   = useRef('following');
+
+  useEffect(() => {
+    if (!uid) return;
+    supabase.from('rounds').select('course_name, pop_score')
+      .eq('user_id', uid).not('pop_score', 'is', null)
+      .order('pop_score', { ascending: false }).limit(100)
+      .then(({ data }) => {
+        const map = {};
+        for (const r of data ?? []) {
+          if (r.course_name && map[r.course_name] == null) map[r.course_name] = r.pop_score;
+        }
+        setMyScoreMap(map);
+      });
+  }, [uid]);
 
   const fetchFollowingIds = async () => {
     if (!uid) return [];
@@ -582,7 +673,7 @@ export default function ActivityFeedScreen({ navigation }) {
           const { data: me } = await supabase.from('profiles').select('username, full_name').eq('id', uid).maybeSingle();
           const name = me?.username ? `@${me.username}` : (me?.full_name?.split(' ')[0] ?? 'Someone');
           const where = item.content?.course_name ? `at ${item.content.course_name}` : '';
-          await sendPushToUser(item.user_id, `${name} liked your round`, where);
+          await sendPushToUser(item.user_id, `${name} liked your round`, where, 'like');
         }
       }
     } catch (e) {
@@ -616,7 +707,7 @@ export default function ActivityFeedScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn} activeOpacity={0.7} accessibilityLabel="Go back" accessibilityRole="button">
           <Text style={s.backArrow}>←</Text>
         </TouchableOpacity>
         <Text style={s.title}>ACTIVITY</Text>
@@ -657,6 +748,7 @@ export default function ActivityFeedScreen({ navigation }) {
               commentCounts={commentCounts}
               onLike={handleLike}
               onComment={setCommentSheet}
+              myBestScore={myScoreMap[item.content?.course_name] ?? null}
             />
           )}
           ItemSeparatorComponent={() => <View style={s.divider} />}
@@ -664,24 +756,24 @@ export default function ActivityFeedScreen({ navigation }) {
           onEndReached={onEndReached}
           onEndReachedThreshold={0.3}
           ListEmptyComponent={
-            <View style={s.centerState}>
-              <Ionicons name="golf-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
-              <Text style={s.emptyText}>
-                {tab === 'following'
-                  ? 'Follow golfers to see their rounds here.'
-                  : 'No activity yet. Log a round to get started!'}
-              </Text>
-              {tab === 'following' && (
-                <>
-                  <TouchableOpacity style={[s.btn, { marginBottom: 10 }]} onPress={() => switchTab('global')} activeOpacity={0.8}>
-                    <Text style={s.btnText}>EXPLORE GLOBAL FEED</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.btn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#C9A84C' }]} onPress={() => navigation.navigate('SearchUsers')} activeOpacity={0.8}>
-                    <Text style={s.btnText}>FIND GOLFERS</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
+            tab === 'following' ? (
+              <View style={s.centerState}>
+                <Ionicons name="flag-outline" size={52} color="rgba(201,168,76,0.25)" style={{ marginBottom: 16 }} />
+                <Text style={s.emptyTitle}>Nothing here yet</Text>
+                <Text style={s.emptyText}>Follow fast golfers to see their rounds, challenges, and milestones right here.</Text>
+                <TouchableOpacity style={s.btn} onPress={() => navigation.navigate('SearchUsers')} activeOpacity={0.8}>
+                  <Text style={s.btnText}>FIND GOLFERS →</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => switchTab('global')} activeOpacity={0.7} style={{ marginTop: 14 }}>
+                  <Text style={{ fontSize: 12, color: '#7A6E58', textDecorationLine: 'underline' }}>Browse global feed instead</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.centerState}>
+                <Ionicons name="golf-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+                <Text style={s.emptyText}>No activity yet. Log a round to get started!</Text>
+              </View>
+            )
           }
           ListFooterComponent={loadingMore ? <ActivityIndicator color="#C9A84C" style={{ paddingVertical: 20 }} /> : null}
           contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
@@ -725,41 +817,62 @@ const s = StyleSheet.create({
   tabText:        { fontSize: 11, fontWeight: '700', color: '#7A6E58', letterSpacing: 2 },
   tabTextActive:  { color: '#C9A84C' },
   // Feed card
-  feedCard:       { paddingHorizontal: 16, paddingVertical: 14 },
-  handle:         { fontSize: 14, fontWeight: '700', color: '#F5EDD8' },
-  timestamp:      { fontSize: 11, color: '#7A6E58' },
-  actionLabel:    { fontSize: 13, color: '#B8A882', marginTop: 2, marginBottom: 8 },
-  postText:       { fontSize: 15, color: '#F5EDD8', lineHeight: 22, marginTop: 6, marginBottom: 8 },
-  divider:        { height: 1, backgroundColor: '#7DC87A18', marginLeft: 66 },
+  feedCard:            { paddingHorizontal: 16, paddingVertical: 18 },
+  feedCardLive:        { borderLeftWidth: 3, borderLeftColor: '#7DC87A', paddingLeft: 13, backgroundColor: 'rgba(125,200,122,0.03)' },
+  feedCardCourseLeader:{ borderLeftWidth: 3, borderLeftColor: '#C9A84C', paddingLeft: 13, backgroundColor: 'rgba(201,168,76,0.03)' },
+  feedCardChallengeWon:{ borderLeftWidth: 3, borderLeftColor: '#C9A84C88', paddingLeft: 13 },
+  avatarLiveDot:       { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#7DC87A', borderWidth: 1.5, borderColor: '#131A14' },
+  // Live NOW badge
+  liveNowBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#7DC87A22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  liveNowDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#7DC87A' },
+  liveNowText:   { fontSize: 9, fontWeight: '800', color: '#7DC87A', letterSpacing: 1 },
+  // Live banner
+  liveBanner:    { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: '#7DC87A0D', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#7DC87A22' },
+  liveDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#7DC87A', marginTop: 4 },
+  liveLabel:     { fontSize: 13, color: '#F5EDD8', fontWeight: '600', lineHeight: 18 },
+  liveMeta:      { fontSize: 11, color: '#7DC87A', marginTop: 3 },
+  handle:        { fontSize: 14, fontWeight: '800', color: '#F5EDD8' },
+  timestamp:     { fontSize: 10, color: 'rgba(184,168,130,0.6)' },
+  actionLabel:   { fontSize: 13, color: '#B8A882', marginTop: 2, marginBottom: 8 },
+  postText:      { fontSize: 15, color: '#F5EDD8', lineHeight: 22, marginTop: 6, marginBottom: 8 },
+  divider:       { height: 1, backgroundColor: '#7DC87A12', marginLeft: 66 },
   // Round card inside feed
-  roundCard:      { marginTop: 8, backgroundColor: '#0D1A0F', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#7DC87A22' },
-  roundCourse:    { fontSize: 14, fontWeight: '600', color: '#F5EDD8', marginBottom: 3 },
-  roundDetails:   { fontSize: 11, color: '#B8A882' },
-  popBadge:       { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, alignItems: 'center' },
-  popScore:       { fontSize: 16, fontWeight: '700' },
-  popLabel:       { fontSize: 7, fontWeight: '700', letterSpacing: 1 },
-  verifiedBadge:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  verifiedText:   { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1 },
-  bestBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  bestText:       { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 1 },
+  roundCard:     { marginTop: 8, backgroundColor: '#0D1A0F', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#7DC87A18' },
+  roundCourse:   { fontSize: 14, fontWeight: '600', color: '#F5EDD8', marginBottom: 3 },
+  roundDetails:  { fontSize: 11, color: '#B8A882' },
+  popBadge:      { borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center', minWidth: 52 },
+  popScore:      { fontSize: 20, fontWeight: '800' },
+  popLabel:      { fontSize: 7, fontWeight: '700', letterSpacing: 1.5, marginTop: -2 },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  verifiedText:  { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1 },
+  bestBadge:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  bestText:      { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 1 },
   // Actions
-  actionBar:      { flexDirection: 'row', gap: 20, marginTop: 10 },
-  actionBtn:      { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  actionCount:    { fontSize: 13, color: '#7A6E58' },
-  // Milestone / leaderboard / review
-  milestoneBanner:{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#C9A84C33' },
-  milestoneEmoji: { fontSize: 20 },
-  milestoneText:  { flex: 1, fontSize: 14, color: '#F5EDD8', lineHeight: 20 },
-  leaderBanner:   { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#C9A84C33' },
-  leaderText:     { flex: 1, fontSize: 14, color: '#F5EDD8', lineHeight: 20 },
-  reviewBanner:   { backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#7DC87A22' },
-  reviewStars:    { fontSize: 14, color: '#C9A84C', marginBottom: 4 },
-  reviewSnippet:  { fontSize: 13, color: '#B8A882', lineHeight: 19, fontStyle: 'italic' },
+  actionBar:     { flexDirection: 'row', gap: 20 },
+  actionBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 44, minHeight: 44, justifyContent: 'center' },
+  actionCount:   { fontSize: 13, color: '#7A6E58' },
+  // Milestone / leaderboard / review / course leader / challenge won
+  milestoneBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#C9A84C33' },
+  milestoneEmoji:      { fontSize: 20 },
+  milestoneText:       { flex: 1, fontSize: 14, color: '#F5EDD8', lineHeight: 20 },
+  leaderBanner:        { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#C9A84C33' },
+  leaderText:          { flex: 1, fontSize: 14, color: '#F5EDD8', lineHeight: 20 },
+  reviewBanner:        { backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#7DC87A22' },
+  reviewStars:         { fontSize: 14, color: '#C9A84C', marginBottom: 4 },
+  reviewSnippet:       { fontSize: 13, color: '#B8A882', lineHeight: 19, fontStyle: 'italic' },
+  courseLeaderBanner:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#C9A84C0D', borderRadius: 10, padding: 12, marginTop: 8, borderWidth: 1, borderColor: '#C9A84C44' },
+  courseLeaderEmoji:   { fontSize: 22 },
+  courseLeaderText:    { fontSize: 14, fontWeight: '600', color: '#F5EDD8', lineHeight: 20 },
+  courseLeaderScore:   { fontSize: 12, fontWeight: '700', color: '#C9A84C', marginTop: 2 },
+  challengeWonBanner:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#C9A84C0D', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: '#C9A84C55' },
+  challengeWonEmoji:   { fontSize: 20 },
+  challengeWonText:    { flex: 1, fontSize: 14, color: '#F5EDD8', lineHeight: 20 },
   // States
-  centerState:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 60 },
-  emptyText:      { fontSize: 17, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', lineHeight: 26, marginBottom: 20 },
-  btn:            { backgroundColor: '#C9A84C', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 },
-  btnText:        { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  centerState:   { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingVertical: 60 },
+  emptyTitle:    { fontSize: 18, fontWeight: '700', color: '#B8A882', textAlign: 'center', marginBottom: 10 },
+  emptyText:     { fontSize: 14, color: '#7A6E58', textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  btn:           { backgroundColor: '#C9A84C', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 },
+  btnText:       { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
   // FAB
   fab:            { position: 'absolute', bottom: 24, right: 20, width: 52, height: 52, borderRadius: 26, backgroundColor: '#C9A84C', alignItems: 'center', justifyContent: 'center', shadowColor: '#C9A84C', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
 });

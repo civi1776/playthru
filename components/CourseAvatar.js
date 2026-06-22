@@ -34,6 +34,8 @@ export default function CourseAvatar({ courseName, city, size = 40 }) {
         source={{ uri: photoUrl }}
         style={{ width: size, height: size, borderRadius: radius, backgroundColor: '#0D1A0F', marginRight: 10 }}
         resizeMode="cover"
+        accessibilityRole="image"
+        accessibilityLabel={courseName ? `${courseName} course photo` : 'Course'}
       />
     );
   }
@@ -49,7 +51,7 @@ export default function CourseAvatar({ courseName, city, size = 40 }) {
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 10,
-    }}>
+    }} accessibilityRole="image" accessibilityLabel={courseName ? `${courseName} course` : 'Course'}>
       <Ionicons name="golf" size={Math.round(size * 0.45)} color="#7DC87A88" />
     </View>
   );

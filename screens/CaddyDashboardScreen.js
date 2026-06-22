@@ -286,7 +286,7 @@ function QuickLogModal({ visible, onClose, caddyId, onSuccess }) {
       if (isGuest && guestName) {
         Alert.alert(
           '✓ Round Logged',
-          `${courseName} · ${formatDuration(duration)}\n\nInvite ${guestName} to PlayThru so they can see their pace stats!`,
+          `${courseName} · ${formatDuration(duration)}\n\nInvite ${guestName} to Clocked so they can see their pace stats!`,
           [
             { text: 'Invite →', onPress: () => {} },
             { text: 'Done', style: 'cancel' },
@@ -338,7 +338,7 @@ function QuickLogModal({ visible, onClose, caddyId, onSuccess }) {
                 <Text style={m.sectionLabel}>WHO DID YOU LOOP FOR?</Text>
                 <TextInput
                   style={m.input}
-                  placeholder="Search PlayThru users or enter name..."
+                  placeholder="Search Clocked users or enter name..."
                   placeholderTextColor="#B8A88266"
                   value={clientQuery}
                   onChangeText={setClientQuery}
@@ -360,7 +360,7 @@ function QuickLogModal({ visible, onClose, caddyId, onSuccess }) {
                         <View style={{ flex: 1, marginLeft: 10 }}>
                           <Text style={m.dropdownName}>{u.full_name || u.username}</Text>
                           {u.pop_score != null && (
-                            <Text style={m.dropdownSub}>POPScore {u.pop_score.toFixed(1)}</Text>
+                            <Text style={m.dropdownSub}>Clocked Score {u.pop_score.toFixed(1)}</Text>
                           )}
                         </View>
                         <Ionicons name="checkmark-circle" size={16} color="#7DC87A" />
@@ -382,7 +382,7 @@ function QuickLogModal({ visible, onClose, caddyId, onSuccess }) {
                       </View>
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={m.dropdownName}>Log for Guest: {clientQuery.trim()}</Text>
-                        <Text style={m.dropdownSub}>Not on PlayThru · still counts toward your loops</Text>
+                        <Text style={m.dropdownSub}>Not on Clocked · still counts toward your loops</Text>
                       </View>
                     </TouchableOpacity>
                   </View>
@@ -956,7 +956,7 @@ function ClientsTab({ caddyId }) {
                 <Text style={d.clientName}>{c.name}</Text>
                 <Text style={d.clientMeta}>
                   {c.rounds} round{c.rounds !== 1 ? 's' : ''}
-                  {c.popScore != null ? ` · POPScore ${c.popScore.toFixed(1)}` : ''}
+                  {c.popScore != null ? ` · Clocked Score ${c.popScore.toFixed(1)}` : ''}
                   {' · Last '}
                   {formatShortDate(c.lastDate)}
                 </Text>
@@ -987,7 +987,7 @@ function ClientsTab({ caddyId }) {
                   <TouchableOpacity style={d.inviteBtn} activeOpacity={0.8}
                     onPress={() => Alert.alert('Invite', `Share link for ${c.name} — coming soon.`)}>
                     <Ionicons name="share-outline" size={13} color="#7DC87A" />
-                    <Text style={d.inviteTxt}>INVITE TO PLAYTHRU</Text>
+                    <Text style={d.inviteTxt}>INVITE TO CLOCKED</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1094,7 +1094,7 @@ function StatsTab({ caddyId, profile, courseRank, nationalRank, signOut }) {
               <Text style={[d.statVal, { fontSize: 15 }]}>
                 {stats.avgClientPop != null ? stats.avgClientPop.toFixed(1) : '—'}
               </Text>
-              <Text style={d.statLbl}>AVG CLIENT{'\n'}POPSCORE</Text>
+              <Text style={d.statLbl}>AVG CLIENT{'\n'}CLOCKED SCORE</Text>
             </View>
           </View>
 
@@ -1188,6 +1188,130 @@ function StatsTab({ caddyId, profile, courseRank, nationalRank, signOut }) {
 
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
 
+// ─── Ambassador Rewards Tab ──────────────────────────────────────────────────
+function RewardsTab({ caddyId }) {
+  const [tiers, setTiers]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [myScore, setMyScore]   = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // Fetch rewards config
+        const { data: configRow } = await supabase
+          .from('app_config').select('value')
+          .eq('key', 'clocked_ambassador_rewards').maybeSingle();
+        if (configRow?.value) {
+          const parsed = JSON.parse(configRow.value);
+          setTiers(parsed.tiers ?? []);
+        }
+
+        // Compute ambassador score: rounds operated + referrals
+        if (caddyId) {
+          const [roundsRes, profileRes] = await Promise.all([
+            supabase.from('rounds').select('id', { count: 'exact', head: true })
+              .eq('caddy_id', caddyId).eq('round_format', 'clocked'),
+            supabase.from('profiles').select('referral_count').eq('id', caddyId).maybeSingle(),
+          ]);
+          setMyScore((roundsRes.count ?? 0) + (profileRes.data?.referral_count ?? 0));
+        }
+      } catch { /* silent */ }
+      finally { setLoading(false); }
+    })();
+  }, [caddyId]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 40 }}>
+        <ActivityIndicator color="#C9A84C" />
+      </View>
+    );
+  }
+
+  // Determine current tier
+  const sortedTiers = [...tiers].sort((a, b) => b.threshold - a.threshold);
+  const currentTier = sortedTiers.find(t => myScore >= t.threshold) ?? null;
+
+  return (
+    <ScrollView contentContainerStyle={rw.container}>
+      {/* Score header */}
+      <View style={rw.scoreCard}>
+        <Text style={rw.scoreLabel}>YOUR AMBASSADOR SCORE</Text>
+        <Text style={rw.scoreValue}>{myScore}</Text>
+        <Text style={rw.scoreSub}>rounds operated + players referred</Text>
+      </View>
+
+      {/* Tiers */}
+      {tiers.map((tier, i) => {
+        const isCurrent = currentTier?.name === tier.name;
+        const isLocked = myScore < tier.threshold;
+        return (
+          <View key={i} style={[rw.tierCard, isCurrent && rw.tierCardCurrent, isLocked && rw.tierCardLocked]}>
+            <View style={rw.tierHeader}>
+              <View style={rw.tierNameRow}>
+                <Ionicons
+                  name={isCurrent ? 'checkmark-circle' : isLocked ? 'lock-closed-outline' : 'checkmark-circle-outline'}
+                  size={16}
+                  color={isCurrent ? '#7DC87A' : isLocked ? '#7A6E58' : '#C9A84C'}
+                />
+                <Text style={[rw.tierName, isCurrent && rw.tierNameCurrent, isLocked && rw.tierNameLocked]}>
+                  {tier.name}
+                </Text>
+              </View>
+              <Text style={[rw.tierThreshold, isLocked && rw.tierThresholdLocked]}>
+                {tier.threshold === 0 ? 'Start' : `${tier.threshold}+ pts`}
+              </Text>
+            </View>
+            {(tier.perks ?? []).map((perk, j) => (
+              <View key={j} style={rw.perkRow}>
+                <View style={[rw.perkDot, isLocked && rw.perkDotLocked]} />
+                <Text style={[rw.perkText, isLocked && rw.perkTextLocked]}>{perk}</Text>
+              </View>
+            ))}
+            {isCurrent && (
+              <View style={rw.currentBadge}>
+                <Text style={rw.currentBadgeText}>CURRENT TIER</Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
+
+      {tiers.length === 0 && (
+        <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+          <Text style={{ fontSize: 14, color: '#7A6E58' }}>Rewards coming soon.</Text>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const rw = StyleSheet.create({
+  container:      { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 12 },
+  scoreCard:      { alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#C9A84C33', padding: 20, marginBottom: 16 },
+  scoreLabel:     { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 6 },
+  scoreValue:     { fontSize: 48, fontWeight: '200', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
+  scoreSub:       { fontSize: 10, color: '#7A6E58', marginTop: 4 },
+  tierCard:       { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, marginBottom: 10 },
+  tierCardCurrent:{ borderColor: '#7DC87A', backgroundColor: '#7DC87A08' },
+  tierCardLocked: { opacity: 0.55 },
+  tierHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  tierNameRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tierName:       { fontSize: 15, fontWeight: '700', color: '#F5EDD8' },
+  tierNameCurrent:{ color: '#7DC87A' },
+  tierNameLocked: { color: '#7A6E58' },
+  tierThreshold:  { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 1 },
+  tierThresholdLocked: { color: '#7A6E58' },
+  perkRow:        { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  perkDot:        { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#C9A84C' },
+  perkDotLocked:  { backgroundColor: '#7A6E58' },
+  perkText:       { fontSize: 13, color: '#B8A882', lineHeight: 18 },
+  perkTextLocked: { color: '#7A6E58' },
+  currentBadge:   { marginTop: 8, alignSelf: 'flex-start', backgroundColor: '#7DC87A22', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  currentBadgeText:{ fontSize: 8, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
+});
+
+// ─── Main Dashboard ──────────────────────────────────────────────────────────
 export default function CaddyDashboardScreen({ navigation }) {
   const { profile, user, refreshProfile, signOut } = useAuth();
   const [activeTab, setActiveTab]         = useState('today');
@@ -1221,6 +1345,7 @@ export default function CaddyDashboardScreen({ navigation }) {
   const TABS = [
     { key: 'today',   label: 'TODAY',      icon: 'sunny-outline' },
     { key: 'clients', label: 'MY CLIENTS', icon: 'people-outline' },
+    { key: 'rewards', label: 'REWARDS',    icon: 'gift-outline' },
     { key: 'stats',   label: 'STATS',      icon: 'stats-chart-outline' },
   ];
 
@@ -1230,15 +1355,25 @@ export default function CaddyDashboardScreen({ navigation }) {
       {/* Header */}
       <View style={d.header}>
         <View>
-          <Text style={d.wordmark}>PLAYTHRU</Text>
+          <Text style={d.wordmark}>CLOCKED</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
             <Text style={d.name}>{firstName}</Text>
-            <View style={d.caddyBadge}><Text style={d.caddyBadgeText}>CADDY</Text></View>
+            <View style={d.ambassadorBadge}><Text style={d.ambassadorBadgeText}>AMBASSADOR</Text></View>
           </View>
           {!!caddyCourse && <Text style={d.courseSub}>{caddyCourse}</Text>}
         </View>
-        <InitialsAvatar name={profile?.full_name} size={44} />
+        <InitialsAvatar name={profile?.full_name} size={44} avatarUrl={profile?.avatar_url} />
       </View>
+
+      {/* Operate a round CTA */}
+      <TouchableOpacity
+        style={d.operateBtn}
+        onPress={() => navigation.getParent()?.navigate('ClockedSetup') ?? navigation.navigate('ClockedSetup')}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="timer-outline" size={18} color="#090F0A" />
+        <Text style={d.operateBtnText}>OPERATE ON THE CLOCK</Text>
+      </TouchableOpacity>
 
       {/* Tab bar */}
       <View style={d.tabBar}>
@@ -1267,6 +1402,9 @@ export default function CaddyDashboardScreen({ navigation }) {
       {activeTab === 'clients' && (
         <ClientsTab caddyId={caddyId} />
       )}
+      {activeTab === 'rewards' && (
+        <RewardsTab caddyId={caddyId} />
+      )}
       {activeTab === 'stats' && (
         <StatsTab
           caddyId={caddyId}
@@ -1289,6 +1427,10 @@ const d = StyleSheet.create({
   name:         { fontSize: 20, fontWeight: '600', color: '#F5EDD8' },
   caddyBadge:   { backgroundColor: '#7DC87A', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 2 },
   caddyBadgeText:{ fontSize: 8, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
+  ambassadorBadge:   { backgroundColor: '#7DC87A', borderRadius: 5, paddingHorizontal: 8, paddingVertical: 2 },
+  ambassadorBadgeText:{ fontSize: 8, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
+  operateBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 16, marginVertical: 10, backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 14 },
+  operateBtnText:{ fontSize: 12, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
   courseSub:    { fontSize: 10, color: '#B8A882', marginTop: 2 },
   avatarCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#7DC87A22', borderWidth: 1, borderColor: '#7DC87A', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarInitials:{ fontSize: 16, fontWeight: '600', color: '#7DC87A' },

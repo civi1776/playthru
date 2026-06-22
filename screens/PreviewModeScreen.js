@@ -44,9 +44,9 @@ function SignupGateModal({ visible, onClose, onSignup, feature }) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={p.gateOverlay}>
         <View style={p.gateCard}>
-          <Text style={p.gateTitle}>Join PlayThru</Text>
+          <Text style={p.gateTitle}>Join Clocked</Text>
           <Text style={p.gateSub}>
-            {feature || 'Create a free account to get your POPScore and compete nationally'}
+            {feature || 'Create a free account to get your Clocked Score and compete nationally'}
           </Text>
           <TouchableOpacity style={p.gateBtn} onPress={onSignup} activeOpacity={0.85}>
             <Text style={p.gateBtnText}>CREATE FREE ACCOUNT</Text>
@@ -517,7 +517,10 @@ export default function PreviewModeScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={p.backBtn} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={20} color="#C9A84C" />
         </TouchableOpacity>
-        <Text style={p.headerTitle}>EXPLORE PLAYTHRU</Text>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={p.headerTitle}>EXPLORE CLOCKED</Text>
+          <Text style={p.headerTagline}>ON THE CLOCK</Text>
+        </View>
         <View style={{ width: 36 }} />
       </View>
 
@@ -582,7 +585,8 @@ const p = StyleSheet.create({
   // Header
   headerRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  headerTitle:   { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  headerTagline: { fontSize: 8, fontWeight: '600', color: '#C9A84C88', letterSpacing: 2, marginTop: 2 },
 
   // Tab bar
   tabBar:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },

@@ -107,7 +107,7 @@ export default function ClaimRoundScreen({ navigation, route }) {
 
       Alert.alert(
         'Round Added',
-        `Your POPScore for this round is ${claimedPOP.toFixed(1)}. (+5% caddy bonus applied)`,
+        `Your Clocked Score for this round is ${claimedPOP.toFixed(1)}. (+5% caddy bonus applied)`,
       );
       navigation.goBack();
     } catch (e) {
@@ -145,7 +145,7 @@ export default function ClaimRoundScreen({ navigation, route }) {
 
         {/* POPScore card */}
         <View style={s.popCard}>
-          <Text style={s.popLabel}>YOUR POPSCORE</Text>
+          <Text style={s.popLabel}>YOUR CLOCKED SCORE</Text>
           <Text style={[s.popValue, { color: popColor(claimedPOP) }]}>{claimedPOP.toFixed(1)}</Text>
           <View style={s.bonusRow}>
             <Ionicons name="arrow-up-circle" size={12} color="#7DC87A" style={{ marginRight: 4 }} />
@@ -162,7 +162,7 @@ export default function ClaimRoundScreen({ navigation, route }) {
         </View>
 
         <Text style={s.disclaimer}>
-          A caddy logged this round for your group at {round.course_name ?? 'this course'}. Adding it to your history will record a POPScore of {claimedPOP.toFixed(1)}.
+          A caddy logged this round for your group at {round.course_name ?? 'this course'}. Adding it to your history will record an Clocked Score of {claimedPOP.toFixed(1)}.
         </Text>
 
         <TouchableOpacity

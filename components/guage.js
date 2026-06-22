@@ -85,7 +85,7 @@ export default function Gauge({ score = 4.2, size = 220 }) {
       {/* Score number — counts up from 0 */}
       <View style={styles.center}>
         <Text style={[styles.score, { fontSize: scoreFontSize }]}>{displayScore.toFixed(1)}</Text>
-        <Text style={[styles.label, { fontSize: Math.max(6, Math.round(8 * scale)) }]}>POPSCORE</Text>
+        <Text style={[styles.label, { fontSize: Math.max(6, Math.round(8 * scale)) }]}>CLOCKED SCORE</Text>
       </View>
     </View>
   );

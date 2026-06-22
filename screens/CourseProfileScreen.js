@@ -130,6 +130,7 @@ export default function CourseProfileScreen({ navigation, route }) {
   const [leaderboard, setLeaderboard]     = useState([]);
   const [avgDuration, setAvgDuration]     = useState(null);
   const [fastestDuration, setFastestDuration] = useState(null);
+  const [liveRoundCount, setLiveRoundCount] = useState(0);
   const [reviews, setReviews]             = useState([]);
   const [userReview, setUserReview]       = useState(null);
   const [hasPlayedHere, setHasPlayedHere] = useState(false);
@@ -146,37 +147,58 @@ export default function CourseProfileScreen({ navigation, route }) {
     try {
     const uid = session?.user?.id ?? null;
 
-    // Live course data
-    const { data: course } = await supabase
-      .from('courses')
-      .select('id, name, city, state, par, pop_score, total_rounds, description, website')
-      .eq('id', initialCourse.id)
-      .maybeSingle();
+    // Look up course — by id when available, by name as fallback
+    let course = null;
+    if (initialCourse.id != null) {
+      const { data } = await supabase
+        .from('courses')
+        .select('id, name, city, state, par, pop_score, total_rounds, description, website')
+        .eq('id', initialCourse.id)
+        .maybeSingle();
+      course = data;
+    }
+    if (!course && initialCourse.name) {
+      const { data } = await supabase
+        .from('courses')
+        .select('id, name, city, state, par, pop_score, total_rounds, description, website')
+        .eq('name', initialCourse.name)
+        .maybeSingle();
+      course = data;
+    }
     setCourseData(course);
 
-    // Follow status
-    const { data: followRow } = await supabase
-      .from('course_follows')
-      .select('id')
-      .eq('user_id', uid)
-      .eq('course_id', initialCourse.id)
-      .maybeSingle();
-    setFollowed(!!followRow);
+    // Follow status (needs course id)
+    if (course?.id && uid) {
+      const { data: followRow } = await supabase
+        .from('course_follows')
+        .select('id')
+        .eq('user_id', uid)
+        .eq('course_id', course.id)
+        .maybeSingle();
+      setFollowed(!!followRow);
+    }
 
-    // All rounds at this course (for stats, leaderboard, activity)
+    // All rounds at this course — live query, keyed by name (reliable across both formats)
+    const courseName = course?.name ?? initialCourse.name;
     const { data: allRounds } = await supabase
       .from('rounds')
-      .select('id, pop_score, duration_minutes, created_at, user_id, profiles!rounds_user_id_fkey(full_name, username)')
-      .eq('course_name', initialCourse.name)
+      .select('id, pop_score, duration_minutes, holes, created_at, user_id, round_format, flagged, profiles(full_name, username)')
+      .eq('course_name', courseName)
+      .eq('flagged', false)
       .order('created_at', { ascending: false });
 
+    setLiveRoundCount(allRounds?.length ?? 0);
+
     if (allRounds && allRounds.length > 0) {
-      // Stats: avg and fastest duration
+      // Live stats from rounds (not from stale cached columns)
       const withDuration = allRounds.filter(r => r.duration_minutes);
       if (withDuration.length > 0) {
-        const sum = withDuration.reduce((acc, r) => acc + r.duration_minutes, 0);
+        const sum = withDuration.reduce((acc, r) => acc + parseFloat(r.duration_minutes), 0);
         setAvgDuration(Math.round(sum / withDuration.length));
-        setFastestDuration(Math.min(...withDuration.map(r => r.duration_minutes)));
+        const fullRounds = withDuration.filter(r => r.holes === '18' || r.holes === 18);
+        if (fullRounds.length > 0) {
+          setFastestDuration(Math.min(...fullRounds.map(r => parseFloat(r.duration_minutes))));
+        }
       }
 
       // Leaderboard: best round per unique user, sorted by pop_score desc, top 10
@@ -193,12 +215,13 @@ export default function CourseProfileScreen({ navigation, route }) {
       setRecentRounds(allRounds.slice(0, 10));
     }
 
-    // Reviews (only if course has a valid UUID id)
-    if (initialCourse.id && typeof initialCourse.id === 'string' && initialCourse.id.length > 10) {
+    // Reviews — use the resolved course id
+    const courseId = course?.id ?? initialCourse.id;
+    if (courseId != null) {
       const { data: reviewsData } = await supabase
         .from('course_reviews')
         .select('id, user_id, body, pace_rating, created_at, profiles!course_reviews_user_id_fkey(username, full_name, avatar_url)')
-        .eq('course_id', initialCourse.id)
+        .eq('course_id', courseId)
         .order('created_at', { ascending: false })
         .limit(20);
       const revs = reviewsData ?? [];
@@ -206,15 +229,12 @@ export default function CourseProfileScreen({ navigation, route }) {
 
       if (uid) {
         setUserReview(revs.find(r => r.user_id === uid) ?? null);
-        const { data: playedRound } = await supabase
-          .from('rounds')
-          .select('id')
-          .eq('course_name', initialCourse.name)
-          .eq('user_id', uid)
-          .limit(1)
-          .maybeSingle();
-        setHasPlayedHere(!!playedRound);
       }
+    }
+
+    // "Played here" — use the live rounds we already fetched
+    if (uid && allRounds) {
+      setHasPlayedHere(allRounds.some(r => r.user_id === uid));
     }
 
     } catch (e) {
@@ -232,12 +252,12 @@ export default function CourseProfileScreen({ navigation, route }) {
       setFollowed(false);
       await supabase.from('course_follows').delete()
         .eq('user_id', userId)
-        .eq('course_id', initialCourse.id);
+        .eq('course_id', courseData?.id ?? initialCourse.id);
     } else {
       setFollowed(true);
       await supabase.from('course_follows').insert({
         user_id: userId,
-        course_id: initialCourse.id,
+        course_id: courseData?.id ?? initialCourse.id,
       });
     }
     setFollowLoading(false);
@@ -249,7 +269,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     setSubmitting(true);
     try {
       const { error } = await supabase.from('course_reviews').insert({
-        course_id: initialCourse.id,
+        course_id: courseData?.id ?? initialCourse.id,
         user_id: uid,
         body: reviewInput.trim(),
         pace_rating: paceRating,
@@ -275,7 +295,7 @@ export default function CourseProfileScreen({ navigation, route }) {
   };
 
   const pop          = parseFloat(courseData?.pop_score ?? initialCourse.avgPop ?? 3.5) || 3.5;
-  const totalRounds  = courseData?.total_rounds ?? initialCourse.rounds ?? 0;
+  const totalRounds  = liveRoundCount || courseData?.total_rounds || initialCourse.rounds || 0;
   const par          = courseData?.par ?? initialCourse.par ?? 72;
   const description  = courseData?.description;
   const location     = initialCourse.location
@@ -311,8 +331,8 @@ export default function CourseProfileScreen({ navigation, route }) {
           <View style={s.hero}>
             <View style={{ marginBottom: 12 }}>
               <CourseAvatar
-                courseName={initialCourse.name}
-                city={location?.split(',')[0]?.trim()}
+                courseName={courseData?.name ?? initialCourse.name}
+                city={courseData?.city ?? initialCourse.city}
                 size={52}
               />
             </View>
@@ -323,7 +343,7 @@ export default function CourseProfileScreen({ navigation, route }) {
           {/* POPScore hero */}
           <View style={s.popHeroCard}>
             <Text style={[s.popHeroNum, { color: popColor(pop) }]}>{pop.toFixed(1)}</Text>
-            <Text style={s.popHeroLabel}>COURSE POPSCORE</Text>
+            <Text style={s.popHeroLabel}>COURSE CLOCKED SCORE</Text>
             {totalRounds > 0 && (
               <Text style={s.popHeroRounds}>Based on {Number(totalRounds).toLocaleString()} rounds</Text>
             )}
@@ -391,10 +411,10 @@ export default function CourseProfileScreen({ navigation, route }) {
           )}
 
           {/* Leaderboard */}
-          {leaderboard.length > 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionLabel}>TOP PACE PLAYERS</Text>
-              {leaderboard.map((round, i) => {
+          <View style={s.section}>
+            <Text style={s.sectionLabel}>TOP PACE PLAYERS</Text>
+            {leaderboard.length > 0 ? (
+              leaderboard.map((round, i) => {
                 const name = round.profiles?.full_name?.split(' ')[0]
                           ?? round.profiles?.username
                           ?? 'Unknown';
@@ -413,9 +433,14 @@ export default function CourseProfileScreen({ navigation, route }) {
                     </Text>
                   </View>
                 );
-              })}
-            </View>
-          )}
+              })
+            ) : (
+              <View style={s.emptyCard}>
+                <Ionicons name="trophy-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 12 }} />
+                <Text style={s.emptyText}>No rounds logged here yet. Be the first.</Text>
+              </View>
+            )}
+          </View>
 
           {/* Recent Activity */}
           {recentRounds.length > 0 && (
@@ -448,17 +473,6 @@ export default function CourseProfileScreen({ navigation, route }) {
             </View>
           )}
 
-          {/* Leaderboard empty state */}
-          {leaderboard.length === 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionLabel}>TOP PACE PLAYERS</Text>
-              <View style={s.emptyCard}>
-                <Ionicons name="trophy-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 12 }} />
-                <Text style={s.emptyText}>No rounds logged here yet. Be the first.</Text>
-              </View>
-            </View>
-          )}
-
           {/* Activity empty state */}
           {recentRounds.length === 0 && (
             <View style={s.section}>
@@ -470,7 +484,7 @@ export default function CourseProfileScreen({ navigation, route }) {
           )}
 
           {/* ── PACE REVIEWS ── */}
-          {initialCourse.id && typeof initialCourse.id === 'string' && initialCourse.id.length > 10 && (
+          {(courseData?.id ?? initialCourse.id) != null && (
             <View style={s.section}>
               <Text style={s.sectionLabel}>PACE REVIEWS</Text>
 
@@ -690,4 +704,9 @@ const s = StyleSheet.create({
   errorText:          { fontSize: 20, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', marginBottom: 20 },
   retryBtn:           { backgroundColor: '#C9A84C', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 },
   retryText:          { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  lockedCard:         { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, gap: 12, overflow: 'hidden' },
+  lockedRow:          { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, opacity: 0.35 },
+  lockedPlaceholder:  { height: 12, backgroundColor: '#B8A882', borderRadius: 6 },
+  lockedOverlay:      { alignItems: 'center', justifyContent: 'center', paddingVertical: 10, gap: 6 },
+  lockedOverlayText:  { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
 });

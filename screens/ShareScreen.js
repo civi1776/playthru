@@ -13,23 +13,14 @@ import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Ellipse, Line, Rect, Text as SvgText } from 'react-native-svg';
+import ClockedShareCard from '../components/ClockedShareCard';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const CARD_WIDTH  = Math.floor(SW * 0.88);
 const CARD_HEIGHT = Math.floor(SH * 0.62);
 
-// Sticker capped to card dimensions with a small margin
-const STICKER_W = Math.min(320, CARD_WIDTH  - 16);
-const STICKER_H = Math.min(420, CARD_HEIGHT - 16);
-
-const CARD_LABELS = [
-  'TRANSPARENT STICKER',
-  'COURSE MAP',
-  'SPEEDOMETER',
-  'PACE VS NATIONAL AVG',
-];
-const NUM_CARDS = 4;
+const STICKER_W = 260;
+const NUM_CARDS  = 2;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -48,285 +39,58 @@ function formatRelToPar(grossScore, holes, isPar3 = false) {
   return diff > 0 ? `+${diff}` : `${diff}`;
 }
 
-// ─── Verification dot ─────────────────────────────────────────────────────────
+// ─── Style 1: Frosted Glass ───────────────────────────────────────────────────
 
-function VerifDot({ level }) {
-  if (level === 'caddy_corroborated') {
-    return <Ionicons name="checkmark-circle" size={15} color="#C9A84C" />;
-  }
+function CardFrosted({ cardRef, roundTime, scoreStr, grossScore, relToPar, courseName }) {
   return (
-    <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: 'rgba(184,168,130,0.35)' }} />
-  );
-}
-
-// ─── SVG Course Map (Card 1) ──────────────────────────────────────────────────
-
-const MAP_W = Math.round(CARD_WIDTH  * 0.9);
-const MAP_H = Math.round(MAP_W * 200 / 280);
-
-function CourseMapSVG() {
-  return (
-    <Svg width={MAP_W} height={MAP_H} viewBox="0 0 280 200">
-      <Path
-        d="M 25,45 Q 70,8 140,12 Q 210,8 255,45 Q 278,80 272,138 Q 264,175 200,188 Q 140,198 80,188 Q 16,175 8,138 Q 2,80 25,45 Z"
-        fill="#0D2B10"
-      />
-      {/* Fairways */}
-      <Ellipse cx="140" cy="100" rx="58" ry="16" fill="#2D7A3A" />
-      <Ellipse cx="93"  cy="57"  rx="48" ry="13" transform="rotate(-38, 93, 57)"   fill="#2D7A3A" />
-      <Ellipse cx="187" cy="57"  rx="48" ry="13" transform="rotate(38, 187, 57)"   fill="#2D7A3A" />
-      <Ellipse cx="78"  cy="150" rx="43" ry="12" transform="rotate(-22, 78, 150)"  fill="#2D7A3A" />
-      <Ellipse cx="202" cy="150" rx="43" ry="12" transform="rotate(22, 202, 150)"  fill="#2D7A3A" />
-      {/* Greens */}
-      <Ellipse cx="74"  cy="100" rx="9" ry="8" fill="#1A5C2A" />
-      <Ellipse cx="206" cy="100" rx="9" ry="8" fill="#1A5C2A" />
-      <Ellipse cx="55"  cy="31"  rx="8" ry="7" fill="#1A5C2A" />
-      <Ellipse cx="225" cy="31"  rx="8" ry="7" fill="#1A5C2A" />
-      <Ellipse cx="140" cy="20"  rx="8" ry="7" fill="#1A5C2A" />
-      <Ellipse cx="32"  cy="162" rx="8" ry="7" fill="#1A5C2A" />
-      <Ellipse cx="248" cy="162" rx="8" ry="7" fill="#1A5C2A" />
-      <Ellipse cx="52"  cy="128" rx="8" ry="7" fill="#1A5C2A" />
-      <Ellipse cx="228" cy="128" rx="8" ry="7" fill="#1A5C2A" />
-      {/* Bunkers */}
-      <Ellipse cx="110" cy="87"  rx="9" ry="5" transform="rotate(-15, 110, 87)"  fill="#D4B483" />
-      <Ellipse cx="170" cy="87"  rx="9" ry="5" transform="rotate(15, 170, 87)"   fill="#D4B483" />
-      <Ellipse cx="76"  cy="50"  rx="8" ry="4" fill="#D4B483" />
-      <Ellipse cx="204" cy="50"  rx="8" ry="4" fill="#D4B483" />
-      <Ellipse cx="62"  cy="152" rx="7" ry="4" fill="#D4B483" />
-      <Ellipse cx="218" cy="152" rx="7" ry="4" fill="#D4B483" />
-      {/* Water */}
-      <Ellipse cx="65"  cy="138" rx="15" ry="9" fill="#4A90D9" opacity="0.9" />
-      <Ellipse cx="215" cy="75"  rx="14" ry="8" fill="#4A90D9" opacity="0.9" />
-    </Svg>
-  );
-}
-
-// ─── Card 1: Course Map Dark ──────────────────────────────────────────────────
-
-function Card1CourseMap({ cardRef, scoreStr, courseName, holes, transport, durationMinutes }) {
-  return (
-    <View ref={cardRef} collapsable={false} style={[c.card, { backgroundColor: '#090F0A' }]}>
-      {/* Wordmark row */}
-      <View style={c.topRow}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-          <Ionicons name="golf" size={9} color="#C9A84C" />
-          <Text style={c.wordmark}>PLAYTHRU</Text>
+    <View ref={cardRef} collapsable={false} style={f.card}>
+      <Text style={f.wordmark}>CLOCKED</Text>
+      <Text style={f.tagline}>GOLF ON THE CLOCK</Text>
+      <Text style={f.timeHero}>{roundTime}</Text>
+      <Text style={f.timeLabel}>ROUND TIME</Text>
+      <View style={f.divider} />
+      <View style={f.statsRow}>
+        <View style={f.statItem}>
+          <Text style={f.statValueGreen}>{scoreStr}</Text>
+          <Text style={f.statLabel}>CLK SCORE</Text>
         </View>
-        <View style={{ alignItems: 'flex-end', flex: 1, marginLeft: 10 }}>
-          <Text style={c.metaCourse} numberOfLines={1}>{courseName || 'Unknown Course'}</Text>
-          <Text style={c.metaStats}>
-            {holes || '18'} holes  ·  {transport || '—'}  ·  {formatDuration(durationMinutes)}
-          </Text>
+        <View style={f.statDivider} />
+        <View style={f.statItem}>
+          <Text style={f.statValueCream}>{grossScore != null ? String(grossScore) : '—'}</Text>
+          <Text style={f.statLabel}>{relToPar != null ? relToPar : 'GOLF'}</Text>
         </View>
       </View>
-
-      {/* Map centred */}
-      <View style={c.mapWrap}>
-        <CourseMapSVG />
-      </View>
-
-      {/* Footer */}
-      <View style={c.bottom}>
-        <View>
-          <Text style={c.scoreNum}>{scoreStr}</Text>
-          <Text style={c.scoreLabel}>POPSCORE</Text>
-        </View>
-      </View>
+      <Text style={f.course} numberOfLines={1}>{courseName || 'Unknown Course'}</Text>
     </View>
   );
 }
 
-// ─── Card 2: Transparent Sticker ─────────────────────────────────────────────
+// ─── Style 2: Outline Only ────────────────────────────────────────────────────
 
-function Card2Sticker({
-  stickerRef, scoreStr, courseName, holes, transport, durationMinutes,
-  verificationLevel, grossScore, isPar3,
-}) {
-  const relToPar     = formatRelToPar(grossScore, holes, isPar3);
-  const scoreDisplay = (grossScore != null && relToPar != null)
-    ? `${grossScore} · ${relToPar}`
-    : null;
-
+function CardOutline({ cardRef, roundTime, scoreStr, grossScore, relToPar, courseName }) {
   return (
-    // Outer area: CARD_WIDTH × CARD_HEIGHT, transparent bg, centres the sticker
-    <View style={k.stickerPage}>
-      {/* The actual sticker — what gets captured */}
-      <View ref={stickerRef} collapsable={false} style={k.stickerBox}>
-
-        {/* Wordmark */}
-        <View style={k.wm}>
-          <Ionicons name="golf" size={11} color="#C9A84C" />
-          <Text style={k.wmText}>PLAYTHRU</Text>
-        </View>
-
-        {/* POPScore hero */}
-        <View style={k.hero}>
-          <Text style={k.popNum}>{scoreStr}</Text>
-          <Text style={k.popLabel}>POPSCORE</Text>
-        </View>
-
-        {/* Bottom — course + stats */}
-        <View style={k.bottomSection}>
-          <View style={k.divider} />
-          <Text style={k.courseName} numberOfLines={1}>{courseName || 'Unknown Course'}</Text>
-          <Text style={k.statsRow}>
-            {[holes || '18', transport || '—', formatDuration(durationMinutes)].join(' · ')}
-          </Text>
-          {scoreDisplay != null && (
-            <Text style={k.scoreRow}>{scoreDisplay}</Text>
-          )}
-        </View>
-
-        {/* Verification dot */}
-        <View style={k.verifDot}>
-          <VerifDot level={verificationLevel} />
-        </View>
-
+    <View ref={cardRef} collapsable={false} style={o.card}>
+      <View style={o.topRow}>
+        <Text style={o.wordmark}>CLOCKED</Text>
+        {grossScore != null && <Text style={o.golfScore}>{grossScore}</Text>}
       </View>
-    </View>
-  );
-}
-
-// ─── Card 3: Speedometer ─────────────────────────────────────────────────────
-
-function SpeedometerSVG({ val }) {
-  const clamped = Math.max(-60, Math.min(60, val ?? 0));
-  const deg     = 180 - ((clamped + 60) / 120) * 180;
-  const rad     = deg * Math.PI / 180;
-  const nx      = (140 + 88 * Math.cos(rad)).toFixed(1);
-  const ny      = (140 - 88 * Math.sin(rad)).toFixed(1);
-  return (
-    <Svg width="280" height="160" viewBox="0 0 280 160">
-      <Path d="M 30 140 A 110 110 0 0 1 250 140" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="16" strokeLinecap="round" />
-      <Path d="M 30 140 A 110 110 0 0 1 85 45"   fill="none" stroke="#C07A6A" strokeWidth="14" strokeLinecap="round" />
-      <Path d="M 85 45  A 110 110 0 0 1 195 45"  fill="none" stroke="#C9A84C" strokeWidth="14" strokeLinecap="round" />
-      <Path d="M 195 45 A 110 110 0 0 1 250 140" fill="none" stroke="#7DC87A" strokeWidth="14" strokeLinecap="round" />
-      <Line x1="140" y1="140" x2={nx} y2={ny} stroke="#F5EDD8" strokeWidth="3" strokeLinecap="round" />
-      <Ellipse cx="140" cy="140" rx="6" ry="6" fill="#F5EDD8" />
-      <SvgText fill="#C07A6A" fontSize="9" fontWeight="700" x="14"  y="158">SLOW</SvgText>
-      <SvgText fill="#7DC87A" fontSize="9" fontWeight="700" x="216" y="158">FAST</SvgText>
-    </Svg>
-  );
-}
-
-function Card3Speedometer({
-  cardRef, scoreStr, courseName, holes, transport, durationMinutes,
-  minutesSavedSigned, minutesSavedDisplay, wasFaster,
-}) {
-  const paceColor = minutesSavedDisplay === 0 ? '#B8A882' : (wasFaster ? '#7DC87A' : '#C07A6A');
-  const paceText  = minutesSavedDisplay == null
-    ? '— min vs course avg'
-    : minutesSavedDisplay === 0
-    ? 'Right on pace'
-    : wasFaster
-    ? `+${minutesSavedDisplay} min faster than avg`
-    : `${minutesSavedDisplay} min behind avg`;
-
-  return (
-    <View ref={cardRef} collapsable={false} style={[c.card, s2.card]}>
-      <View style={s2.topRow}>
-        <Ionicons name="golf" size={9} color="#C9A84C" />
-        <Text style={s2.wordmark}>PLAYTHRU</Text>
-      </View>
-
-      <View style={s2.dialWrap}>
-        <SpeedometerSVG val={minutesSavedSigned ?? 0} />
-        <View style={s2.dialCenter} pointerEvents="none">
-          <Text style={s2.dialTime}>{formatDuration(durationMinutes)}</Text>
-          <Text style={s2.dialSub}>ROUND TIME</Text>
+      <Text style={o.timeHero}>{roundTime}</Text>
+      <Text style={o.timeLabel}>ROUND TIME</Text>
+      <View style={o.pillRow}>
+        <View style={o.pillGreen}>
+          <Text style={o.pillGreenText}>{scoreStr} CLK</Text>
         </View>
-      </View>
-
-      <Text style={[s2.paceResult, { color: paceColor }]}>{paceText}</Text>
-
-      <View style={{ flex: 1 }} />
-
-      <View style={s2.popRow}>
-        <Text style={s2.popNum}>{scoreStr}</Text>
-        <Text style={s2.popLabel}>POPSCORE</Text>
-      </View>
-      <Text style={s2.course} numberOfLines={1}>{courseName || 'Unknown Course'}</Text>
-      <Text style={s2.meta}>{holes || '18'} holes  ·  {transport || '—'}</Text>
-    </View>
-  );
-}
-
-// ─── Card 4: Pace vs National Average ────────────────────────────────────────
-
-const BAR_MAX_W = CARD_WIDTH - 80; // available bar width (padding accounted)
-
-function Card4PaceBar({
-  cardRef, scoreStr, courseName, holes, transport, durationMinutes, wasFaster,
-  minutesSavedDisplay,
-}) {
-  const natAvg     = holes === '9' ? 120 : 240;
-  const yourTime   = (durationMinutes != null && !isNaN(durationMinutes)) ? durationMinutes : null;
-  const maxTime    = yourTime != null ? Math.max(natAvg, yourTime) : natAvg;
-
-  const natAvgBarW = Math.round((natAvg / maxTime) * BAR_MAX_W);
-  const yourBarW   = yourTime != null ? Math.round((yourTime / maxTime) * BAR_MAX_W) : natAvgBarW;
-
-  const diffColor  = minutesSavedDisplay === 0 ? '#B8A882' : (wasFaster ? '#7DC87A' : '#C07A6A');
-  const diffText   = minutesSavedDisplay == null
-    ? '— vs national avg'
-    : minutesSavedDisplay === 0
-    ? 'Right on pace'
-    : wasFaster
-    ? `↑ ${minutesSavedDisplay} min faster`
-    : `↓ ${minutesSavedDisplay} min slower`;
-
-  const youLabel   = yourTime != null ? formatDuration(yourTime) : '--';
-
-  return (
-    <View ref={cardRef} collapsable={false} style={[c.card, p4.card]}>
-      {/* Wordmark */}
-      <View style={p4.topRow}>
-        <Ionicons name="golf" size={9} color="#C9A84C" />
-        <Text style={p4.wordmark}>PLAYTHRU</Text>
-      </View>
-
-      <Text style={p4.headline}>PACE COMPARISON</Text>
-
-      {/* Bars */}
-      <View style={{ flex: 1, justifyContent: 'center', gap: 22 }}>
-
-        {/* YOU bar */}
-        <View style={p4.barBlock}>
-          <View style={p4.barLabelRow}>
-            <Text style={p4.barLabel}>YOU</Text>
-            <Text style={[p4.barTime, { color: '#7DC87A' }]}>{youLabel}</Text>
+        {grossScore != null && (
+          <View style={o.pillWhite}>
+            <Text style={o.pillWhiteText}>
+              Shot {grossScore}{relToPar != null ? ` · ${relToPar}` : ''}
+            </Text>
           </View>
-          <View style={[p4.barTrack, { width: BAR_MAX_W }]}>
-            <View style={[p4.barFill, { width: yourBarW, backgroundColor: '#7DC87A' }]} />
-          </View>
-        </View>
-
-        {/* NAT AVG bar */}
-        <View style={p4.barBlock}>
-          <View style={p4.barLabelRow}>
-            <Text style={p4.barLabel}>NAT AVG</Text>
-            <Text style={[p4.barTime, { color: '#C9A84C' }]}>{formatDuration(natAvg)}</Text>
-          </View>
-          <View style={[p4.barTrack, { width: BAR_MAX_W }]}>
-            <View style={[p4.barFill, { width: natAvgBarW, backgroundColor: '#C9A84C' }]} />
-          </View>
-        </View>
-
-        {/* Diff */}
-        <Text style={[p4.diffText, { color: diffColor }]}>{diffText}</Text>
+        )}
       </View>
-
-      {/* Footer */}
-      <View style={p4.footer}>
-        <View>
-          <Text style={p4.popNum}>{scoreStr}</Text>
-          <Text style={p4.popLabel}>POPSCORE</Text>
-        </View>
-        <View style={{ alignItems: 'flex-end', flex: 1, marginLeft: 12 }}>
-          <Text style={p4.footerCourse} numberOfLines={1}>{courseName || 'Unknown Course'}</Text>
-          <Text style={p4.footerMeta}>{holes || '18'} holes · {transport || '—'}</Text>
-        </View>
-      </View>
+      <Text style={o.bottom} numberOfLines={1}>
+        GOLF ON THE CLOCK · {courseName || 'Unknown Course'}
+      </Text>
     </View>
   );
 }
@@ -334,24 +98,29 @@ function Card4PaceBar({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function ShareScreen({ navigation, route }) {
+  const roundFormat       = route.params?.roundFormat       ?? 'pace';
   const popScore          = route.params?.popScore          ?? null;
   const courseName        = route.params?.courseName        ?? 'Unknown Course';
   const holes             = route.params?.holes             ?? '18';
   const transport         = route.params?.transport         ?? 'Cart';
   const durationMinutes   = route.params?.durationMinutes   ?? null;
-  const verificationLevel = route.params?.verificationLevel ?? 'self_reported';
   const grossScore        = route.params?.grossScore        ?? null;
   const isPar3            = route.params?.isPar3            ?? false;
-  const avgCourseMinutes  = route.params?.avgCourseMinutes  ?? null;
 
-  const stickerRef = useRef(null); // Transparent Sticker inner box (for copySticker)
-  const card1Ref   = useRef(null); // Sticker page wrapper (pos 1)
-  const card2Ref   = useRef(null); // Course Map (pos 2)
-  const card3Ref   = useRef(null); // Speedometer (pos 3)
-  const card4Ref   = useRef(null); // Pace vs National Avg (pos 4)
+  // Clocked-specific params
+  const teamScore         = route.params?.teamScore         ?? null;
+  const totalElapsed      = route.params?.totalElapsed      ?? null;
+  const totalTimePar      = route.params?.totalTimePar      ?? null;
+  const totalPenalty       = route.params?.totalPenalty       ?? null;
+  const playerTotals      = route.params?.playerTotals      ?? null;
+  const isUnranked        = route.params?.isUnranked        ?? false;
+  const formatBadgeStr    = route.params?.formatBadge       ?? '';
 
-  // card refs indexed by carousel position (sticker pos uses stickerRef for inner capture)
-  const CARD_REFS = [card1Ref, card2Ref, card3Ref, card4Ref];
+  const isClocked = roundFormat === 'clocked';
+
+  const stickerRef = useRef(null); // Style 1 — Frosted Glass / Clocked Card
+  const card2Ref   = useRef(null); // Style 2 — Outline
+  const CARD_REFS  = [stickerRef, card2Ref];
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [saving,      setSaving]      = useState(false);
@@ -359,21 +128,17 @@ export default function ShareScreen({ navigation, route }) {
 
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
 
-  // Safe computed values
+  // Safe computed values (pace rounds)
   const rawScore = popScore != null
     ? (typeof popScore === 'number' ? popScore : parseFloat(popScore))
     : null;
   const score    = rawScore != null && !isNaN(rawScore) ? rawScore : null;
   const scoreStr = score != null ? score.toFixed(1) : '--';
 
-  const defaultAvg          = holes === '9' ? 120 : 240;
-  const actualMinutes       = durationMinutes ?? 0;
-  const safeMins            = (avgCourseMinutes ?? defaultAvg) - actualMinutes;
-  const minutesSavedDisplay = (durationMinutes != null && !isNaN(safeMins))
-    ? Math.abs(Math.round(safeMins)) : null;
-  const minutesSavedSigned  = (durationMinutes != null && !isNaN(safeMins))
-    ? Math.round(safeMins) : null;
-  const wasFaster = safeMins > 0;
+  // Share message
+  const shareMessage = isClocked
+    ? `Scored ${teamScore != null ? (teamScore > 0 ? '+' + teamScore : teamScore) : '--'} at ${courseName}. Played on the clock.`
+    : `My Clocked Score: ${scoreStr} at ${courseName}. Tracked with Clocked.`;
 
   const goHome    = () => navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2800); };
@@ -383,7 +148,7 @@ export default function ShareScreen({ navigation, route }) {
       setSaving(true);
       await new Promise(r => setTimeout(r, 160));
       // Card 1 (sticker) — capture the stickerRef (inner box), not the page wrapper
-      const ref = activeIndex === 0 ? stickerRef : CARD_REFS[activeIndex];
+      const ref = CARD_REFS[activeIndex];
       return await captureRef(ref, { format: 'png', quality: 1, result: resultType });
     } catch (e) {
       Alert.alert('Error', 'Could not capture the card.');
@@ -432,14 +197,12 @@ export default function ShareScreen({ navigation, route }) {
     try {
       await RNShare.share({
         url: uri,
-        message: `My POPScore: ${scoreStr} at ${courseName}. Tracked with PlayThru.`,
+        message: shareMessage,
       });
     } catch (e) {
       // silent fail
     }
   };
-
-  const base = { scoreStr, courseName, holes, transport, durationMinutes };
 
   return (
     <SafeAreaView style={ss.container}>
@@ -464,42 +227,63 @@ export default function ShareScreen({ navigation, route }) {
             setActiveIndex(Math.round(e.nativeEvent.contentOffset.x / SW));
           }}
         >
-          {/* Card 1: Transparent Sticker */}
-          <View style={ss.page}>
-            <Card2Sticker
-              stickerRef={stickerRef}
-              {...base}
-              verificationLevel={verificationLevel}
-              grossScore={grossScore}
-              isPar3={isPar3}
-            />
-          </View>
+          {isClocked ? (
+            <>
+              {/* Clocked Style 1 — Full Card */}
+              <View style={ss.page}>
+                <View ref={stickerRef} collapsable={false}>
+                  <ClockedShareCard
+                    teamScore={teamScore}
+                    totalElapsed={totalElapsed}
+                    totalTimePar={totalTimePar}
+                    playerTotals={playerTotals}
+                    formatBadge={formatBadgeStr}
+                    courseName={courseName}
+                    date={route.params?.date}
+                    isUnranked={isUnranked}
+                  />
+                </View>
+              </View>
 
-          {/* Card 2: Course Map */}
-          <View style={ss.page}>
-            <Card1CourseMap cardRef={card2Ref} {...base} />
-          </View>
+              {/* Clocked Style 2 — Outline */}
+              <View style={ss.page}>
+                <CardOutline
+                  cardRef={card2Ref}
+                  roundTime={formatDuration(durationMinutes)}
+                  scoreStr={teamScore != null ? (teamScore > 0 ? `+${teamScore}` : String(teamScore)) : '--'}
+                  grossScore={null}
+                  relToPar={null}
+                  courseName={courseName}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Style 1: Frosted Glass */}
+              <View style={ss.page}>
+                <CardFrosted
+                  cardRef={stickerRef}
+                  roundTime={formatDuration(durationMinutes)}
+                  scoreStr={scoreStr}
+                  grossScore={grossScore}
+                  relToPar={formatRelToPar(grossScore, holes, isPar3)}
+                  courseName={courseName}
+                />
+              </View>
 
-          {/* Card 3: Speedometer */}
-          <View style={ss.page}>
-            <Card3Speedometer
-              cardRef={card3Ref}
-              {...base}
-              minutesSavedSigned={minutesSavedSigned}
-              minutesSavedDisplay={minutesSavedDisplay}
-              wasFaster={wasFaster}
-            />
-          </View>
-
-          {/* Card 4: Pace vs National Average */}
-          <View style={ss.page}>
-            <Card4PaceBar
-              cardRef={card4Ref}
-              {...base}
-              minutesSavedDisplay={minutesSavedDisplay}
-              wasFaster={wasFaster}
-            />
-          </View>
+              {/* Style 2: Outline Only */}
+              <View style={ss.page}>
+                <CardOutline
+                  cardRef={card2Ref}
+                  roundTime={formatDuration(durationMinutes)}
+                  scoreStr={scoreStr}
+                  grossScore={grossScore}
+                  relToPar={formatRelToPar(grossScore, holes, isPar3)}
+                  courseName={courseName}
+                />
+              </View>
+            </>
+          )}
         </ScrollView>
       </View>
 
@@ -509,9 +293,6 @@ export default function ShareScreen({ navigation, route }) {
           <View key={i} style={[ss.dot, i === activeIndex && ss.dotActive]} />
         ))}
       </View>
-
-      {/* Card label */}
-      <Text style={ss.cardLabel}>{CARD_LABELS[activeIndex] ?? ''}</Text>
 
       {/* Toast */}
       {!!toast && (
@@ -529,6 +310,8 @@ export default function ShareScreen({ navigation, route }) {
             onPress={copySticker}
             activeOpacity={0.8}
             disabled={saving}
+            accessibilityLabel="Copy sticker to clipboard"
+            accessibilityRole="button"
           >
             <Ionicons name="copy-outline" size={18} color="#C9A84C" />
             <Text style={ss.actionBtnTxt}>Copy{'\n'}Sticker</Text>
@@ -539,6 +322,8 @@ export default function ShareScreen({ navigation, route }) {
             onPress={saveToCameraRoll}
             activeOpacity={0.8}
             disabled={saving}
+            accessibilityLabel="Save score card to photos"
+            accessibilityRole="button"
           >
             <Ionicons name="download-outline" size={18} color="#090F0A" />
             <Text style={[ss.actionBtnTxt, { color: '#090F0A' }]}>Save to{'\n'}Photos</Text>
@@ -549,6 +334,8 @@ export default function ShareScreen({ navigation, route }) {
             onPress={shareCard}
             activeOpacity={0.8}
             disabled={saving}
+            accessibilityLabel="Share score card"
+            accessibilityRole="button"
           >
             <Ionicons name="share-outline" size={18} color="#C9A84C" />
             <Text style={ss.actionBtnTxt}>Share</Text>
@@ -564,101 +351,43 @@ export default function ShareScreen({ navigation, route }) {
   );
 }
 
-// ─── Shared card base (Cards 1, 3, 4) ────────────────────────────────────────
+// ─── Style 1: Frosted Glass ───────────────────────────────────────────────────
 
-const c = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.2)',
-    paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 22,
-    overflow: 'hidden',
-  },
-  // Course Map card specifics
-  topRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 },
-  wordmark:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3 },
-  metaCourse: { fontSize: 12, fontWeight: '600', color: '#F5EDD8', textAlign: 'right', maxWidth: 160 },
-  metaStats:  { fontSize: 10, color: '#B8A882', textAlign: 'right', marginTop: 2 },
-  mapWrap:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  bottom:     { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8 },
-  scoreNum:   { fontSize: 48, fontFamily: 'Georgia', color: '#C9A84C', lineHeight: 52 },
-  scoreLabel: { fontSize: 8, fontWeight: '700', color: 'rgba(201,168,76,0.55)', letterSpacing: 4 },
+const f = StyleSheet.create({
+  card:           { width: STICKER_W, backgroundColor: 'rgba(13,26,15,0.65)', borderRadius: 18,
+                    borderWidth: 1, borderColor: 'rgba(201,168,76,0.3)', padding: 20, alignItems: 'center' },
+  wordmark:       { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 4 },
+  tagline:        { fontSize: 6, fontWeight: '700', color: 'rgba(201,168,76,0.6)', letterSpacing: 2, marginTop: 2, marginBottom: 14 },
+  timeHero:       { fontSize: 32, fontFamily: 'Georgia', fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
+  timeLabel:      { fontSize: 6, fontWeight: '700', color: 'rgba(255,255,255,0.5)', letterSpacing: 3, marginTop: 4, marginBottom: 12 },
+  divider:        { width: '100%', height: 1, backgroundColor: 'rgba(201,168,76,0.2)', marginBottom: 12 },
+  statsRow:       { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  statItem:       { flex: 1, alignItems: 'center' },
+  statDivider:    { width: 1, height: 28, backgroundColor: 'rgba(201,168,76,0.2)' },
+  statValueGreen: { fontSize: 22, fontFamily: 'Georgia', color: '#7DC87A', textAlign: 'center' },
+  statValueCream: { fontSize: 22, fontFamily: 'Georgia', color: '#F5EDD8', textAlign: 'center' },
+  statLabel:      { fontSize: 6, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 2, marginTop: 2 },
+  course:         { fontSize: 10, color: 'rgba(255,255,255,0.5)', letterSpacing: 0.5, textAlign: 'center' },
 });
 
-// ─── Card 2: Sticker styles ───────────────────────────────────────────────────
+// ─── Style 2: Outline Only ────────────────────────────────────────────────────
 
-const k = StyleSheet.create({
-  stickerPage: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  stickerBox: {
-    width: STICKER_W,
-    height: STICKER_H,
-    backgroundColor: 'rgba(9,15,10,0.72)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.6)',
-    padding: 20,
-    flexDirection: 'column',
-  },
-  wm:            { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  wmText:        { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 3 },
-  hero:          { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  popNum:        { fontSize: 80, fontFamily: 'Georgia', color: '#C9A84C', lineHeight: 80, textAlign: 'center' },
-  popLabel:      { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 4, textAlign: 'center', marginTop: 8 },
-  bottomSection: { flexShrink: 0 },
-  divider:       { height: 1, backgroundColor: 'rgba(201,168,76,0.3)', marginVertical: 12 },
-  courseName:    { fontSize: 16, fontWeight: '600', color: '#F5EDD8', textAlign: 'center', marginBottom: 5 },
-  statsRow:      { fontSize: 12, color: '#B8A882', textAlign: 'center', lineHeight: 18 },
-  scoreRow:      { fontSize: 14, color: '#F5EDD8', textAlign: 'center', marginTop: 5 },
-  verifDot:      { position: 'absolute', bottom: 16, right: 16 },
-});
-
-// ─── Card 3: Speedometer styles ───────────────────────────────────────────────
-
-const s2 = StyleSheet.create({
-  card:       { alignItems: 'center', backgroundColor: '#090F0A' },
-  topRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginBottom: 4 },
-  wordmark:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3 },
-  dialWrap:   { marginTop: 12, alignItems: 'center', position: 'relative' },
-  dialCenter: { position: 'absolute', bottom: 18, alignItems: 'center' },
-  dialTime:   { fontSize: 28, fontFamily: 'Georgia', color: '#F5EDD8', textAlign: 'center' },
-  dialSub:    { fontSize: 7, fontWeight: '700', color: '#B8A882', letterSpacing: 2, marginTop: 2 },
-  paceResult: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginTop: 18 },
-  popRow:     { alignItems: 'center', marginBottom: 6 },
-  popNum:     { fontSize: 36, fontFamily: 'Georgia', color: '#C9A84C', lineHeight: 40 },
-  popLabel:   { fontSize: 8, fontWeight: '700', color: 'rgba(201,168,76,0.55)', letterSpacing: 4 },
-  course:     { fontSize: 13, fontWeight: '600', color: '#F5EDD8', textAlign: 'center', marginTop: 10 },
-  meta:       { fontSize: 11, color: '#B8A882', textAlign: 'center', marginTop: 4 },
-});
-
-// ─── Card 4: Pace vs National Average styles ──────────────────────────────────
-
-const p4 = StyleSheet.create({
-  card:        { backgroundColor: '#090F0A' },
-  topRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  wordmark:    { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3 },
-  headline:    { fontSize: 11, fontWeight: '700', color: '#B8A882', letterSpacing: 3, marginBottom: 4 },
-  barBlock:    { gap: 8 },
-  barLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  barLabel:    { fontSize: 11, fontWeight: '700', color: '#F5EDD8', letterSpacing: 1 },
-  barTime:     { fontSize: 12, fontWeight: '600' },
-  barTrack:    { height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.06)' },
-  barFill:     { height: 14, borderRadius: 7 },
-  diffText:    { fontSize: 26, fontWeight: '700', textAlign: 'center', marginTop: 8 },
-  footer:      { flexDirection: 'row', alignItems: 'flex-end', marginTop: 12 },
-  popNum:      { fontSize: 36, fontFamily: 'Georgia', color: '#C9A84C', lineHeight: 40 },
-  popLabel:    { fontSize: 8, fontWeight: '700', color: 'rgba(201,168,76,0.55)', letterSpacing: 4 },
-  footerCourse:{ fontSize: 13, fontWeight: '600', color: '#F5EDD8', textAlign: 'right' },
-  footerMeta:  { fontSize: 11, color: '#B8A882', textAlign: 'right', marginTop: 2 },
+const TS = { textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 };
+const o = StyleSheet.create({
+  card:           { width: STICKER_W, backgroundColor: 'transparent', borderRadius: 14,
+                    borderWidth: 1.5, borderColor: 'rgba(125,200,122,0.6)', padding: 16, alignItems: 'center' },
+  topRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 10 },
+  wordmark:       { fontSize: 8, fontWeight: '700', color: '#7DC87A', letterSpacing: 3, ...TS },
+  golfScore:      { fontSize: 13, fontWeight: '700', color: '#F5EDD8', ...TS },
+  timeHero:       { fontSize: 30, fontFamily: 'Georgia', fontWeight: '700', color: '#FFFFFF', textAlign: 'center',
+                    textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8, marginBottom: 4 },
+  timeLabel:      { fontSize: 7, fontWeight: '700', color: '#7DC87A', letterSpacing: 3, marginBottom: 12, ...TS },
+  pillRow:        { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  pillGreen:      { borderWidth: 1, borderColor: 'rgba(125,200,122,0.7)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  pillGreenText:  { fontSize: 11, fontWeight: '700', color: '#7DC87A', ...TS },
+  pillWhite:      { borderWidth: 1, borderColor: 'rgba(245,237,216,0.6)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  pillWhiteText:  { fontSize: 11, fontWeight: '700', color: '#F5EDD8', ...TS },
+  bottom:         { fontSize: 7, color: 'rgba(255,255,255,0.6)', letterSpacing: 1.5, textAlign: 'center', ...TS },
 });
 
 // ─── Screen chrome styles ─────────────────────────────────────────────────────
@@ -685,6 +414,8 @@ const ss = StyleSheet.create({
   shareBtn:     { borderWidth: 1, borderColor: '#C9A84C55', backgroundColor: 'transparent' },
   actionBtnTxt: { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 1, textAlign: 'center' },
   btnDisabled:  { opacity: 0.4 },
-  laterBtn:     { alignItems: 'center', paddingVertical: 4 },
-  laterText:    { fontSize: 13, color: '#B8A88266' },
+  laterBtn:          { alignItems: 'center', paddingVertical: 4 },
+  laterText:         { fontSize: 13, color: '#B8A88266' },
+  upgradeNote:       { alignItems: 'center', paddingVertical: 6, paddingHorizontal: 20 },
+  upgradeNoteText:   { fontSize: 11, color: '#C9A84C99', letterSpacing: 0.5, fontStyle: 'italic' },
 });

@@ -31,15 +31,15 @@ export default function POPScoreInfoScreen({ navigation }) {
 
         {/* Hero header */}
         <View style={s.hero}>
-          <Text style={s.heroTitle}>POPScore</Text>
-          <Text style={s.heroSub}>Pace of Play Score</Text>
+          <Text style={s.heroTitle}>Clocked Score</Text>
+          <Text style={s.heroSub}>On The Clock Score</Text>
         </View>
 
         {/* Section 1 — What is it */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>What is a POPScore?</Text>
+          <Text style={s.sectionTitle}>What is an Clocked Score?</Text>
           <Text style={s.body}>
-            Your POPScore is a number from 0.0 to 5.0 powered by an AI algorithm that measures how efficiently you play golf. The higher your score, the faster you play relative to the expected time for your specific round conditions. PlayThru's AI calculates your score automatically every time you log a round, factoring in multiple inputs to give you the most accurate pace rating in golf.
+            Your Clocked Score is a number from 0.0 to 5.0 powered by an AI algorithm that measures how efficiently you play golf. The higher your score, the faster you play relative to the expected time for your specific round conditions. Clocked's AI calculates your score automatically every time you log a round, factoring in multiple inputs to give you the most accurate pace rating in golf.
           </Text>
         </View>
 
@@ -63,7 +63,7 @@ export default function POPScoreInfoScreen({ navigation }) {
         <View style={s.section}>
           <Text style={s.sectionTitle}>How our AI calculates your score</Text>
           <Text style={[s.body, { marginBottom: 16 }]}>
-            PlayThru's AI weighs five key inputs from every round you log and combines them into a single precise score. No two rounds are scored the same way — the algorithm adapts to your specific conditions every time:
+            Clocked's AI weighs five key inputs from every round you log and combines them into a single precise score. No two rounds are scored the same way — the algorithm adapts to your specific conditions every time:
           </Text>
           <View style={s.inputList}>
             {INPUTS.map(item => (
@@ -84,7 +84,7 @@ export default function POPScoreInfoScreen({ navigation }) {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Your initial score</Text>
           <Text style={s.body}>
-            When you first joined PlayThru, our AI set your initial POPScore based on your typical round time. As you log more rounds, the AI continuously learns from your real on-course performance and refines your score to be more accurate over time. The more you log, the smarter it gets.
+            When you first joined Clocked, our AI set your initial Clocked Score based on your typical round time. As you log more rounds, the AI continuously learns from your real on-course performance and refines your score to be more accurate over time. The more you log, the smarter it gets.
           </Text>
         </View>
 
@@ -92,7 +92,7 @@ export default function POPScoreInfoScreen({ navigation }) {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Round verification</Text>
           <Text style={[s.body, { marginBottom: 16 }]}>
-            Every round on PlayThru gets a verification badge to indicate how its data was collected. Higher-confidence rounds carry more weight in your score.
+            Every round on Clocked gets a verification badge to indicate how its data was collected. Higher-confidence rounds carry more weight in your score.
           </Text>
           <View style={s.verifyList}>
             <View style={s.verifyRow}>
@@ -101,7 +101,7 @@ export default function POPScoreInfoScreen({ navigation }) {
             </View>
             <View style={s.verifyRow}>
               <VerificationBadge level="caddy_corroborated" />
-              <Text style={s.verifyDesc}>Caddy verified — a caddy on PlayThru confirmed your round times.</Text>
+              <Text style={s.verifyDesc}>Caddy verified — a caddy on Clocked confirmed your round times.</Text>
             </View>
             <View style={s.verifyRow}>
               <VerificationBadge level="gps_tracked" />
@@ -112,7 +112,7 @@ export default function POPScoreInfoScreen({ navigation }) {
 
         {/* Footer */}
         <Text style={s.footer}>
-          PlayThru uses leading-edge AI to deliver the most accurate pace of play score in golf.
+          Clocked uses leading-edge AI to deliver the most accurate pace of play score in golf.
         </Text>
 
       </ScrollView>

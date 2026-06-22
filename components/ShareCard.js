@@ -44,7 +44,10 @@ export default function ShareCard({ popScore, courseName, date, holes, transport
       {/* Top — wordmark */}
       <View style={s.top}>
         <Ionicons name="star" size={10} color={GOLD} />
-        <Text style={s.wordmark}>PLAYTHRU</Text>
+        <View>
+          <Text style={s.wordmark}>CLOCKED</Text>
+          <Text style={s.brandTagline}>ON THE CLOCK</Text>
+        </View>
       </View>
 
       {/* Center — POPScore */}
@@ -52,7 +55,7 @@ export default function ShareCard({ popScore, courseName, date, holes, transport
         <Text style={[s.scoreNumber, { color: scoreColor }]}>{scoreStr}</Text>
         <View style={s.scoreLabelRow}>
           <View style={s.scoreLine} />
-          <Text style={s.scoreLabel}>POPSCORE</Text>
+          <Text style={s.scoreLabel}>CLOCKED SCORE</Text>
           <View style={s.scoreLine} />
         </View>
       </View>
@@ -89,8 +92,9 @@ export default function ShareCard({ popScore, courseName, date, holes, transport
 
       {/* Tagline */}
       <View style={s.bottom}>
-        <Text style={s.tagline}>Track your pace at playthru.com</Text>
+        <Text style={s.tagline}>Track your pace at clocked.golf</Text>
       </View>
+
     </View>
   );
 }
@@ -118,9 +122,10 @@ const s = StyleSheet.create({
   cornerV: { position: 'absolute', top: 0, left: 0, width: 1, height: 16, backgroundColor: GOLD },
 
   // Top
-  top: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  star: { fontSize: 10, color: GOLD },
+  top: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  star: { fontSize: 10, color: GOLD, marginTop: 2 },
   wordmark: { fontSize: 11, fontWeight: '700', color: GOLD, letterSpacing: 5 },
+  brandTagline: { fontSize: 8, fontWeight: '700', color: '#C9A84C99', letterSpacing: 2, marginTop: 2 },
 
   // Score
   center: { alignItems: 'center', flex: 1, justifyContent: 'center' },
@@ -151,6 +156,7 @@ const s = StyleSheet.create({
   statDot:   { width: 3, height: 3, borderRadius: 1.5, backgroundColor: GOLD, opacity: 0.4, marginBottom: 8 },
 
   // Bottom
-  bottom: { alignItems: 'center' },
-  tagline: { fontSize: 10, color: MUTED, letterSpacing: 1.5, fontStyle: 'italic' },
+  bottom:    { alignItems: 'center' },
+  tagline:   { fontSize: 10, color: MUTED, letterSpacing: 1.5, fontStyle: 'italic' },
+  watermark: { position: 'absolute', bottom: 10, right: 12, fontSize: 8, color: '#C9A84C66', fontStyle: 'italic', letterSpacing: 0.5 },
 });

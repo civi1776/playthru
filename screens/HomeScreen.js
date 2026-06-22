@@ -5,45 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import Gauge from '../components/guage';
 import SkeletonLoader from '../components/SkeletonLoader';
 import CourseAvatar from '../components/CourseAvatar';
+import ChallengeButton from '../components/ChallengeButton';
 import InitialsAvatar from '../components/InitialsAvatar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { scheduleWeeklyDigest } from '../lib/notifications';
+import { ROUND_STATE_KEY, ROUND_STALENESS_MS } from '../lib/roundConstants';
 
-const UPCOMING_FEATURES = [
-  { icon: 'hardware-chip',      title: 'AI Pace Coach',    subtitle: 'Weekly insights' },
-  { icon: 'navigate-circle',    title: 'GPS Tracking',     subtitle: 'Automatic pace scoring powered by real-time GPS — no logging required' },
-  { icon: 'people-outline',     title: 'Private Groups',   subtitle: 'Play with your crew' },
-  { icon: 'school-outline',     title: 'PlayThru Speed School', subtitle: 'Train your pace game' },
-  { icon: 'book-outline',       title: 'POP Rules',        subtitle: 'Pace of Play Rules — our simplified ruleset designed to keep your round moving without sacrificing the game.', gold: true },
-];
-
-function ComingSoonCard() {
-  return (
-    <View style={styles.proCard}>
-      <View style={styles.proBadge}>
-        <Text style={styles.proBadgeText}>COMING SOON</Text>
-      </View>
-      <View style={styles.proFeatureRow}>
-        {UPCOMING_FEATURES.map(f => (
-          <TouchableOpacity
-            key={f.title}
-            style={[styles.proFeature, f.gold && styles.proFeatureGold]}
-            onPress={() => Alert.alert('Coming Soon', 'This feature is in development. Stay tuned!')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.proComingSoonBadge}>
-              <Text style={styles.proComingSoonText}>IN DEVELOPMENT</Text>
-            </View>
-            <Ionicons name={f.icon} size={22} color={f.gold ? '#C9A84C' : '#B8A882'} style={{ marginBottom: 6 }} />
-            <Text style={[styles.proFeatureTitle, f.gold && { color: '#C9A84C' }]}>{f.title}</Text>
-            <Text style={styles.proFeatureSub}>{f.subtitle}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-}
 
 function HomeSkeleton() {
   return (
@@ -154,52 +123,42 @@ function PlayerHomeScreen({ navigation }) {
   const [loadingCourse, setLoadingCourse] = useState(true);
   const [paceTrend, setPaceTrend]       = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
+  const [myScoreMap,     setMyScoreMap]     = useState({});
   const [featuredRound, setFeaturedRound] = useState(null);
   const [lastRound, setLastRound]         = useState(null);
   const [monthlyDelta, setMonthlyDelta]   = useState(undefined);
   const [totalRounds, setTotalRounds]     = useState(0);
+  const [savedRound, setSavedRound]       = useState(null);
+  const [unreadCount, setUnreadCount]     = useState(0);
 
-  // Fetch Course of the Day — cached for 24 hours via AsyncStorage
+  // Fetch Course of the Day — server picks a shared course daily via RPC;
+  // client caches by date so the DB is hit at most once per day per device.
   useEffect(() => {
     (async () => {
       try {
         const cached     = await AsyncStorage.getItem('course_of_day');
-        const cachedTime = await AsyncStorage.getItem('course_of_day_time');
-        const hoursSince = cachedTime
-          ? (Date.now() - new Date(cachedTime).getTime()) / (1000 * 60 * 60)
-          : 999;
+        const cachedDate = await AsyncStorage.getItem('course_of_day_date');
+        const today      = new Date().toISOString().slice(0, 10);
 
-        if (cached && hoursSince < 24) {
+        if (cached && cachedDate === today) {
           setCourseOfDay(JSON.parse(cached));
           setLoadingCourse(false);
           return;
         }
 
-        const { data, error } = await supabase
-          .from('courses')
-          .select('id, name, city, state, country, holes, avg_time, pop_score, total_rounds, par, latitude, longitude')
-          .gt('total_rounds', 0)
-          .order('pop_score', { ascending: false })
-          .limit(10);
-        if (error) throw error;
-
-        let selected = null;
-        if (data && data.length > 0) {
-          selected = data[Math.floor(Math.random() * data.length)];
-        } else {
-          const { data: fallback } = await supabase
+        const { data: cotd } = await supabase.rpc('get_or_set_course_of_the_day');
+        if (cotd && cotd.length > 0) {
+          const { data: courseData } = await supabase
             .from('courses')
-            .select('id, name, city, state, country, holes, avg_time, pop_score, total_rounds, par')
-            .limit(1)
+            .select('*')
+            .eq('id', cotd[0].course_id)
             .maybeSingle();
-          selected = fallback ?? null;
+          if (courseData) {
+            await AsyncStorage.setItem('course_of_day', JSON.stringify(courseData));
+            await AsyncStorage.setItem('course_of_day_date', today);
+          }
+          setCourseOfDay(courseData ?? null);
         }
-
-        if (selected) {
-          await AsyncStorage.setItem('course_of_day', JSON.stringify(selected));
-          await AsyncStorage.setItem('course_of_day_time', new Date().toISOString());
-        }
-        setCourseOfDay(selected);
       } catch (e) {
         // silent fail
       } finally {
@@ -231,6 +190,20 @@ function PlayerHomeScreen({ navigation }) {
       } catch (e) { /* silent fail */ }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('rounds').select('course_name, pop_score')
+      .eq('user_id', user.id).not('pop_score', 'is', null)
+      .order('pop_score', { ascending: false }).limit(100)
+      .then(({ data }) => {
+        const map = {};
+        for (const r of data ?? []) {
+          if (r.course_name && map[r.course_name] == null) map[r.course_name] = r.pop_score;
+        }
+        setMyScoreMap(map);
+      });
+  }, [user?.id]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -298,6 +271,16 @@ function PlayerHomeScreen({ navigation }) {
         setMonthlyDelta(null);
       }
 
+      // Unread notification count for bell badge
+      if (uid) {
+        const { count: nc } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', uid)
+          .eq('read', false);
+        setUnreadCount(nc ?? 0);
+      }
+
     } catch (e) {
       setError(true);
     } finally {
@@ -326,7 +309,44 @@ function PlayerHomeScreen({ navigation }) {
     })();
   }, [profile?.pop_score]);
 
-  useFocusEffect(useCallback(() => { refreshProfile(); fetchAll(); }, []));
+  const handleDiscard = () => {
+    Alert.alert(
+      'Discard round?',
+      'Your in-progress round will be permanently discarded.',
+      [
+        { text: 'Keep Round', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            AsyncStorage.removeItem(ROUND_STATE_KEY).catch(() => {});
+            setSavedRound(null);
+          },
+        },
+      ],
+    );
+  };
+
+  useFocusEffect(useCallback(() => {
+    refreshProfile();
+    fetchAll();
+    // Check for a saved live round — same 12-hour staleness threshold as LiveRoundScreen rehydration
+    AsyncStorage.getItem(ROUND_STATE_KEY).then(raw => {
+      if (!raw) { setSavedRound(null); return; }
+      try {
+        const saved = JSON.parse(raw);
+        if (!saved?.startTs || !saved?.course) { setSavedRound(null); return; }
+        if (Date.now() - saved.startTs > ROUND_STALENESS_MS) {
+          AsyncStorage.removeItem(ROUND_STATE_KEY).catch(() => {});
+          setSavedRound(null);
+          return;
+        }
+        setSavedRound({ courseName: saved.course.name, currentHole: saved.currentHole ?? 1 });
+      } catch {
+        setSavedRound(null);
+      }
+    }).catch(() => {});
+  }, []));
 
   const firstName = profile?.full_name?.split(' ')[0] ?? '';
   const popScore  = profile?.pop_score;
@@ -345,18 +365,35 @@ function PlayerHomeScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.wordmark}>PLAYTHRU</Text>
+            <Text style={styles.wordmark}>CLOCKED</Text>
+            <Text style={styles.brandTagline}>ON THE CLOCK</Text>
             {!loading && !error && (
               <Text style={styles.greeting}>{getGreeting()}, {firstName}.</Text>
             )}
             {loading && <SkeletonLoader width={180} height={14} style={{ marginTop: 8 }} />}
           </View>
           <TouchableOpacity
+            onPress={() => navigation.navigate('Notifications')}
+            activeOpacity={0.8}
+            style={styles.headerBell}
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            accessibilityRole="button"
+          >
+            <Ionicons name="notifications-outline" size={22} color="#B8A882" />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => navigation.navigate('Profile')}
             activeOpacity={0.8}
             style={styles.headerAvatar}
+            accessibilityLabel="View your profile"
+            accessibilityRole="button"
           >
-            <InitialsAvatar name={profile?.full_name} size={38} />
+            <InitialsAvatar name={profile?.full_name} size={38} avatarUrl={profile?.avatar_url} />
           </TouchableOpacity>
         </View>
 
@@ -383,6 +420,8 @@ function PlayerHomeScreen({ navigation }) {
                 style={styles.scoreInfoBtn}
                 onPress={() => navigation.navigate('POPScoreInfo')}
                 activeOpacity={0.7}
+                accessibilityLabel="About Clocked Score"
+                accessibilityRole="button"
               >
                 <Ionicons name="information-circle-outline" size={20} color="#C9A84C" />
               </TouchableOpacity>
@@ -394,27 +433,33 @@ function PlayerHomeScreen({ navigation }) {
                   </View>
               }
               <View style={styles.scoreRow}>
-                <View style={styles.scoreStat}>
+                <View style={styles.scoreStat} accessible={true} accessibilityLabel={`National average 3.9`}>
                   <Text style={styles.scoreStatLabel}>NAT'L AVG</Text>
-                  <Text style={styles.scoreStatValue}>3.9</Text>
+                  <Text style={styles.scoreStatValue} accessibilityRole="text">3.9</Text>
                 </View>
-                <View style={styles.scoreStat}>
+                <View style={styles.scoreStat} accessible={true} accessibilityLabel={`Your Clocked Score ${popScore != null ? popScore.toFixed(1) : 'not yet earned'}`}>
                   <Text style={styles.scoreStatLabel}>YOU</Text>
-                  <Text style={styles.scoreStatValue}>{popScore != null ? popScore.toFixed(1) : '--'}</Text>
+                  <Text style={styles.scoreStatValue} accessibilityRole="text">{popScore != null ? popScore.toFixed(1) : '--'}</Text>
                 </View>
-                <View style={styles.scoreStat}>
+                <View style={styles.scoreStat} accessible={true} accessibilityLabel={`Monthly change ${monthlyDelta == null ? 'not available' : `${monthlyDelta >= 0 ? 'up' : 'down'} ${Math.abs(monthlyDelta).toFixed(1)} percent`}`}>
                   <Text style={styles.scoreStatLabel}>MONTHLY</Text>
                   {monthlyDelta == null ? (
-                    <Text style={styles.scoreStatValue}>--</Text>
+                    <Text style={styles.scoreStatValue} accessibilityRole="text">--</Text>
                   ) : (
-                    <Text style={[styles.scoreStatValue, { color: monthlyDelta >= 0 ? '#7DC87A' : '#C07A6A' }]}>
+                    <Text style={[styles.scoreStatValue, { color: monthlyDelta >= 0 ? '#7DC87A' : '#C07A6A' }]} accessibilityRole="text">
                       {monthlyDelta >= 0 ? '↑' : '↓'}{Math.abs(monthlyDelta).toFixed(1)}%
                     </Text>
                   )}
                 </View>
               </View>
+              {profile?.handicap_index != null && (
+                <View style={styles.hcpRow}>
+                  <Text style={styles.hcpLabel}>HANDICAP INDEX</Text>
+                  <Text style={styles.hcpValue}>{profile.handicap_index.toFixed(1)}</Text>
+                </View>
+              )}
               <TouchableOpacity onPress={() => navigation.navigate('POPScoreInfo')} activeOpacity={0.7} style={{ marginTop: 12 }}>
-                <Text style={styles.popInfoLink}>What is my POPScore?</Text>
+                <Text style={styles.popInfoLink}>What is my Clocked Score?</Text>
               </TouchableOpacity>
             </View>
 
@@ -425,9 +470,9 @@ function PlayerHomeScreen({ navigation }) {
               const now = new Date();
               const sameMonth = now.getMonth() === roundDate.getMonth() && now.getFullYear() === roundDate.getFullYear();
               const sameYear  = now.getFullYear() === roundDate.getFullYear();
-              const label = sameMonth ? 'Best POPScore this month'
+              const label = sameMonth ? 'Best Clocked Score this month'
                 : sameYear ? 'Fastest round this year'
-                : 'Best POPScore ever';
+                : 'Best Clocked Score ever';
               const sc = r.pop_score;
               const badgeColor = sc >= 4.0 ? '#7DC87A' : sc >= 3.0 ? '#C9A84C' : '#C07A6A';
               const detailParts = [
@@ -446,7 +491,7 @@ function PlayerHomeScreen({ navigation }) {
                   <View style={styles.featuredBody}>
                     <View style={[styles.featuredBadge, { borderColor: badgeColor }]}>
                       <Text style={[styles.featuredBadgeScore, { color: badgeColor }]}>{sc.toFixed(1)}</Text>
-                      <Text style={[styles.featuredBadgePop, { color: badgeColor }]}>POP</Text>
+                      <Text style={[styles.featuredBadgePop, { color: badgeColor }]}>CLK</Text>
                     </View>
                     <View style={{ flex: 1, marginHorizontal: 12 }}>
                       <Text style={styles.featuredCourse} numberOfLines={1}>{r.course_name ?? '—'}</Text>
@@ -501,7 +546,7 @@ function PlayerHomeScreen({ navigation }) {
                       <Text style={[styles.lastRoundScore, { color: badgeColor }]}>
                         {sc != null ? sc.toFixed(1) : '—'}
                       </Text>
-                      <Text style={styles.lastRoundScoreLabel}>POP</Text>
+                      <Text style={styles.lastRoundScoreLabel}>CLK</Text>
                       {lr.caddy_logged && (
                         <View style={styles.lastRoundVerified}>
                           <Ionicons name="checkmark-circle" size={10} color="#7DC87A" />
@@ -544,7 +589,7 @@ function PlayerHomeScreen({ navigation }) {
                   <View style={styles.cotdPopRow}>
                     <Text style={styles.cotdPopNum}>{cotdPop.toFixed(1)}</Text>
                     <View>
-                      <Text style={styles.cotdPopLabel}>COURSE POPSCORE</Text>
+                      <Text style={styles.cotdPopLabel}>COURSE CLOCKED SCORE</Text>
                       <Text style={styles.cotdPopRounds}>
                         Based on {courseOfDay.total_rounds || 0} round{courseOfDay.total_rounds !== 1 ? 's' : ''}
                       </Text>
@@ -577,7 +622,7 @@ function PlayerHomeScreen({ navigation }) {
               activeOpacity={0.85}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <Text style={[styles.cardLabel, { marginBottom: 0 }]}>ACTIVITY</Text>
+                <Text style={[styles.cardLabel, { marginBottom: 0, color: '#7A6E58' }]}>ACTIVITY</Text>
                 <Text style={{ fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 1 }}>SEE ALL →</Text>
               </View>
               {recentActivity.length === 0 ? (
@@ -588,30 +633,99 @@ function PlayerHomeScreen({ navigation }) {
               ) : (
                 recentActivity.map((item) => {
                   const initials = (item.full_name || item.username || 'G')[0].toUpperCase();
-                  const handle = item.username ? `@${item.username}` : (item.full_name?.split(' ')[0] ?? 'Golfer');
-                  const pop = item.content?.pop_score != null ? item.content.pop_score.toFixed(1) : null;
-                  const course = item.content?.course_name || null;
-                  const typeLabel = item.type === 'round_logged' ? 'logged a round'
-                    : item.type === 'milestone' ? 'hit a milestone'
-                    : item.type === 'post' ? 'posted'
-                    : 'was active';
+                  const handle   = item.username ? `@${item.username}` : (item.full_name?.split(' ')[0] ?? 'Golfer');
+                  const popRaw   = item.content?.pop_score != null ? parseFloat(item.content.pop_score) : null;
+                  const pop      = popRaw != null ? popRaw.toFixed(1) : null;
+                  const course   = item.content?.course_name || null;
+                  const isLive   = item.type === 'live_round_started';
+                  const isMilestone = item.type === 'milestone';
+                  const holesDetail     = item.content?.holes;
+                  const transportDetail = item.content?.transport;
+                  const milestoneTitle  = item.content?.title ?? null;
+
+                  const leftBorderColor = popRaw == null
+                    ? '#2A3B2C'
+                    : popRaw >= 4.0 ? '#7DC87A'
+                    : popRaw >= 3.0 ? '#C9A84C'
+                    : '#8B4040';
+
                   return (
-                    <View key={item.id} style={[styles.friendRow, { marginBottom: 10 }]}>
-                      <View style={[styles.friendAvatar, { width: 36, height: 36, borderRadius: 18 }]}>
-                        <Text style={[styles.friendInitial, { fontSize: 15 }]}>{initials}</Text>
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <Text style={[styles.friendText, { fontWeight: '700' }]}>{handle}</Text>
-                          <Text style={[styles.feedTime, { fontSize: 11 }]}>{typeLabel}</Text>
-                          {pop != null && (
-                            <View style={{ backgroundColor: '#C9A84C22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#C9A84C' }}>{pop}</Text>
-                            </View>
-                          )}
+                    <View
+                      key={item.id}
+                      style={[
+                        styles.feedCard,
+                        { borderLeftColor: leftBorderColor },
+                        isLive && { borderLeftColor: '#7DC87A' },
+                      ]}
+                    >
+                      {/* Avatar */}
+                      <View style={{ position: 'relative' }}>
+                        <View style={styles.friendAvatar}>
+                          <Text style={styles.friendInitial}>{initials}</Text>
                         </View>
-                        {course && <Text style={[styles.feedTime, { marginTop: 1 }]} numberOfLines={1}>{course}</Text>}
-                        <Text style={[styles.feedTime, { marginTop: 2 }]}>{timeAgo(item.created_at)}</Text>
+                        {isLive && (
+                          <View style={{ position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: 5, backgroundColor: '#7DC87A', borderWidth: 1.5, borderColor: '#0D1A0F' }} />
+                        )}
+                      </View>
+
+                      {/* Content */}
+                      <View style={{ flex: 1 }}>
+                        {isMilestone ? (
+                          /* ── Milestone card ── */
+                          <>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                              <Ionicons name="star" size={14} color="#C9A84C" />
+                              <Text style={styles.feedHandle}>{handle}</Text>
+                            </View>
+                            {milestoneTitle ? (
+                              <Text style={styles.feedMilestoneTitle}>{milestoneTitle}</Text>
+                            ) : (
+                              <Text style={styles.feedMuted}>hit a milestone</Text>
+                            )}
+                            <Text style={[styles.feedMuted, { marginTop: 4 }]}>{timeAgo(item.created_at)}</Text>
+                          </>
+                        ) : (
+                          /* ── Round / live card ── */
+                          <>
+                            {/* Row 1: handle + action */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginBottom: 2 }}>
+                              <Text style={styles.feedHandle}>{handle}</Text>
+                              <Text style={styles.feedMuted}>
+                                {isLive ? 'is playing live' : 'logged a round'}
+                              </Text>
+                            </View>
+
+                            {/* Row 2: course name */}
+                            {course != null && (
+                              <Text style={styles.feedCourse} numberOfLines={1}>{course}</Text>
+                            )}
+                            {isLive && (holesDetail || transportDetail) && (
+                              <Text style={styles.feedMuted}>{[holesDetail && `${holesDetail} holes`, transportDetail].filter(Boolean).join(' · ')}</Text>
+                            )}
+
+                            {/* CLK score badge */}
+                            {pop != null && (
+                              <View style={styles.feedScoreBadge}>
+                                <Text style={styles.feedScoreLabel}>CLK</Text>
+                                <Text style={styles.feedScoreValue}>{pop}</Text>
+                              </View>
+                            )}
+
+                            {/* Bottom row: timestamp + challenge */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                              <Text style={styles.feedTime}>{timeAgo(item.created_at)}</Text>
+                              {item.type === 'round_logged' && (
+                                <ChallengeButton
+                                  targetUserId={item.user_id}
+                                  targetUsername={item.username ?? item.full_name?.split(' ')[0] ?? 'player'}
+                                  courseName={course}
+                                  challengerScore={myScoreMap[course] ?? null}
+                                  variant="inline"
+                                />
+                              )}
+                            </View>
+                          </>
+                        )}
                       </View>
                     </View>
                   );
@@ -656,21 +770,16 @@ function PlayerHomeScreen({ navigation }) {
               })()}
             </View>
 
-            {/* Pro Member Teaser — shown only after 5 rounds logged */}
-            {totalRounds >= 5 ? (
-              <ComingSoonCard />
-            ) : (
-              <View style={styles.proProgressCard}>
-                <Text style={styles.proProgressEyebrow}>MORE COMING SOON</Text>
-                <Text style={styles.proProgressBody}>
-                  Log {5 - totalRounds} more round{5 - totalRounds !== 1 ? 's' : ''} to unlock upcoming features
-                </Text>
-                <View style={styles.proProgressTrack}>
-                  <View style={[styles.proProgressFill, { width: `${(totalRounds / 5) * 100}%` }]} />
-                </View>
-                <Text style={styles.proProgressCount}>{totalRounds} of 5 rounds logged</Text>
-              </View>
-            )}
+            {/* Invite Friends card */}
+            <TouchableOpacity
+              style={styles.inviteCard}
+              onPress={() => navigation.navigate('SearchUsers')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="people-outline" size={22} color="#C9A84C" style={{ marginBottom: 8 }} />
+              <Text style={styles.inviteTitle}>Invite Friends to Clocked</Text>
+              <Text style={styles.inviteSub}>See how your pace compares to your crew. Find golfers you know.</Text>
+            </TouchableOpacity>
           </>
         )}
 
@@ -679,11 +788,27 @@ function PlayerHomeScreen({ navigation }) {
       {/* FABs */}
       <View style={styles.fabRow}>
         <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('Log')} activeOpacity={0.8}>
-          <Text style={styles.fabText}>+ LOG ROUND</Text>
+          <Text style={styles.fabText}>+ LOG PACE ROUND</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.fabLive} onPress={() => navigation.navigate('LiveRound')} activeOpacity={0.8}>
-          <Text style={styles.fabLiveText}>▶ LIVE ROUND</Text>
-        </TouchableOpacity>
+        {savedRound ? (
+          <View style={[styles.fabLive, styles.fabLiveResume]}>
+            <TouchableOpacity
+              style={{ flex: 1, alignItems: 'center' }}
+              onPress={() => navigation.navigate('LiveRound')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.fabLiveText}>▶ RESUME</Text>
+              <Text style={styles.fabResumeSub}>{savedRound.courseName} · Hole {savedRound.currentHole}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDiscard} activeOpacity={0.7} hitSlop={{ top: 12, bottom: 12, left: 12, right: 0 }}>
+              <Ionicons name="close-outline" size={18} color="#7DC87A" style={{ opacity: 0.6, paddingLeft: 12 }} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.fabLive} onPress={() => navigation.navigate('LiveRound')} activeOpacity={0.8}>
+            <Text style={styles.fabLiveText}>▶ LIVE ROUND</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -692,12 +817,19 @@ function PlayerHomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container:        { flex: 1, backgroundColor: '#090F0A' },
   header:           { padding: 22, paddingTop: 52, borderBottomWidth: 1, borderBottomColor: '#7DC87A22', flexDirection: 'row', alignItems: 'center' },
-  headerAvatar:     { marginLeft: 12, paddingTop: 4 },
-  wordmark:         { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 4 },
+  headerBell:       { position: 'relative', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
+  bellBadge:        { position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#C9A84C', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  bellBadgeText:    { fontSize: 9, fontWeight: '700', color: '#090F0A' },
+  headerAvatar:     { marginLeft: 4, paddingTop: 4 },
+  wordmark:         { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 2 },
+  brandTagline:     { fontSize: 9, fontWeight: '600', color: '#C9A84C88', letterSpacing: 3, marginBottom: 6 },
   greeting:         { fontSize: 20, fontFamily: 'Georgia', color: '#F5EDD8' },
   subGreeting:      { fontSize: 11, fontWeight: '600', color: '#7DC87A', marginTop: 3 },
   scoreCard:        { margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center' },
-  scoreInfoBtn:     { position: 'absolute', top: 12, right: 12, padding: 4, zIndex: 1 },
+  scoreInfoBtn:     { position: 'absolute', top: 6, right: 6, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  hcpRow:           { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  hcpLabel:         { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
+  hcpValue:         { fontSize: 14, fontWeight: '600', color: '#C9A84C' },
   popInfoLink:      { fontSize: 12, color: '#C9A84C', textAlign: 'center', textDecorationLine: 'underline' },
   scoreRow:         { flexDirection: 'row', gap: 32, marginTop: 12 },
   scoreStat:        { alignItems: 'center' },
@@ -743,16 +875,26 @@ const styles = StyleSheet.create({
   emptyText:        { fontSize: 20, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', marginBottom: 20, lineHeight: 28 },
   emptyBtn:         { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28 },
   emptyBtnText:     { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
-  feedTime:        { fontSize: 10, color: '#7A6E58', marginTop: 3 },
+  feedTime:        { fontSize: 10, color: 'rgba(184,168,130,0.6)', marginTop: 3 },
   feedEmpty:       { paddingVertical: 16, alignItems: 'center', gap: 12 },
   feedEmptyText:   { fontSize: 13, color: '#7A6E58', textAlign: 'center', lineHeight: 19 },
   feedEmptyBtn:    { backgroundColor: '#C9A84C', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20 },
   feedEmptyBtnText:{ fontSize: 10, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
-  // friends activity
-  friendRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#7DC87A0A' },
-  friendAvatar:     { width: 34, height: 34, borderRadius: 17, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C33', alignItems: 'center', justifyContent: 'center' },
-  friendInitial:    { fontSize: 13, fontWeight: '600', color: '#C9A84C' },
-  friendText:       { fontSize: 13, color: '#F5EDD8' },
+  // friends activity feed cards
+  feedCard:             { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 14, borderTopWidth: 1, borderTopColor: '#7DC87A0A', borderLeftWidth: 3, paddingLeft: 12, marginLeft: -12 },
+  friendAvatar:         { width: 36, height: 36, borderRadius: 18, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C33', alignItems: 'center', justifyContent: 'center' },
+  friendInitial:        { fontSize: 14, fontWeight: '600', color: '#C9A84C' },
+  feedHandle:           { fontSize: 15, fontWeight: '700', color: '#F5EDD8' },
+  feedMuted:            { fontSize: 13, color: '#B8A882' },
+  feedCourse:           { fontSize: 13, color: '#B8A882', marginBottom: 6 },
+  feedScoreBadge:       { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginTop: 2 },
+  feedScoreLabel:       { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+  feedScoreValue:       { fontSize: 16, fontWeight: '700', color: '#C9A84C' },
+  feedMilestoneTitle:   { fontSize: 15, fontWeight: '600', color: '#F5EDD8', lineHeight: 22 },
+  // invite card
+  inviteCard:      { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#0D1A0F', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: '#C9A84C22', alignItems: 'center' },
+  inviteTitle:     { fontSize: 14, fontWeight: '700', color: '#F5EDD8', marginBottom: 6, textAlign: 'center' },
+  inviteSub:       { fontSize: 12, color: '#7A6E58', textAlign: 'center', lineHeight: 18 },
   // course of the day
   cotdCard:         { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#0D1A0F', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#7DC87A22' },
   cotdSectionLabel: { fontSize: 9, letterSpacing: 1, color: '#B8A882', fontWeight: '700', marginBottom: 8 },
@@ -770,23 +912,6 @@ cotdName:         { fontSize: 13, fontWeight: '600', color: '#F5EDD8', lineHeigh
   trendLabel:       { fontSize: 11, fontWeight: '600', letterSpacing: 1, marginTop: 4 },
   trendStats:       { flexDirection: 'row', gap: 24, marginTop: 10 },
   // GPS Tease
-  // Pro
-  proProgressCard:       { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#0D1A0F', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: 'rgba(125,200,122,0.2)' },
-  proProgressEyebrow:    { fontSize: 11, fontWeight: '700', letterSpacing: 1, color: '#B8A882', marginBottom: 6 },
-  proProgressBody:       { fontSize: 14, color: '#F5EDD8', marginBottom: 10, lineHeight: 20 },
-  proProgressTrack:      { backgroundColor: '#162B19', borderRadius: 6, height: 6, overflow: 'hidden' },
-  proProgressFill:       { backgroundColor: '#C9A84C', height: 6, borderRadius: 6 },
-  proProgressCount:      { fontSize: 11, color: '#B8A882', marginTop: 6 },
-  proCard:          { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#1A2E1C', borderRadius: 20, padding: 18, borderWidth: 1, borderColor: 'rgba(125,200,122,0.25)' },
-  proBadge:         { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 6, paddingHorizontal: 9, paddingVertical: 3, marginBottom: 10 },
-  proBadgeText:     { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
-  proFeatureRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  proFeature:       { width: '47%', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: 'rgba(125,200,122,0.1)' },
-  proFeatureGold:   { borderColor: 'rgba(201,168,76,0.45)', backgroundColor: 'rgba(201,168,76,0.07)' },
-  proFeatureTitle:  { fontSize: 11, fontWeight: '600', color: '#B8A882', marginBottom: 2 },
-  proFeatureSub:    { fontSize: 10, color: '#7A6E58' },
-  proComingSoonBadge: { alignSelf: 'flex-end', borderWidth: 1, borderColor: '#C9A84C', backgroundColor: 'transparent', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2, marginBottom: 8 },
-  proComingSoonText:  { fontSize: 7, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
   fabRow: {
     position: 'absolute', bottom: 16, left: 16, right: 16,
     flexDirection: 'row', gap: 10,
@@ -804,7 +929,9 @@ cotdName:         { fontSize: 13, fontWeight: '600', color: '#F5EDD8', lineHeigh
     shadowColor: '#7DC87A', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
   },
-  fabLiveText: { fontSize: 12, fontWeight: '700', color: '#7DC87A', letterSpacing: 2 },
+  fabLiveText:   { fontSize: 12, fontWeight: '700', color: '#7DC87A', letterSpacing: 2 },
+  fabLiveResume: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
+  fabResumeSub:  { fontSize: 9, fontWeight: '600', color: '#7DC87A', opacity: 0.75, letterSpacing: 0.5, marginTop: 2 },
 });
 
 // ─── Caddy Home Screen ────────────────────────────────────────────────────────
@@ -899,7 +1026,7 @@ function CaddyHomeScreen({ navigation }) {
     return (
       <View style={cs.container}>
         <View style={cs.header}>
-          <Text style={cs.wordmark}>PLAYTHRU</Text>
+          <Text style={cs.wordmark}>CLOCKED</Text>
         </View>
         <View style={cs.errorCard}>
           <Ionicons name="cloud-offline-outline" size={32} color="rgba(201,168,76,0.3)" style={{ marginBottom: 12 }} />
@@ -918,7 +1045,7 @@ function CaddyHomeScreen({ navigation }) {
 
         {/* Header */}
         <View style={cs.header}>
-          <Text style={cs.wordmark}>PLAYTHRU</Text>
+          <Text style={cs.wordmark}>CLOCKED</Text>
           {loading
             ? <SkeletonLoader width={180} height={20} style={{ marginTop: 6 }} />
             : (

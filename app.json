@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "PlayThru",
+    "name": "Clocked",
     "slug": "playthru",
     "scheme": "playthru",
-    "version": "1.0.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/PlayThru_AppIcon.png",
     "userInterfaceStyle": "light",
@@ -18,16 +18,15 @@
       "backgroundColor": "#090F0A",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "PlayThru uses your location to show nearby courses first.",
-        "NSFaceIDUsageDescription": "PlayThru uses Face ID to keep your account secure.",
-        "NSPhotoLibraryUsageDescription": "PlayThru uses your photo library to let you set a profile picture and save your POPScore share card.",
-        "NSCameraUsageDescription": "PlayThru uses your camera to take a profile photo.",
-        "NSPhotoLibraryAddUsageDescription": "PlayThru saves your POPScore share card to your photo library.",
-        "NSMicrophoneUsageDescription": "PlayThru may use the microphone when recording video content."
+        "NSLocationWhenInUseUsageDescription": "Clocked uses your location to show nearby courses first.",
+        "NSFaceIDUsageDescription": "Clocked uses Face ID to keep your account secure.",
+        "NSPhotoLibraryUsageDescription": "Clocked uses your photo library to let you set a profile picture and save your POPScore share card.",
+        "NSCameraUsageDescription": "Clocked uses your camera to take a profile photo.",
+        "NSPhotoLibraryAddUsageDescription": "Clocked saves your Clocked Score share card to your photo library.",
+        "NSMicrophoneUsageDescription": "Clocked may use the microphone when recording video content."
       }
     },
     "android": {
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#090F0A",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -61,21 +60,21 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow PlayThru to save your POPScore card to your photos.",
-          "savePhotosPermission": "Allow PlayThru to save your POPScore card to your photos."
+          "photosPermission": "Allow Clocked to save your Clocked Score card to your photos.",
+          "savePhotosPermission": "Allow Clocked to save your Clocked Score card to your photos."
         }
       ],
       "expo-image",
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "PlayThru uses Face ID to keep your account secure."
+          "faceIDPermission": "Clocked uses Face ID to keep your account secure."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "PlayThru uses your location to show nearby courses first."
+          "locationWhenInUsePermission": "Clocked uses your location to show nearby courses first."
         }
       ]
     ],

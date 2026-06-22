@@ -45,7 +45,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
         {/* Header */}
         <View style={s.header}>
-          <Text style={s.wordmark}>PLAYTHRU</Text>
+          <Text style={s.wordmark}>CLOCKED</Text>
           <Text style={s.title}>Reset Password</Text>
           <Text style={s.subtitle}>
             Enter your email and we'll send you a reset link.

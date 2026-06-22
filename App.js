@@ -1,18 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import Constants from 'expo-constants';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, AppState, Animated, AccessibilityInfo } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Montserrat_700Bold } from '@expo-google-fonts/montserrat';
+import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { supabase } from './lib/supabase';
-import { setupNotifications } from './lib/notifications';
+import { setupNotifications, refreshPushToken } from './lib/notifications';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 import HomeScreen             from './screens/HomeScreen';
+import FeedScreen             from './screens/FeedScreen';
+import RulesScreen            from './screens/RulesScreen';
 import CaddyDashboardScreen    from './screens/CaddyDashboardScreen';
 import CaddyLeaderboardScreen  from './screens/CaddyLeaderboardScreen';
 import LogScreen          from './screens/LogScreen';
@@ -33,9 +36,15 @@ import ActivityFeedScreen    from './screens/ActivityFeedScreen';
 import LiveRoundScreen      from './screens/LiveRoundScreen';
 import ResetPasswordScreen  from './screens/ResetPasswordScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
-import GamesScreen          from './screens/GamesScreen';
+// GamesScreen retired — the sport is the one game
 import PreviewModeScreen    from './screens/PreviewModeScreen';
 import SettingsScreen       from './screens/SettingsScreen';
+import EditProfileScreen   from './screens/EditProfileScreen';
+import PaywallScreen              from './screens/PaywallScreen';
+import NotificationCenterScreen  from './screens/NotificationCenterScreen';
+import ClockedSetupScreen        from './screens/ClockedSetupScreen';
+import ClockedRoundScreen        from './screens/ClockedRoundScreen';
+import ConfirmRoundScreen        from './screens/ConfirmRoundScreen';
 
 // ─── Deep link helpers ────────────────────────────────────────────────────────
 function parseUrlParams(url) {
@@ -94,18 +103,83 @@ const RootStack = createNativeStackNavigator();
 
 // ─── Tab bar ─────────────────────────────────────────────────────────────────
 const PLAYER_TABS = [
-  { name: 'Home',        icon: 'home',       label: 'HOME' },
-  { name: 'Log',         icon: 'add-circle', label: 'LOG' },
-  { name: 'Courses',     icon: 'location',   label: 'COURSES' },
-  { name: 'Profile',     icon: 'person',     label: 'PROFILE' },
-  { name: 'Leaderboard', icon: 'trophy',     label: 'RANKS' },
+  { name: 'Feed',        icon: 'flash-outline',  label: 'FEED' },
+  { name: 'Rules',       icon: 'book-outline',   label: 'RULES' },
+  { name: 'Play',        icon: 'timer-outline',  label: 'PLAY', isPlay: true },
+  { name: 'Ranks',       icon: 'trophy',         label: 'RANKS' },
+  { name: 'You',         icon: 'person',         label: 'YOU' },
 ];
 const CADDY_TABS = [
-  { name: 'Home',        icon: 'person',     label: 'CADDY' },
-  { name: 'Log',         icon: 'add-circle', label: 'LOG' },
-  { name: 'Courses',     icon: 'location',   label: 'COURSES' },
-  { name: 'Leaderboard', icon: 'trophy',     label: 'RANKS' },
+  { name: 'Home',        icon: 'shield-outline', label: 'HUB' },
+  { name: 'Play',        icon: 'timer-outline',  label: 'OPERATE', isPlay: true },
+  { name: 'Leaderboard', icon: 'trophy',         label: 'RANKS' },
+  { name: 'Log',         icon: 'add-circle',     label: 'LOG' },
 ];
+
+// ─── Play button glow colors ─────────────────────────────────────────────────
+const PLAY_GOLD       = '#F0CB5B'; // brighter, more saturated than #C9A84C
+const PLAY_GOLD_TOP   = '#F7DC82'; // lighter highlight for gradient top
+const PLAY_GOLD_BOT   = '#D4A832'; // richer shadow for gradient bottom
+const TAB_ACTIVE      = '#B8A24A'; // active tabs: gold but a notch below Play
+const TAB_INACTIVE    = 'rgba(160,152,130,0.35)'; // greyer than before
+
+function PlayButton({ onPress }) {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [reduceMotion, setReduceMotion] = useState(true); // default safe
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled?.().then(v => {
+      setReduceMotion(!!v);
+      if (!v) {
+        // Gentle breathing pulse: scale 1→1.12→1, opacity on glow ring
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, { toValue: 1.12, duration: 1200, useNativeDriver: true }),
+            Animated.timing(pulseAnim, { toValue: 1,    duration: 1200, useNativeDriver: true }),
+          ])
+        ).start();
+      }
+    });
+  }, []);
+
+  const glowOpacity = reduceMotion ? 0.25 : pulseAnim.interpolate({
+    inputRange: [1, 1.12], outputRange: [0.18, 0.35],
+  });
+
+  return (
+    <TouchableOpacity
+      style={nav.playItem}
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel="Play Clocked"
+    >
+      {/* Outer glow ring */}
+      <Animated.View style={[nav.glowRing, {
+        transform: [{ scale: reduceMotion ? 1 : pulseAnim }],
+        opacity: glowOpacity,
+      }]} />
+
+      {/* Gradient circle */}
+      <View style={nav.playCircle}>
+        <Svg width={52} height={52} style={nav.gradientSvg}>
+          <Defs>
+            <LinearGradient id="playGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={PLAY_GOLD_TOP} />
+              <Stop offset="1" stopColor={PLAY_GOLD_BOT} />
+            </LinearGradient>
+          </Defs>
+          <Circle cx={26} cy={26} r={25} fill="url(#playGrad)" />
+        </Svg>
+        <View style={nav.playIconWrap}>
+          <Ionicons name="timer-outline" size={26} color="#090F0A" />
+        </View>
+      </View>
+
+      <Text style={nav.playLabel}>PLAY</Text>
+    </TouchableOpacity>
+  );
+}
 
 function BottomNav({ state, navigation, isCaddy }) {
   const tabs = isCaddy ? CADDY_TABS : PLAYER_TABS;
@@ -113,16 +187,33 @@ function BottomNav({ state, navigation, isCaddy }) {
     <View style={nav.container}>
       {tabs.map((tab, i) => {
         const active = state.index === i;
+
+        if (tab.isPlay) {
+          return (
+            <PlayButton
+              key={tab.name}
+              onPress={() => {
+                const root = navigation.getParent();
+                if (root) root.navigate('ClockedSetup');
+                else navigation.navigate('ClockedSetup');
+              }}
+            />
+          );
+        }
+
         return (
           <TouchableOpacity
             key={tab.name}
             style={nav.item}
             onPress={() => navigation.navigate(tab.name)}
             activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={tab.label}
           >
             <Ionicons name={tab.icon} size={24}
-              color={active ? '#C9A84C' : 'rgba(184,168,130,0.4)'} />
-            <Text style={[nav.label, { color: active ? '#C9A84C' : 'rgba(184,168,130,0.4)' }]}>
+              color={active ? TAB_ACTIVE : TAB_INACTIVE} />
+            <Text style={[nav.label, { color: active ? TAB_ACTIVE : TAB_INACTIVE }]}>
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -140,6 +231,23 @@ const nav = StyleSheet.create({
   },
   item:  { alignItems: 'center', justifyContent: 'center', flex: 1, paddingTop: 4 },
   label: { fontSize: 9, fontFamily: 'Montserrat_700Bold', letterSpacing: 1.5, marginTop: 3 },
+
+  // Play button
+  playItem: { alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: -18 },
+  glowRing: {
+    position: 'absolute', top: -6, width: 68, height: 68, borderRadius: 34,
+    backgroundColor: PLAY_GOLD,
+  },
+  playCircle: {
+    width: 52, height: 52, borderRadius: 26, overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: PLAY_GOLD, shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.55, shadowRadius: 18, elevation: 10,
+    borderWidth: 2, borderColor: '#090D0A',
+  },
+  gradientSvg: { position: 'absolute', top: 0, left: 0 },
+  playIconWrap: { position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 52, height: 52 },
+  playLabel: { fontSize: 9, fontFamily: 'Montserrat_700Bold', letterSpacing: 1.5, marginTop: 3, color: PLAY_GOLD },
 });
 
 // ─── Main app (tab navigator) ─────────────────────────────────────────────────
@@ -157,20 +265,25 @@ function MainApp() {
           screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
         >
           <Tab.Screen name="Home"        component={CaddyDashboardScreen} />
+          {/* Play/Operate — the BottomNav button pushes ClockedSetup on the root stack */}
+          <Tab.Screen name="Play"        component={CaddyDashboardScreen} />
+          <Tab.Screen name="Leaderboard" component={CaddyLeaderboardScreen} />
           <Tab.Screen name="Log"         component={LogScreen} />
           <Tab.Screen name="Courses"     component={CoursesScreen} />
-          <Tab.Screen name="Leaderboard" component={CaddyLeaderboardScreen} />
         </Tab.Navigator>
       ) : (
         <Tab.Navigator
           tabBar={props => <BottomNav {...props} />}
           screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
         >
-          <Tab.Screen name="Home"        component={HomeScreen} />
+          <Tab.Screen name="Feed"        component={FeedScreen} />
+          <Tab.Screen name="Rules"       component={RulesScreen} />
+          {/* Play tab has no screen — the BottomNav button pushes ClockedSetup on the root stack */}
+          <Tab.Screen name="Play"        component={FeedScreen} />
+          <Tab.Screen name="Ranks"       component={LeaderboardScreen} />
+          <Tab.Screen name="You"         component={ProfileScreen} />
+          {/* Hidden: reachable via navigate() from links/FABs, no visible tab */}
           <Tab.Screen name="Log"         component={LogScreen} />
-          <Tab.Screen name="Courses"     component={CoursesScreen} />
-          <Tab.Screen name="Profile"     component={ProfileScreen} />
-          <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
         </Tab.Navigator>
       )}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
@@ -178,55 +291,37 @@ function MainApp() {
   );
 }
 
-// ─── Biometric gate ───────────────────────────────────────────────────────────
+// ─── Update gate ─────────────────────────────────────────────────────────────
 
-function BiometricGate({ onUnlock }) {
-  const [failed, setFailed] = useState(false);
-
-  const tryAuth = async () => {
-    setFailed(false);
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Unlock PlayThru',
-      fallbackLabel: 'Use Password',
-      cancelLabel: 'Cancel',
-    });
-    if (result.success) {
-      onUnlock();
-    } else {
-      setFailed(true);
-    }
-  };
-
-  useEffect(() => { tryAuth(); }, []);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
+function UpdateGateScreen() {
   return (
-    <View style={gate.container}>
-      <Text style={gate.wordmark}>PLAYTHRU</Text>
-      <Ionicons name="finger-print" size={64} color="#C9A84C" style={{ marginBottom: 24 }} />
-      <Text style={gate.subtitle}>
-        {failed ? 'Face ID failed. Try again.' : 'Tap to unlock with Face ID'}
+    <View style={ug.container}>
+      <Text style={ug.wordmark}>CLOCKED</Text>
+      <View style={ug.badge}>
+        <Text style={ug.badgeText}>UPDATE REQUIRED</Text>
+      </View>
+      <Text style={ug.message}>
+        A new version of Clocked Golf is available. Please update to continue.
       </Text>
-      <TouchableOpacity style={gate.unlockBtn} onPress={tryAuth} activeOpacity={0.8}>
-        <Text style={gate.unlockBtnText}>{failed ? 'TRY AGAIN' : 'UNLOCK'}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={handleSignOut} activeOpacity={0.7} style={{ marginTop: 32 }}>
-        <Text style={gate.signOutLink}>Sign in with password instead</Text>
+      <TouchableOpacity
+        style={ug.btn}
+        onPress={() => Linking.openURL('https://apps.apple.com/app/id6761913592')}
+        activeOpacity={0.85}
+      >
+        <Text style={ug.btnText}>UPDATE NOW</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const gate = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: '#090F0A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  wordmark:      { fontSize: 22, fontWeight: '700', color: '#C9A84C', letterSpacing: 6, marginBottom: 48 },
-  subtitle:      { fontSize: 15, color: '#B8A882', textAlign: 'center', marginBottom: 32 },
-  unlockBtn:     { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 16, paddingHorizontal: 48 },
-  unlockBtnText: { fontSize: 12, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
-  signOutLink:   { fontSize: 13, color: '#B8A88266' },
+const ug = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#090F0A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  wordmark:  { fontSize: 22, fontWeight: '700', color: '#C9A84C', letterSpacing: 6, marginBottom: 40 },
+  badge:     { backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16, marginBottom: 28 },
+  badgeText: { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 3 },
+  message:   { fontSize: 15, color: '#B8A882', textAlign: 'center', lineHeight: 24, marginBottom: 40 },
+  btn:       { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 18, paddingHorizontal: 52 },
+  btnText:   { fontSize: 13, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
 });
 
 // ─── Root navigator ───────────────────────────────────────────────────────────
@@ -236,17 +331,41 @@ function AppNavigator() {
   const { session, profile, initializing } = useAuth();
   const navRef   = useRef(null);
   const [navReady, setNavReady]             = useState(false);
-  const [showBiometricGate, setShowBiometricGate] = useState(false);
-  const biometricCheckedRef = useRef(false); // only gate once per launch
+  const [updateRequired, setUpdateRequired] = useState(false);
+  const notificationsSetupRef  = useRef(false);  // only run setupNotifications once per session
 
   useFonts({ Montserrat_700Bold });
-
-  useEffect(() => { setupNotifications(); }, []);
 
   // Warm Supabase schema cache for the rounds table so new columns (e.g.
   // active_game) are recognised without a manual PostgREST cache reload.
   useEffect(() => {
     supabase.from('rounds').select('id').limit(1).then(() => {});
+  }, []);
+
+  // Version gate — block outdated builds
+  useEffect(() => {
+    (async () => {
+      try {
+        const CACHE_KEY = 'min_build_check';
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { blocked, ts } = JSON.parse(cached);
+          if (Date.now() - ts < 5 * 60 * 1000) { setUpdateRequired(blocked); return; }
+        }
+        const { data } = await supabase
+          .from('app_config').select('value')
+          .eq('key', 'min_build_number').maybeSingle();
+        if (!data?.value) return;
+        const buildStr = Constants.nativeBuildVersion;
+        if (!buildStr) return;
+        const thisBuild = parseInt(buildStr, 10);
+        const minBuild  = parseInt(data.value, 10);
+        if (isNaN(thisBuild) || isNaN(minBuild)) return;
+        const blocked = thisBuild < minBuild;
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ blocked, ts: Date.now() }));
+        setUpdateRequired(blocked);
+      } catch (e) { /* fail silently */ }
+    })();
   }, []);
 
   useEffect(() => {
@@ -255,14 +374,39 @@ function AppNavigator() {
     return () => sub.remove();
   }, []);
 
+  // Refresh push token whenever the app returns to foreground — tokens can rotate.
+  useEffect(() => {
+    if (!session) return;
+    const appStateRef = { current: AppState.currentState };
+    const sub = AppState.addEventListener('change', nextState => {
+      const wasBackground = /inactive|background/.test(appStateRef.current);
+      appStateRef.current = nextState;
+      if (wasBackground && nextState === 'active') {
+        refreshPushToken().catch(() => {});
+        AsyncStorage.removeItem('min_build_check').catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [session]);
+
   // Navigate into the app when user taps a notification
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       const type = response.notification.request.content.data?.type;
       if (type === 'inactivity') {
-        navRef.current?.navigate('Log');
+        navRef.current?.navigate('Feed');
+      } else if (type === 'round_confirm') {
+        const meta = response.notification.request.content.data;
+        navRef.current?.navigate('ConfirmRound', { roundId: meta?.round_id, playerKey: meta?.player_key });
+      } else if (type === 'comment') {
+        // Route to Feed — the comment thread can be opened from the notification center
+        navRef.current?.navigate('Feed');
+      } else if (type === 'still_playing' || type === 'interaction_ladder') {
+        // 'still_playing' is legacy; 'interaction_ladder' is the current ladder type.
+        // Both route to LiveRound — the rehydration useEffect restores the saved round on mount.
+        navRef.current?.navigate('LiveRound');
       } else {
-        navRef.current?.navigate('Home');
+        navRef.current?.navigate('Feed');
       }
     });
     return () => sub.remove();
@@ -277,8 +421,7 @@ function AppNavigator() {
     const topRoute = state?.routes?.[state.index ?? 0]?.name;
 
     if (!session) {
-      setShowBiometricGate(false);
-      biometricCheckedRef.current = false;
+      notificationsSetupRef.current = false;
       if (topRoute !== 'Welcome') {
         navRef.current?.reset({ index: 0, routes: [{ name: 'Welcome' }] });
       }
@@ -289,15 +432,19 @@ function AppNavigator() {
       if (topRoute !== 'Main') {
         navRef.current?.reset({ index: 0, routes: [{ name: 'Main' }] });
       }
-      // Check biometric gate once after login/app-open with an active session
-      if (!biometricCheckedRef.current) {
-        biometricCheckedRef.current = true;
+      // Set up push notifications once after auth is confirmed
+      if (!notificationsSetupRef.current) {
+        notificationsSetupRef.current = true;
+        setupNotifications();
+        // One-time token save for existing users who have no token
         (async () => {
-          const stored = await AsyncStorage.getItem('faceIdEnabled');
-          if (stored === 'true') {
-            const hasHardware = await LocalAuthentication.hasHardwareAsync();
-            const isEnrolled  = await LocalAuthentication.isEnrolledAsync();
-            if (hasHardware && isEnrolled) setShowBiometricGate(true);
+          const { data: profileCheck } = await supabase
+            .from('profiles')
+            .select('push_token')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          if (!profileCheck?.push_token) {
+            refreshPushToken().catch(() => {});
           }
         })();
       }
@@ -305,6 +452,8 @@ function AppNavigator() {
     }
     // session exists but no profile yet — stay on Welcome/SignUp (onboarding in progress)
   }, [session, profile, initializing, navReady]);
+
+  if (updateRequired) return <UpdateGateScreen />;
 
   // Block render until AuthContext has resolved session + profile
   if (initializing) {
@@ -320,11 +469,6 @@ function AppNavigator() {
 
   return (
     <>
-    {showBiometricGate && (
-      <View style={StyleSheet.absoluteFill}>
-        <BiometricGate onUnlock={() => setShowBiometricGate(false)} />
-      </View>
-    )}
     <NavigationContainer ref={navRef} onReady={() => setNavReady(true)}>
       <RootStack.Navigator
         screenOptions={{ headerShown: false }}
@@ -350,8 +494,14 @@ function AppNavigator() {
         <RootStack.Screen name="LiveRound"       component={LiveRoundScreen} />
         <RootStack.Screen name="ResetPassword"   component={ResetPasswordScreen} />
         <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-        <RootStack.Screen name="Games"          component={GamesScreen} />
+        {/* Games screen retired — the sport is the one game */}
         <RootStack.Screen name="Settings"       component={SettingsScreen} />
+        <RootStack.Screen name="EditProfile"    component={EditProfileScreen} />
+        <RootStack.Screen name="Paywall"        component={PaywallScreen} />
+        <RootStack.Screen name="Notifications"  component={NotificationCenterScreen} />
+        <RootStack.Screen name="ClockedSetup"   component={ClockedSetupScreen} />
+        <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} />
+        <RootStack.Screen name="ConfirmRound"  component={ConfirmRoundScreen} />
       </RootStack.Navigator>
     </NavigationContainer>
     </>

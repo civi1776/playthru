@@ -9,8 +9,8 @@ export default function WelcomeScreen({ navigation }) {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.wordmark}>PLAYTHRU</Text>
-        <Text style={styles.subtitle}>SPEED HANDICAP</Text>
+        <Text style={styles.wordmark}>CLOCKED</Text>
+        <Text style={styles.subtitle}>ON THE CLOCK</Text>
         <View style={styles.divider} />
         <View style={styles.buttons}>
           <TouchableOpacity
@@ -66,7 +66,8 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 11,
-    color: '#B8A882',
+    fontWeight: '700',
+    color: '#C9A84C',
     letterSpacing: 4,
     marginBottom: 28,
   },

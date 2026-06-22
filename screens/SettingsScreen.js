@@ -1,42 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import * as LocalAuthentication from 'expo-local-authentication';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 export default function SettingsScreen({ navigation }) {
   const { user } = useAuth();
-  const [faceIdEnabled, setFaceIdEnabled] = useState(false);
 
-  useFocusEffect(useCallback(() => {
-    AsyncStorage.getItem('faceIdEnabled').then(v => setFaceIdEnabled(v === 'true'));
-  }, []));
-
-  const handleFaceIdToggle = async () => {
-    if (faceIdEnabled) {
-      await AsyncStorage.setItem('faceIdEnabled', 'false');
-      setFaceIdEnabled(false);
-    } else {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled  = await LocalAuthentication.isEnrolledAsync();
-      if (!hasHardware || !isEnrolled) {
-        Alert.alert('Face ID not available', 'This device does not have Face ID set up.');
-        return;
-      }
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Confirm Face ID for PlayThru',
-        cancelLabel: 'Cancel',
-      });
-      if (result.success) {
-        await AsyncStorage.setItem('faceIdEnabled', 'true');
-        setFaceIdEnabled(true);
-      }
-    }
-  };
+  const handleEditProfile = () => navigation.navigate('EditProfile');
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -56,14 +27,14 @@ export default function SettingsScreen({ navigation }) {
       await supabase.auth.signOut();
       navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] });
     } catch (e) {
-      Alert.alert('Error', 'Could not delete account. Please contact hello@playthrugolf.app');
+      Alert.alert('Error', 'Could not delete account. Please contact hello@clocked.golf');
     }
   };
 
   const confirmDelete = () => {
     Alert.alert(
       'Delete Account',
-      'This will permanently delete your account and all your data including your POPScore history, rounds, and profile. This cannot be undone.',
+      'This will permanently delete your account and all your data including your Clocked Score history, rounds, and profile. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete My Account', style: 'destructive', onPress: handleDeleteAccount },
@@ -86,16 +57,11 @@ export default function SettingsScreen({ navigation }) {
         {/* Account section */}
         <Text style={s.sectionLabel}>ACCOUNT</Text>
         <View style={s.card}>
-          <View style={s.row}>
-            <Ionicons name="scan-outline" size={20} color="#C9A84C" style={s.rowIcon} />
-            <Text style={s.rowLabel}>Face ID Login</Text>
-            <Switch
-              value={faceIdEnabled}
-              onValueChange={handleFaceIdToggle}
-              trackColor={{ false: '#2A3B2C', true: '#3A6B3C' }}
-              thumbColor={faceIdEnabled ? '#C9A84C' : '#6B7C6D'}
-            />
-          </View>
+          <TouchableOpacity style={s.row} onPress={handleEditProfile} activeOpacity={0.7}>
+            <Ionicons name="person-outline" size={20} color="#C9A84C" style={s.rowIcon} />
+            <Text style={s.rowLabel}>Edit Profile</Text>
+            <Ionicons name="chevron-forward" size={16} color="#4A5C4B" />
+          </TouchableOpacity>
 
           <View style={s.divider} />
 

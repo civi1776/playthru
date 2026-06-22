@@ -98,7 +98,7 @@ export default function SignInScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.eyebrow}>WELCOME BACK</Text>
-          <Text style={styles.title}>Sign in to PlayThru</Text>
+          <Text style={styles.title}>Sign in to Clocked</Text>
         </View>
 
         {/* Inputs */}

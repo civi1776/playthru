@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
+  View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sendLocalNotification } from '../lib/notifications';
+import ChallengeButton from '../components/ChallengeButton';
 import Gauge from '../components/guage';
 import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
@@ -42,6 +43,47 @@ function formatShortDate(isoStr) {
   return `${months[d.getMonth()]} ${d.getDate()}`;
 }
 
+function timeAgo(isoStr) {
+  if (!isoStr) return '';
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 60)     return 'Just now';
+  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  const d = new Date(isoStr);
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${mo[d.getMonth()]} ${d.getDate()}`;
+}
+
+function PubActRow({ item }) {
+  const typeMap = {
+    round_logged:       { icon: 'golf',        color: '#7DC87A', label: c => `Logged a round at ${c?.course_name ?? '—'}` },
+    live_round_started: { icon: 'golf',        color: '#7DC87A', label: c => `Playing live at ${c?.course_name ?? 'a course'} right now` },
+    milestone:          { icon: 'trophy',      color: '#C9A84C', label: c => c?.title ?? 'Reached a milestone' },
+    leaderboard:        { icon: 'trending-up', color: '#C9A84C', label: c => c?.description ?? 'Moved on the leaderboard' },
+    course_review:      { icon: 'location',    color: '#7DC87A', label: c => `Reviewed ${c?.course_name ?? 'a course'}` },
+    user_post:          { icon: 'chatbubble',  color: '#B8A882', label: c => c?.text?.slice(0, 80) ?? 'Shared an update' },
+    course_leader:      { icon: 'trophy',      color: '#C9A84C', label: c => c?.description ?? 'Set a course record' },
+  };
+  const info    = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: '#7A6E58', label: () => 'Activity' };
+  const content = item.content ?? {};
+  const pop     = content.pop_score;
+  return (
+    <View style={s.actRow}>
+      <View style={[s.actIconWrap, { backgroundColor: info.color + '22' }]}>
+        <Ionicons name={info.icon} size={16} color={info.color} />
+      </View>
+      <View style={s.actContent}>
+        <Text style={s.actLabel}>{info.label(content)}</Text>
+        {item.type === 'round_logged' && pop != null && (
+          <Text style={[s.actPop, { color: popColor(pop) }]}>{pop.toFixed(1)} CLK</Text>
+        )}
+        <Text style={s.actTime}>{timeAgo(item.created_at)}</Text>
+      </View>
+    </View>
+  );
+}
+
 function getInitials(fullName) {
   if (!fullName) return '?';
   const parts = fullName.trim().split(/\s+/);
@@ -56,12 +98,16 @@ export default function PublicProfileScreen({ navigation, route }) {
   const { user, profile: myProfile, signOut } = useAuth();
   const myUid = user?.id;
 
-  const [profile, setProfile]         = useState(null);
-  const [rounds, setRounds]           = useState([]);
-  const [caddyRounds, setCaddyRounds] = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [following, setFollowing]     = useState(false);
+  const [profile, setProfile]           = useState(null);
+  const [rounds, setRounds]             = useState([]);
+  const [caddyRounds, setCaddyRounds]   = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [following, setFollowing]       = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [pubTab, setPubTab]             = useState('profile');
+  const [activityItems, setActivityItems]   = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [challengerBestScore, setChallengerBestScore] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -73,7 +119,7 @@ export default function PublicProfileScreen({ navigation, route }) {
           .select('course_name, created_at, holes, duration_minutes, pop_score')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
-          .limit(3),
+          .limit(20),
         myUid
           ? supabase.from('follows').select('id').eq('follower_id', myUid).eq('following_id', userId).maybeSingle()
           : Promise.resolve({ data: null }),
@@ -90,6 +136,27 @@ export default function PublicProfileScreen({ navigation, route }) {
       setCaddyRounds(caddyRoundsData ?? []);
       setFollowing(!!followData);
       setLoading(false);
+
+      // Fetch challenger's best score at this user's most recent course
+      if (myUid && roundsData?.length > 0) {
+        const defaultCourse = roundsData[0].course_name;
+        if (defaultCourse) {
+          supabase.from('rounds').select('pop_score')
+            .eq('user_id', myUid).eq('course_name', defaultCourse)
+            .not('pop_score', 'is', null)
+            .order('pop_score', { ascending: false }).limit(1).maybeSingle()
+            .then(({ data }) => setChallengerBestScore(data?.pop_score ?? null));
+        }
+      }
+
+      // Load activity feed (non-blocking)
+      setActivityLoading(true);
+      supabase.from('activity_feed')
+        .select('id, type, content, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(30)
+        .then(({ data }) => { setActivityItems(data ?? []); setActivityLoading(false); });
     };
     load();
   }, [userId, myUid]);
@@ -112,12 +179,8 @@ export default function PublicProfileScreen({ navigation, route }) {
       if (error) { setFollowing(false); } // revert
       else {
         // Notify the followed user
-        const { data: followedProfile } = await supabase
-          .from('profiles').select('push_token').eq('id', userId).single();
-        if (followedProfile?.push_token) {
-          const senderName = myProfile?.username ? `@${myProfile.username}` : 'Someone';
-          await sendLocalNotification('New Follower', `${senderName} is now following you on PlayThru.`);
-        }
+        const senderName = myProfile?.username ? `@${myProfile.username}` : 'Someone';
+        await sendPushToUser(userId, 'New Follower', `${senderName} is now following you on Clocked.`, 'new_follower');
       }
     }
     setFollowLoading(false);
@@ -163,12 +226,10 @@ export default function PublicProfileScreen({ navigation, route }) {
     : [];
 
   // Stat card values from rounds
-  const bestPop  = rounds.length > 0
-    ? Math.max(...rounds.map(r => r.pop_score ?? 0))
-    : null;
-  const avgTime  = rounds.length > 0
-    ? Math.round(rounds.reduce((s, r) => s + (r.duration_minutes || 0), 0) / rounds.length)
-    : null;
+  const bestPop  = rounds.length > 0 ? Math.max(...rounds.map(r => r.pop_score ?? 0)) : null;
+  const avgTime  = rounds.length > 0 ? Math.round(rounds.reduce((s, r) => s + (r.duration_minutes || 0), 0) / rounds.length) : null;
+  let paceStreak = 0;
+  for (const r of rounds) { if ((r.pop_score ?? 0) >= 3.5) paceStreak++; else break; }
 
   const isOwnProfile = myUid === userId;
 
@@ -198,10 +259,37 @@ export default function PublicProfileScreen({ navigation, route }) {
         )}
       </View>
 
+      {/* Challenge button — visitors only, golfers only */}
+      {!isOwnProfile && myUid && !isCaddy && rounds.length > 0 && (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 10, alignItems: 'flex-end' }}>
+          <ChallengeButton
+            targetUserId={userId}
+            targetUsername={profile.username ?? profile.full_name?.split(' ')[0] ?? 'player'}
+            courseName={rounds[0]?.course_name}
+            challengerScore={challengerBestScore}
+          />
+        </View>
+      )}
+
+      {/* Profile / Activity tabs */}
+      <View style={s.pubTabBar}>
+        {['PROFILE', 'ACTIVITY'].map(t => (
+          <TouchableOpacity
+            key={t}
+            style={[s.pubTabBtn, pubTab === t.toLowerCase() && s.pubTabBtnActive]}
+            onPress={() => setPubTab(t.toLowerCase())}
+            activeOpacity={0.8}
+          >
+            <Text style={[s.pubTabText, pubTab === t.toLowerCase() && s.pubTabTextActive]}>{t}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {pubTab === 'profile' && (
       <ScrollView contentContainerStyle={s.scroll}>
         {/* Avatar + identity */}
         <View style={s.identityRow}>
-          <InitialsAvatar name={profile.full_name} size={60} />
+          <InitialsAvatar name={profile.full_name} size={60} avatarUrl={profile.avatar_url} />
           <View style={s.identityInfo}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <Text style={s.fullName}>{profile.full_name || '—'}</Text>
@@ -268,7 +356,7 @@ export default function PublicProfileScreen({ navigation, route }) {
             }
             <View style={{ marginTop: 10, gap: 8 }}>
               <View>
-                <Text style={s.scoreLabel}>POPSCORE</Text>
+                <Text style={s.scoreLabel}>CLOCKED SCORE</Text>
                 <Text style={s.scoreValue}>{pop != null ? pop.toFixed(1) : '—'}</Text>
               </View>
               <View>
@@ -286,12 +374,16 @@ export default function PublicProfileScreen({ navigation, route }) {
             <Text style={s.statValue}>{rounds.length > 0 ? profile.total_rounds ?? rounds.length : 0}</Text>
           </View>
           <View style={s.statCard}>
-            <Text style={s.statLabel}>BEST{'\n'}POPSCORE</Text>
+            <Text style={s.statLabel}>BEST{'\n'}CLOCKED SCORE</Text>
             <Text style={s.statValue}>{bestPop != null && bestPop > 0 ? bestPop.toFixed(1) : '—'}</Text>
           </View>
           <View style={s.statCard}>
             <Text style={s.statLabel}>AVG ROUND{'\n'}TIME</Text>
             <Text style={s.statValue}>{formatDuration(avgTime)}</Text>
+          </View>
+          <View style={s.statCard}>
+            <Text style={s.statLabel}>PACE{'\n'}STREAK</Text>
+            <Text style={s.statValue}>{paceStreak > 0 ? `${paceStreak}${paceStreak >= 3 ? ' 🔥' : ''}` : '—'}</Text>
           </View>
         </View>}
 
@@ -375,6 +467,23 @@ export default function PublicProfileScreen({ navigation, route }) {
           </View>
         )}
       </ScrollView>
+      )}
+
+      {pubTab === 'activity' && (
+        activityLoading
+          ? <ActivityIndicator color="#C9A84C" style={{ marginTop: 60 }} />
+          : activityItems.length === 0
+            ? <View style={s.actEmpty}>
+                <Ionicons name="time-outline" size={36} color="rgba(201,168,76,0.2)" />
+                <Text style={s.actEmptyText}>No activity yet.</Text>
+              </View>
+            : <FlatList
+                data={activityItems}
+                keyExtractor={i => i.id}
+                renderItem={({ item }) => <PubActRow item={item} />}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              />
+      )}
     </SafeAreaView>
   );
 }
@@ -428,6 +537,20 @@ const s = StyleSheet.create({
 
   emptyRounds:    { alignItems: 'center', paddingVertical: 40 },
   emptyRoundsText:{ fontSize: 16, color: '#7A6E58', fontFamily: 'serif' },
+
+  pubTabBar:      { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 8, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
+  pubTabBtn:      { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A22' },
+  pubTabBtnActive:{ borderColor: '#C9A84C', backgroundColor: '#C9A84C22' },
+  pubTabText:     { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
+  pubTabTextActive: { color: '#C9A84C' },
+  actEmpty:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 10 },
+  actEmptyText:   { fontSize: 14, color: '#7A6E58' },
+  actRow:         { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#7DC87A11', gap: 12 },
+  actIconWrap:    { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  actContent:     { flex: 1 },
+  actLabel:       { fontSize: 13, color: '#F5EDD8', fontWeight: '500', lineHeight: 18 },
+  actPop:         { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
+  actTime:        { fontSize: 10, color: 'rgba(184,168,130,0.5)', marginTop: 3 },
 
   // Own caddy profile account actions
   accountSection: { marginTop: 32, gap: 10, paddingBottom: 12 },

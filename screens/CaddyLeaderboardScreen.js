@@ -467,7 +467,7 @@ export default function CaddyLeaderboardScreen({ navigation }) {
 
       {/* Header + stat bar */}
       <View style={lb.header}>
-        <Text style={lb.wordmark}>PLAYTHRU</Text>
+        <Text style={lb.wordmark}>CLOCKED</Text>
         <Text style={lb.title}>CADDY LEADERBOARD</Text>
         <View style={lb.statBar}>
           <View style={lb.statBarItem}>
@@ -580,12 +580,12 @@ export default function CaddyLeaderboardScreen({ navigation }) {
             <View style={lb.emptyBox}>
               <Ionicons name="flag-outline" size={44} color="#7DC87A33" style={{ marginBottom: 14 }} />
               <Text style={lb.emptyTitle}>
-                You're the first caddy from{'\n'}{profile?.caddy_course || 'your club'} on PlayThru!
+                You're the first caddy from{'\n'}{profile?.caddy_course || 'your club'} on Clocked!
               </Text>
               <Text style={[lb.emptyTxt, { marginTop: 6, marginBottom: 20 }]}>Invite your fellow caddies to compete</Text>
               <TouchableOpacity
                 style={lb.inviteBtn}
-                onPress={() => Share.share({ message: `Join me on PlayThru — the caddy app. Download at playthrugolf.app` })}
+                onPress={() => Share.share({ message: `Join me on Clocked — the caddy app. Download at clocked.golf` })}
                 activeOpacity={0.8}
               >
                 <Ionicons name="share-outline" size={14} color="#090F0A" />

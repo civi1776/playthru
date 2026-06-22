@@ -212,7 +212,7 @@ export default function CoursesScreen({ navigation }) {
       const { data, error: err } = await supabase
         .from('courses')
         .select('id, name, city, state, course_type, holes, pop_score, total_rounds, avg_time, latitude, longitude')
-        .order('name', { ascending: true })
+        .order('total_rounds', { ascending: false, nullsFirst: false })
         .limit(200);
       if (err) throw err;
       const rows = (data && data.length > 0) ? data.map(normalise) : LOCAL_COURSES;
@@ -410,7 +410,7 @@ export default function CoursesScreen({ navigation }) {
                       <View style={s.popAccentRow}>
                         <Text style={s.popAccentNum}>{displayPop.toFixed(1)}</Text>
                         <View>
-                          <Text style={s.popAccentLabel}>COURSE POPSCORE</Text>
+                          <Text style={s.popAccentLabel}>COURSE CLOCKED SCORE</Text>
                           <Text style={s.popAccentRounds}>
                             {course.rounds || 0} round{course.rounds !== 1 ? 's' : ''}
                           </Text>
