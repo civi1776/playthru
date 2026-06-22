@@ -1550,16 +1550,16 @@ export default function LiveRoundScreen({ navigation }) {
         const { data: courseRounds } = await supabase.from('rounds').select('pop_score, duration_minutes, pace_delay, holes').eq('course_name', course.name).eq('flagged', false);
         if (courseRounds && courseRounds.length > 0) {
           const scored = courseRounds.filter(r => r.pop_score != null);
-          const courseAvg = scored.length > 0 ? scored.reduce((s, r) => s + parseFloat(r.pop_score), 0) / scored.length : null;
+          const courseAvg = scored.length > 0 ? scored.reduce((s, r) => s + (Number(r.pop_score) || 0), 0) / scored.length : null;
           const constantCount     = courseRounds.filter(r => r.pace_delay === 'constant').length;
           const managementPenalty = parseFloat((constantCount / courseRounds.length * 0.5).toFixed(2));
           const avgPop  = courseAvg != null
             ? parseFloat(Math.max(1.0, Math.min(5.0, courseAvg - managementPenalty)).toFixed(2))
             : null;
           const timed = courseRounds.filter(r => r.duration_minutes != null);
-          const avgTime = timed.length > 0 ? parseFloat((timed.reduce((s, r) => s + parseFloat(r.duration_minutes), 0) / timed.length).toFixed(1)) : null;
+          const avgTime = timed.length > 0 ? parseFloat((timed.reduce((s, r) => s + (Number(r.duration_minutes) || 0), 0) / timed.length).toFixed(1)) : null;
           const fullRounds = courseRounds.filter(r => r.duration_minutes != null && (r.holes === '18' || r.holes === 18));
-          const fastestTime = fullRounds.length > 0 ? Math.min(...fullRounds.map(r => parseFloat(r.duration_minutes))) : null;
+          const fastestTime = fullRounds.length > 0 ? Math.min(...fullRounds.map(r => Number(r.duration_minutes) || 0)) : null;
           const courseUpdate = { total_rounds: courseRounds.length, management_penalty: managementPenalty };
           if (avgPop != null && !isNaN(avgPop)) courseUpdate.pop_score = avgPop;
           if (avgTime != null && !isNaN(avgTime)) courseUpdate.avg_time = avgTime;

@@ -329,7 +329,7 @@ export default function SignUpScreen({ navigation }) {
   };
 
   const getAgeFromDob = (month, day, year) => {
-    const dob = new Date(parseInt(year), MONTHS.indexOf(month), parseInt(day));
+    const dob = new Date(parseInt(year, 10), MONTHS.indexOf(month), parseInt(day, 10));
     const today = new Date();
     let age = today.getFullYear() - dob.getFullYear();
     const m = today.getMonth() - dob.getMonth();
@@ -446,7 +446,7 @@ export default function SignUpScreen({ navigation }) {
         home_course:        !isCaddy ? (homeCourse || null) : null,
         handicap:           !isCaddy && handicapMode === 'handicap' ? parseFloat(handicapValue) : null,
         handicap_index:     !isCaddy && handicapMode === 'handicap' ? parseFloat(handicapValue) : null,
-        avg_score:          !isCaddy && handicapMode === 'avg_score' ? parseInt(handicapValue) : null,
+        avg_score:          !isCaddy && handicapMode === 'avg_score' ? parseInt(handicapValue, 10) : null,
         typical_round_time: !isCaddy ? roundTime : null,
         pop_score:          popScore,
         // caddy-specific

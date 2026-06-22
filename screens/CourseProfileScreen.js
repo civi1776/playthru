@@ -193,11 +193,11 @@ export default function CourseProfileScreen({ navigation, route }) {
       // Live stats from rounds (not from stale cached columns)
       const withDuration = allRounds.filter(r => r.duration_minutes);
       if (withDuration.length > 0) {
-        const sum = withDuration.reduce((acc, r) => acc + parseFloat(r.duration_minutes), 0);
+        const sum = withDuration.reduce((acc, r) => acc + (Number(r.duration_minutes) || 0), 0);
         setAvgDuration(Math.round(sum / withDuration.length));
         const fullRounds = withDuration.filter(r => r.holes === '18' || r.holes === 18);
         if (fullRounds.length > 0) {
-          setFastestDuration(Math.min(...fullRounds.map(r => parseFloat(r.duration_minutes))));
+          setFastestDuration(Math.min(...fullRounds.map(r => Number(r.duration_minutes) || 0)));
         }
       }
 

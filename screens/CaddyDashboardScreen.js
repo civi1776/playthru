@@ -259,7 +259,7 @@ function QuickLogModal({ visible, onClose, caddyId, onSuccess }) {
         course_name: courseName,
         holes,
         transport,
-        players: parseInt(players) || 1,
+        players: parseInt(players, 10) || 1,
         duration_minutes: duration,
         tee_time: startTime,
         caddy_id: caddyId,
