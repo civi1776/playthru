@@ -424,11 +424,6 @@ export default function SignUpScreen({ navigation }) {
 
       // ── Upsert profile ──
       const popScore = isCaddy ? 3.5 : (POP_FROM_TIME[roundTime] || 3.8);
-      const dobMonthNum = dobMonth ? String(MONTHS.indexOf(dobMonth) + 1).padStart(2, '0') : null;
-      const dobDayPad   = dobDay   ? String(dobDay).padStart(2, '0') : null;
-      const dateOfBirth = dobYear && dobMonthNum && dobDayPad
-        ? `${dobYear}-${dobMonthNum}-${dobDayPad}` : null;
-
       const profilePayload = {
         id:                 userId,
         email:              pendingEmail,
@@ -437,7 +432,7 @@ export default function SignUpScreen({ navigation }) {
         last_name:          (lastName || '').trim(),
         username:           (username || '').replace('@', '').trim(),
         hometown:           (homeCity || '').trim(),
-        date_of_birth:      dateOfBirth,
+        age_verified:       true, // COPPA gate already confirmed >=13 before this line
         pro_trial_active:   false,
         account_type:       accountType || 'golfer',
         // golfer-specific
