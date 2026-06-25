@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Constants from 'expo-constants';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, AppState, Animated, AccessibilityInfo } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
