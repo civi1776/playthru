@@ -77,8 +77,8 @@ export default function SettingsScreen({ navigation }) {
         <View style={[s.card, s.dangerCard]}>
           <TouchableOpacity style={s.row} onPress={confirmDelete} activeOpacity={0.7}>
             <Ionicons name="trash-outline" size={20} color="#E05252" style={s.rowIcon} />
-            <View style={{ flex: 1 }}>
-              <Text style={[s.rowLabel, { color: '#E05252' }]}>Delete Account</Text>
+            <View style={{ flex: 1, flexDirection: 'column', justifyContent: 'center' }}>
+              <Text style={[s.rowLabel, { color: '#E05252', flex: 0 }]}>Delete Account</Text>
               <Text style={s.rowSub}>Permanently removes all your data</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color="#4A3B3B" />
@@ -98,7 +98,7 @@ const s = StyleSheet.create({
   sectionLabel:{ fontSize: 10, fontWeight: '700', color: '#5A7A5C', letterSpacing: 2, marginBottom: 8 },
   card:        { backgroundColor: '#0F2312', borderRadius: 14, borderWidth: 1, borderColor: '#1E3320', overflow: 'hidden' },
   dangerCard:  { borderColor: '#3B1E1E', backgroundColor: '#140F0F' },
-  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, minHeight: 56 },
+  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, minHeight: 56 },
   rowIcon:     { marginRight: 12 },
   rowLabel:    { flex: 1, fontSize: 15, color: '#E8DCC8', fontWeight: '500' },
   rowSub:      { fontSize: 11, color: '#7A6E58', marginTop: 4, marginBottom: 2 },
