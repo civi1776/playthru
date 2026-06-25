@@ -336,7 +336,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
       // Post to activity feed — fire and forget, never block round save
       if (savedRoundId) {
-        supabase.from('activity_feed').insert({
+        (async () => { try { await supabase.from('activity_feed').insert({
           user_id:  uid,
           type:     'round_logged',
           round_id: savedRoundId,
@@ -351,7 +351,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
             total_elapsed:    summary.totalElapsed,
             total_time_par:   summary.totalTimePar,
           },
-        }).catch(() => {});
+        }); } catch {} })();
       }
 
       AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
