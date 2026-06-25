@@ -3,7 +3,6 @@ import {
   View, Text, TouchableOpacity, TextInput, ScrollView, Modal, StyleSheet,
   Alert, AppState, AccessibilityInfo, KeyboardAvoidingView, Platform, Vibration,
 } from 'react-native';
-import { Audio } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -401,22 +400,11 @@ export default function ClockedRoundScreen({ navigation, route }) {
   const elapsed       = clockRunning ? displayElapsed : (holeFrozenTime ?? 0);
   const remaining     = curTimePar - elapsed;
 
-  // Trigger buzzer + vibration at 10 seconds remaining
+  // Vibration alert at 10 seconds remaining
   useEffect(() => {
     if (clockRunning && remaining <= 10 && remaining > 0 && !buzzedRef.current) {
       buzzedRef.current = true;
       Vibration.vibrate([0, 200, 100, 200]);
-      (async () => {
-        try {
-          const { sound } = await Audio.Sound.createAsync(
-            require('../assets/sounds/buzzer.mp3'),
-            { shouldPlay: true }
-          );
-          sound.setOnPlaybackStatusUpdate((status) => {
-            if (status.didJustFinish) sound.unloadAsync().catch(() => {});
-          });
-        } catch { /* sound failure never crashes the round */ }
-      })();
     }
   }, [remaining, clockRunning]);
   const clkColor      = clockColor(remaining, curTimePar);
