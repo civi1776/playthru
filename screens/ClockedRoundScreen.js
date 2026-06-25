@@ -239,7 +239,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       summary: { totalScore: summary.totalScore, totalTimePar: summary.totalTimePar,
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty, playerTotals: summary.playerTotals },
     };
-    const durationMinutes = Math.round((Date.now() - roundStartTs) / 60000);
+    const durationMinutes = Math.max(1, Math.round((Date.now() - roundStartTs) / 60000));
     try {
       // Get fresh auth uid — don't rely on context which may be stale
       const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -271,16 +271,20 @@ export default function ClockedRoundScreen({ navigation, route }) {
       let savedRoundId = null;
       for (let attempt = 0; attempt < 5; attempt++) {
         const result = await supabase.from('rounds').insert([row]).select('id');
-
-        // 2. After rounds insert
         console.log('CLOCKED_SAVE_ROUND', { attempt, data: JSON.stringify(result.data), error: JSON.stringify(result.error) });
 
         if (!result.error) {
           savedRoundId = result.data?.[0]?.id ?? null;
           break;
         }
-        const match = result.error.message?.match(/Could not find the (\w+) column/);
-        if (!match) break;
+
+        // Only retry schema-cache errors (column not found = 42703)
+        if (result.error.code !== '42703') {
+          Alert.alert('Could not save round', result.error.message);
+          return;
+        }
+        const match = result.error.message.match(/column "([^"]+)" of relation/);
+        if (!match) { Alert.alert('Could not save round', result.error.message); return; }
         const { [match[1]]: _dropped, ...rest } = row;
         row = rest;
       }
