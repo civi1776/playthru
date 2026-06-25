@@ -116,7 +116,7 @@ export default function SearchUsersScreen({ navigation }) {
       });
       // Notify the followed user
       const name = myUsername ? `@${myUsername}` : 'Someone';
-      await sendPushToUser(userId, 'New Follower', `${name} started following you`, 'new_follower');
+      await sendPushToUser(userId, 'New Follower', `${name} started following you`, 'new_follower', { follower_id: myUid });
     }
   };
 

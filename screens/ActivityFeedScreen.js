@@ -673,7 +673,7 @@ export default function ActivityFeedScreen({ navigation }) {
           const { data: me } = await supabase.from('profiles').select('username, full_name').eq('id', uid).maybeSingle();
           const name = me?.username ? `@${me.username}` : (me?.full_name?.split(' ')[0] ?? 'Someone');
           const where = item.content?.course_name ? `at ${item.content.course_name}` : '';
-          await sendPushToUser(item.user_id, `${name} liked your round`, where, 'like');
+          await sendPushToUser(item.user_id, `${name} liked your round`, where, 'like', { activity_id: item.id });
         }
       }
     } catch (e) {

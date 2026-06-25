@@ -389,28 +389,69 @@ function AppNavigator() {
     return () => sub.remove();
   }, [session]);
 
-  // Navigate into the app when user taps a notification
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(response => {
-      const type = response.notification.request.content.data?.type;
-      if (type === 'inactivity') {
-        navRef.current?.navigate('Feed');
-      } else if (type === 'round_confirm') {
-        const meta = response.notification.request.content.data;
-        navRef.current?.navigate('ConfirmRound', { roundId: meta?.round_id, playerKey: meta?.player_key });
-      } else if (type === 'comment') {
-        // Route to Feed — the comment thread can be opened from the notification center
-        navRef.current?.navigate('Feed');
-      } else if (type === 'still_playing' || type === 'interaction_ladder') {
-        // 'still_playing' is legacy; 'interaction_ladder' is the current ladder type.
-        // Both route to LiveRound — the rehydration useEffect restores the saved round on mount.
-        navRef.current?.navigate('LiveRound');
-      } else {
-        navRef.current?.navigate('Feed');
-      }
-    });
-    return () => sub.remove();
+  // ── Notification deep-linking ────────────────────────────────────────────────
+  // Dispatches to the correct screen based on notification type + meta.
+  // Used for both foreground taps and cold-start launches.
+  const handleNotificationNav = useCallback((response) => {
+    if (!response || !navRef.current) return;
+    const data = response.notification.request.content.data ?? {};
+    const type = data.type;
+
+    switch (type) {
+      case 'round_confirm':
+        navRef.current.navigate('ConfirmRound', { roundId: data.round_id, playerKey: data.player_key });
+        break;
+      case 'comment':
+      case 'like':
+        // Route to Feed (activity_id is in data for future scroll-to support)
+        navRef.current.navigate('Feed');
+        break;
+      case 'new_follower':
+        if (data.follower_id) navRef.current.navigate('PublicProfile', { userId: data.follower_id });
+        else navRef.current.navigate('Feed');
+        break;
+      case 'challenge_received':
+      case 'challenge_accepted':
+      case 'challenge_declined':
+      case 'challenge_result':
+        navRef.current.navigate('Notifications');
+        break;
+      case 'milestone':
+      case 'clocked_score':
+        navRef.current.navigate('You');
+        break;
+      case 'rank_move':
+      case 'course_leader':
+        navRef.current.navigate('Ranks');
+        break;
+      case 'still_playing':
+      case 'interaction_ladder':
+        navRef.current.navigate('LiveRound');
+        break;
+      case 'inactivity':
+      case 'weekly_digest':
+      case 'monthly_challenge':
+      case 'friend_round':
+      case 'course_update':
+      default:
+        navRef.current.navigate('Feed');
+        break;
+    }
   }, []);
+
+  // Foreground tap: listener fires when user taps a notification while app is open
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(handleNotificationNav);
+    return () => sub.remove();
+  }, [handleNotificationNav]);
+
+  // Cold start: check if the app was launched from a notification tap
+  useEffect(() => {
+    if (!navReady) return;
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) handleNotificationNav(response);
+    });
+  }, [navReady, handleNotificationNav]);
 
   // Reactively handle all auth state transitions.
   // Guard against resetting to Main on every refreshProfile() call by checking

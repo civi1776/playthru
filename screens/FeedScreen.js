@@ -231,7 +231,7 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
         const snippet = body.length > 60 ? body.slice(0, 60) + '\u2026' : body;
 
         // Push notification
-        sendPushToUser(activity.user_id, `${name} commented`, `"${snippet}"`, 'comment').catch(() => {});
+        sendPushToUser(activity.user_id, `${name} commented`, `"${snippet}"`, 'comment', { activity_id: activity.id }).catch(() => {});
 
         // In-app notification row
         supabase.from('notifications').insert({

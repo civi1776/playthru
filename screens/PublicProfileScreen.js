@@ -198,7 +198,7 @@ export default function PublicProfileScreen({ navigation, route }) {
       else {
         // Notify the followed user
         const senderName = myProfile?.username ? `@${myProfile.username}` : 'Someone';
-        await sendPushToUser(userId, 'New Follower', `${senderName} is now following you on Clocked.`, 'new_follower');
+        await sendPushToUser(userId, 'New Follower', `${senderName} is now following you on Clocked.`, 'new_follower', { follower_id: myUid });
       }
     }
     setFollowLoading(false);
