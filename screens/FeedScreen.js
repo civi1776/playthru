@@ -510,7 +510,7 @@ export default function FeedScreen({ navigation }) {
       <View style={s.header}>
         <View>
           <Text style={s.wordmark}>CLOCKED</Text>
-          <Text style={s.tagline}>Golf as a sport.</Text>
+          <Text style={s.tagline}>GOLF AS A SPORT.</Text>
         </View>
         <View style={s.headerRight}>
           {/* + menu for secondary actions */}

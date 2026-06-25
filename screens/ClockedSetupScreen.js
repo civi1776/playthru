@@ -234,6 +234,15 @@ export default function ClockedSetupScreen({ navigation }) {
               autoCapitalize="none"
               autoCorrect={false}
             />
+            {/* Quick-play: skip course selection */}
+            <TouchableOpacity
+              style={s.skipCourseBtn}
+              onPress={() => { setCourse(null); setPhase(PHASE.HOLES); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="flash-outline" size={14} color="#C9A84C88" />
+              <Text style={s.skipCourseText}>Skip — I'll set par manually</Text>
+            </TouchableOpacity>
             {results.map(c => (
               <TouchableOpacity
                 key={c.name}
@@ -507,7 +516,7 @@ export default function ClockedSetupScreen({ navigation }) {
         {/* ── CONFIRM ── */}
         {phase === PHASE.CONFIRM && (
           <View style={s.confirmWrap}>
-            <Text style={s.confirmCourse}>{course?.name ?? ''}</Text>
+            <Text style={s.confirmCourse}>{course?.name ?? 'Quick Play'}</Text>
 
             <View style={s.confirmGrid}>
               <View style={s.confirmItem}>
@@ -572,6 +581,8 @@ const s = StyleSheet.create({
   sectionQ:    { fontSize: 10, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 8, marginTop: 12 },
 
   searchInput: { backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 14, padding: 14, color: '#F5EDD8', fontSize: 15, marginBottom: 12 },
+  skipCourseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: 12 },
+  skipCourseText:{ fontSize: 12, color: '#C9A84C88', fontWeight: '500' },
   courseRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', padding: 12, marginBottom: 8, gap: 12 },
   courseName:  { fontSize: 14, fontWeight: '500', color: '#F5EDD8' },
   courseSub:   { fontSize: 11, color: '#B8A882', marginTop: 2 },

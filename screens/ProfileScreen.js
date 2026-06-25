@@ -1135,7 +1135,7 @@ export default function ProfileScreen({ navigation }) {
               <Ionicons name="settings-outline" size={18} color="#C9A84C" />
             </TouchableOpacity>
           </View>
-          <InitialsAvatar name={profile?.full_name} size={52} avatarUrl={profile?.avatar_url} />
+          <InitialsAvatar name={profile?.full_name} size={52} avatarUrl={profile?.avatar_url} username={profile?.username} />
         </View>
       </View>
 

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView, Modal, StyleSheet,
-  Alert, AppState, AccessibilityInfo, KeyboardAvoidingView, Platform,
+  Alert, AppState, AccessibilityInfo, KeyboardAvoidingView, Platform, Vibration,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -257,7 +258,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       }
 
       let row = {
-        user_id: uid, course_name: course.name, holes: String(holeCount), transport,
+        user_id: uid, course_name: course?.name ?? null, holes: String(holeCount), transport,
         players: String(playerCount), tee_time: new Date(roundStartTs).toISOString(),
         finish_time: new Date().toISOString(), duration_minutes: durationMinutes,
         round_format: 'clocked', hole_scores: holeScoresJson, active_game: activeGameJson,
@@ -316,26 +317,43 @@ export default function ClockedRoundScreen({ navigation, route }) {
           sendPushToUser(
             p.user_id,
             'Confirm your round',
-            `${loggerName} logged an on-the-clock round at ${course.name} \u2014 confirm your scores.`,
+            `${loggerName} logged an on-the-clock round at ${course?.name ?? 'a course'} \u2014 confirm your scores.`,
             'round_confirm',
           ).catch(() => {});
           supabase.from('notifications').insert({
             user_id: p.user_id,
             type: 'round_confirm',
             title: 'Confirm your round',
-            body: `${loggerName} logged an on-the-clock round at ${course.name}.`,
+            body: `${loggerName} logged an on-the-clock round at ${course?.name ?? 'a course'}.`,
             meta: { round_id: savedRoundId, player_key: p.player_key },
           }).catch(() => {});
         }
       }
 
-      // No activity_feed insert exists for clocked rounds (noted as P1 — not added here)
-      // 5 & 6 skipped — no activity_feed insert in this path
+      // Post to activity feed — fire and forget, never block round save
+      if (savedRoundId) {
+        supabase.from('activity_feed').insert({
+          user_id:  uid,
+          type:     'round_logged',
+          round_id: savedRoundId,
+          content: {
+            course_name:      course?.name ?? null,
+            holes:            String(holeCount),
+            transport,
+            players:          String(playerCount),
+            duration_minutes: durationMinutes,
+            round_format:     'clocked',
+            team_score:       summary.totalScore,
+            total_elapsed:    summary.totalElapsed,
+            total_time_par:   summary.totalTimePar,
+          },
+        }).catch(() => {});
+      }
 
       AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
       const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       navigation.navigate('Share', {
-        roundFormat: 'clocked', courseName: course.name, date: dateStr,
+        roundFormat: 'clocked', courseName: course?.name ?? 'Quick Play', date: dateStr,
         holes: String(holeCount), transport, durationMinutes,
         teamScore: summary.totalScore, totalTimePar: summary.totalTimePar,
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty,
@@ -372,10 +390,34 @@ export default function ClockedRoundScreen({ navigation, route }) {
     });
   };
 
+  // ── 10-second buzzer ──
+  const buzzedRef = useRef(false);
+  // Reset buzzer flag when hole changes
+  useEffect(() => { buzzedRef.current = false; }, [currentHole]);
+
   // ── Derived ──
   const runningSummary = summarizeRound(holeResults);
   const elapsed       = clockRunning ? displayElapsed : (holeFrozenTime ?? 0);
   const remaining     = curTimePar - elapsed;
+
+  // Trigger buzzer + vibration at 10 seconds remaining
+  useEffect(() => {
+    if (clockRunning && remaining <= 10 && remaining > 0 && !buzzedRef.current) {
+      buzzedRef.current = true;
+      Vibration.vibrate([0, 200, 100, 200]);
+      (async () => {
+        try {
+          const { sound } = await Audio.Sound.createAsync(
+            require('../assets/sounds/buzzer.mp3'),
+            { shouldPlay: true }
+          );
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.didJustFinish) sound.unloadAsync().catch(() => {});
+          });
+        } catch { /* sound failure never crashes the round */ }
+      })();
+    }
+  }, [remaining, clockRunning]);
   const clkColor      = clockColor(remaining, curTimePar);
   const holeStopped   = holeFrozenTime != null;
 

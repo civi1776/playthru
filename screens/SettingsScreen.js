@@ -98,9 +98,9 @@ const s = StyleSheet.create({
   sectionLabel:{ fontSize: 10, fontWeight: '700', color: '#5A7A5C', letterSpacing: 2, marginBottom: 8 },
   card:        { backgroundColor: '#0F2312', borderRadius: 14, borderWidth: 1, borderColor: '#1E3320', overflow: 'hidden' },
   dangerCard:  { borderColor: '#3B1E1E', backgroundColor: '#140F0F' },
-  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  row:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, minHeight: 56 },
   rowIcon:     { marginRight: 12 },
   rowLabel:    { flex: 1, fontSize: 15, color: '#E8DCC8', fontWeight: '500' },
-  rowSub:      { fontSize: 11, color: '#7A6E58', marginTop: 2 },
+  rowSub:      { fontSize: 11, color: '#7A6E58', marginTop: 4, marginBottom: 2 },
   divider:     { height: 1, backgroundColor: '#1E3320', marginHorizontal: 16 },
 });

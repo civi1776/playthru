@@ -45,6 +45,13 @@ export default function EditProfileScreen({ navigation }) {
 
   const pickAndUploadAvatar = async () => {
     try {
+      // 1. Get authoritative uid fresh — not from context (may be stale)
+      const { data: { user: authUser }, error: authErr } = await supabase.auth.getUser();
+      if (authErr || !authUser) {
+        Alert.alert('Session expired', 'Please sign in again to upload a photo.');
+        return;
+      }
+
       // Request permission
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
@@ -63,27 +70,31 @@ export default function EditProfileScreen({ navigation }) {
 
       setUploading(true);
       const asset = result.assets[0];
+
+      // 2. Build path from authUser.id ONLY
       const ext = asset.uri.split('.').pop()?.toLowerCase() ?? 'jpg';
-      const filePath = `${user.id}/avatar.${ext}`;
+      const contentType = asset.mimeType ?? `image/${ext === 'png' ? 'png' : 'jpeg'}`;
+      const filePath = `${authUser.id}/avatar.${ext}`;
+
+      // 3. Log before upload
+      console.log('AVATAR_UPLOAD', { authUid: authUser.id, filePath, contentType });
 
       // Fetch the image as a blob
       const response = await fetch(asset.uri);
       const blob = await response.blob();
 
-      // Upload to Supabase Storage
-      const { error: uploadErr } = await supabase.storage
+      // 4. Upload with explicit contentType + upsert, log full error
+      const { error: upErr } = await supabase.storage
         .from('avatars')
-        .upload(filePath, blob, {
-          contentType: asset.mimeType ?? `image/${ext === 'png' ? 'png' : 'jpeg'}`,
-          upsert: true,
-        });
+        .upload(filePath, blob, { contentType, upsert: true });
 
-      if (uploadErr) {
-        Alert.alert('Upload failed', uploadErr.message);
+      if (upErr) {
+        console.log('AVATAR_UPLOAD_ERROR', JSON.stringify(upErr));
+        Alert.alert('Upload failed', upErr.message);
         return;
       }
 
-      // Get public URL
+      // 5. Get public URL, cache-bust, save to profile
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
       const publicUrl = urlData?.publicUrl;
       if (!publicUrl) {
@@ -91,14 +102,13 @@ export default function EditProfileScreen({ navigation }) {
         return;
       }
 
-      // Bust cache by appending timestamp
       const finalUrl = `${publicUrl}?t=${Date.now()}`;
-
-      // Save to profile
-      await supabase.from('profiles').update({ avatar_url: finalUrl }).eq('id', user.id);
+      await supabase.from('profiles').update({ avatar_url: finalUrl }).eq('id', authUser.id);
       setAvatarUrl(finalUrl);
       await refreshProfile();
+      console.log('AVATAR_UPLOAD_SUCCESS', { filePath, finalUrl });
     } catch (e) {
+      console.log('AVATAR_UPLOAD_CATCH', e?.message);
       Alert.alert('Error', 'Could not upload photo.');
     } finally {
       setUploading(false);
@@ -214,7 +224,7 @@ export default function EditProfileScreen({ navigation }) {
           {/* Avatar picker */}
           <TouchableOpacity style={s.avatarPicker} onPress={pickAndUploadAvatar} disabled={uploading} activeOpacity={0.8}>
             <View style={s.avatarWrap}>
-              <InitialsAvatar name={profile?.full_name} size={80} avatarUrl={avatarUrl} />
+              <InitialsAvatar name={profile?.full_name} size={80} avatarUrl={avatarUrl} username={profile?.username} />
               <View style={s.avatarCameraBadge}>
                 {uploading
                   ? <ActivityIndicator size="small" color="#090F0A" />
