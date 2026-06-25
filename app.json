@@ -20,11 +20,12 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Clocked uses your location to show nearby courses first.",
         "NSFaceIDUsageDescription": "Clocked uses Face ID to keep your account secure.",
-        "NSPhotoLibraryUsageDescription": "Clocked uses your photo library to let you set a profile picture and save your POPScore share card.",
+        "NSPhotoLibraryUsageDescription": "Clocked uses your photo library so you can set a profile picture.",
         "NSCameraUsageDescription": "Clocked uses your camera to take a profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Clocked saves your Clocked Score share card to your photo library.",
         "NSMicrophoneUsageDescription": "Clocked may use the microphone when recording video content."
-      }
+      },
+      "version": "1.5.1"
     },
     "android": {
       "adaptiveIcon": {
@@ -65,6 +66,12 @@
         }
       ],
       "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Clocked uses your photo library so you can set a profile picture."
+        }
+      ],
       [
         "expo-local-authentication",
         {

@@ -241,17 +241,40 @@ export default function ClockedRoundScreen({ navigation, route }) {
     };
     const durationMinutes = Math.round((Date.now() - roundStartTs) / 60000);
     try {
+      // Get fresh auth uid — don't rely on context which may be stale
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const uid = authUser?.id ?? user?.id;
+      if (!uid) { Alert.alert('Error', 'Not signed in. Please restart the app.'); return; }
+
+      // Daily rate limit (3 rounds per 24h)
+      const { count: todayCount } = await supabase
+        .from('rounds').select('id', { count: 'exact', head: true })
+        .eq('user_id', uid)
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      if ((todayCount ?? 0) >= 3) {
+        Alert.alert('Daily limit reached', 'You can log a maximum of 3 rounds per day.');
+        return;
+      }
+
       let row = {
-        user_id: user?.id, course_name: course.name, holes: String(holeCount), transport,
+        user_id: uid, course_name: course.name, holes: String(holeCount), transport,
         players: String(playerCount), tee_time: new Date(roundStartTs).toISOString(),
         finish_time: new Date().toISOString(), duration_minutes: durationMinutes,
         round_format: 'clocked', hole_scores: holeScoresJson, active_game: activeGameJson,
         flagged: false, verification_level: operatingCaddyId ? 'caddy_operated' : 'self_reported',
         ...(operatingCaddyId ? { caddy_id: operatingCaddyId, caddy_logged: true } : {}),
       };
+
+      // 1. Before rounds insert
+      console.log('CLOCKED_SAVE_START', { userId: user?.id, courseId: course?.id, courseName: course?.name, holesCount: holeScoresJson?.length, roundFormat: 'clocked' });
+
       let savedRoundId = null;
       for (let attempt = 0; attempt < 5; attempt++) {
         const result = await supabase.from('rounds').insert([row]).select('id');
+
+        // 2. After rounds insert
+        console.log('CLOCKED_SAVE_ROUND', { attempt, data: JSON.stringify(result.data), error: JSON.stringify(result.error) });
+
         if (!result.error) {
           savedRoundId = result.data?.[0]?.id ?? null;
           break;
@@ -271,19 +294,24 @@ export default function ClockedRoundScreen({ navigation, route }) {
               round_id:   savedRoundId,
               user_id:    p.userId,
               player_key: p.name,
-              status:     p.userId === user?.id ? 'confirmed' : 'pending',
-              confirmed_at: p.userId === user?.id ? new Date().toISOString() : null,
+              status:     p.userId === uid ? 'confirmed' : 'pending',
+              confirmed_at: p.userId === uid ? new Date().toISOString() : null,
             };
           })
           .filter(Boolean);
 
         if (participantRows.length > 0) {
-          await supabase.from('round_participants').insert(participantRows).catch(() => {});
+          // 3. Before round_participants insert
+          console.log('CLOCKED_SAVE_PARTICIPANTS_START', { roundId: savedRoundId, participantCount: participantRows.length });
+
+          // 4. After round_participants insert
+          const partResult = await supabase.from('round_participants').insert(participantRows);
+          console.log('CLOCKED_SAVE_PARTICIPANTS', { data: JSON.stringify(partResult.data), error: JSON.stringify(partResult.error) });
         }
 
         // Notify pending participants
         const pending = participantRows.filter(r => r.status === 'pending');
-        const loggerName = playerDefs.find(p => p.userId === user?.id)?.name ?? 'Your partner';
+        const loggerName = playerDefs.find(p => p.userId === uid)?.name ?? 'Your partner';
         for (const p of pending) {
           sendPushToUser(
             p.user_id,
@@ -301,6 +329,9 @@ export default function ClockedRoundScreen({ navigation, route }) {
         }
       }
 
+      // No activity_feed insert exists for clocked rounds (noted as P1 — not added here)
+      // 5 & 6 skipped — no activity_feed insert in this path
+
       AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
       const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       navigation.navigate('Share', {
@@ -310,7 +341,14 @@ export default function ClockedRoundScreen({ navigation, route }) {
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty,
         playerTotals: summary.playerTotals, formatBadge: formatBadge(playerCount),
       });
-    } catch { Alert.alert('Error', 'Could not save your round. Please try again.'); }
+
+      // 8. End of save
+      console.log('CLOCKED_SAVE_DONE');
+    } catch (e) {
+      // 7. Catch block
+      console.log('CLOCKED_SAVE_CATCH', { message: e?.message, stack: e?.stack });
+      Alert.alert('Error', 'Could not save your round. Please try again.');
+    }
   };
 
   const handleAbandon = () => {

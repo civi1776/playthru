@@ -1226,6 +1226,17 @@ export default function LogScreen({ navigation }) {
 
       // ── Golfer (POPScore) path ───────────────────────────────────────────────
 
+      // Daily rate limit (3 rounds per 24h)
+      const { count: todayRoundCount } = await supabase
+        .from('rounds').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      if ((todayRoundCount ?? 0) >= 3) {
+        setSaving(false);
+        Alert.alert('Daily limit reached', 'You can log a maximum of 3 rounds per day.');
+        return;
+      }
+
       // Capture old rank before this round changes the leaderboard
       let oldRank = null;
       try {

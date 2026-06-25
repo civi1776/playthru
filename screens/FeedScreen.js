@@ -271,7 +271,7 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
         {/* Comment list */}
         <FlatList
           data={comments}
-          keyExtractor={c => c.id}
+          keyExtractor={(c, i) => c.id ? `${c.id}-${i}` : `comment-${i}`}
           contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
           ListEmptyComponent={
             loading
@@ -542,7 +542,7 @@ export default function FeedScreen({ navigation }) {
 
       <FlatList
         data={items}
-        keyExtractor={item => item.id}
+        keyExtractor={(item, index) => item.id ? `${item.id}-${index}` : `feed-${index}`}
         ListHeaderComponent={ListHeader}
         renderItem={({ item }) => (
           <FeedItem

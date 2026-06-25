@@ -9,13 +9,17 @@ export function AuthProvider({ children }) {
   const [session,      setSession]      = useState(null);
   const [initializing, setInitializing] = useState(true);
 
-  // Explicit column list — never fetch date_of_birth (COPPA: don't store/transmit DOB after age gate)
-  const PROFILE_COLS = 'id, email, full_name, first_name, last_name, username, hometown, home_state, home_country, home_course, account_type, handicap, handicap_index, avg_score, typical_round_time, pop_score, national_rank, push_token, avatar_url, is_pro, pro_expires_at, trial_started_at, subscription_source, pro_trial_active, referral_code, referral_count, referred_by, age_verified, caddy_course, caddy_courses, caddy_experience, caddy_rating, caddy_total_loops, bio, created_at';
-
+  // Fetch all columns — strip date_of_birth client-side (COPPA: don't hold DOB in memory)
   const loadProfile = async (userId) => {
     if (!userId) { setProfile(null); return; }
-    const { data, error } = await supabase.from('profiles').select(PROFILE_COLS).eq('id', userId).maybeSingle();
-    if (!error) setProfile(data ? { ...data } : null);
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    if (error) { console.log('PROFILE_FETCH_ERROR', error.message); setProfile(null); return; }
+    if (data) {
+      const { date_of_birth: _dob, ...safe } = data;
+      setProfile(safe);
+    } else {
+      setProfile(null);
+    }
   };
 
   useEffect(() => {
@@ -42,8 +46,11 @@ export function AuthProvider({ children }) {
   const refreshProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return null;
-    const { data } = await supabase.from('profiles').select(PROFILE_COLS).eq('id', session.user.id).maybeSingle();
-    if (data) setProfile({ ...data });
+    const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+    if (data) {
+      const { date_of_birth: _dob, ...safe } = data;
+      setProfile(safe);
+    }
     return data ?? null;
   };
 
