@@ -110,6 +110,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
   // Edit modal
   const [editHoleIdx, setEditHoleIdx]       = useState(null); // null = closed
+  const [editingTime, setEditingTime]       = useState(false);
+  const [editTimeStr, setEditTimeStr]       = useState('');
 
   // ── Clock tick (timestamp-anchored) ──
   const clockRef = useRef(null);
@@ -516,25 +518,41 @@ export default function ClockedRoundScreen({ navigation, route }) {
             })}
           </View>
 
-          {/* ── Frozen time display + edit ── */}
-          {holeStopped && (
+          {/* ── Frozen time display + edit (cross-platform) ── */}
+          {holeStopped && (editingTime ? (
+            <View style={st.frozenTimeRow}>
+              <Text style={st.frozenTimeLabel}>HOLE TIME</Text>
+              <TextInput
+                style={st.frozenTimeInput}
+                value={editTimeStr}
+                onChangeText={setEditTimeStr}
+                placeholder="m:ss"
+                placeholderTextColor="#7A6E58"
+                keyboardType="numbers-and-punctuation"
+                maxLength={5}
+                autoFocus
+              />
+              <TouchableOpacity onPress={() => {
+                const secs = parseTimeInput(editTimeStr);
+                if (secs != null && secs > 0) { setHoleFrozenTime(secs); setDisplayElapsed(secs); }
+                setEditingTime(false);
+              }} activeOpacity={0.7}>
+                <Ionicons name="checkmark" size={18} color="#7DC87A" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setEditingTime(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={18} color="#7A6E58" />
+              </TouchableOpacity>
+            </View>
+          ) : (
             <TouchableOpacity style={st.frozenTimeRow} onPress={() => {
-              Alert.prompt('Edit Hole Time', 'Enter time as m:ss', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Set', onPress: (val) => {
-                  const secs = parseTimeInput(val ?? '');
-                  if (secs != null && secs > 0) {
-                    setHoleFrozenTime(secs);
-                    setDisplayElapsed(secs);
-                  }
-                }},
-              ], 'plain-text', formatSeconds(holeFrozenTime));
+              setEditTimeStr(formatSeconds(holeFrozenTime));
+              setEditingTime(true);
             }} activeOpacity={0.7}>
               <Text style={st.frozenTimeLabel}>HOLE TIME</Text>
               <Text style={st.frozenTimeValue}>{formatSeconds(holeFrozenTime)}</Text>
               <Ionicons name="pencil-outline" size={12} color={DIM} style={{ marginLeft: 6 }} />
             </TouchableOpacity>
-          )}
+          ))}
 
           {/* ── Next Hole / Finish ── */}
           {holeStopped && (
@@ -722,6 +740,7 @@ const st = StyleSheet.create({
   frozenTimeRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8, paddingVertical: 6 },
   frozenTimeLabel:  { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 2 },
   frozenTimeValue:  { fontSize: 14, fontWeight: '600', color: CREAM, fontVariant: ['tabular-nums'] },
+  frozenTimeInput:  { fontSize: 14, fontWeight: '600', color: CREAM, fontVariant: ['tabular-nums'], backgroundColor: BG, borderWidth: 1, borderColor: GOLD + '44', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, minWidth: 50, textAlign: 'center' },
 
   // Next hole
   nextHoleBtn:   { backgroundColor: GOLD, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
