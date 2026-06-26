@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import InitialsAvatar from '../components/InitialsAvatar';
+import CourseAvatar from '../components/CourseAvatar';
 import { sendPushToUser } from '../lib/notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ROUND_STATE_KEY, ROUND_STALENESS_MS } from '../lib/roundConstants';
@@ -92,7 +93,8 @@ function RoundContentCard({ content, navigation }) {
           <Text style={{ fontSize: 10, color: '#C9A84C', fontWeight: '700', letterSpacing: 1.5 }}>ON THE CLOCK</Text>
         </View>
       )}
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        {content?.course_name ? <CourseAvatar courseName={content.course_name} city={content.city ?? null} size={44} /> : null}
         <View style={{ flex: 1 }}>
           <Text style={s.roundCourse} numberOfLines={1}>{content?.course_name || 'Quick Play'}</Text>
           {parts.length > 0 && <Text style={s.roundDetails}>{parts.join(' \u00B7 ')}</Text>}

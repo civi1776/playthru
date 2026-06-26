@@ -14,6 +14,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import ClockedShareCard from '../components/ClockedShareCard';
+import CourseAvatar from '../components/CourseAvatar';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const CARD_WIDTH  = Math.floor(SW * 0.88);
@@ -60,6 +61,11 @@ function CardFrosted({ cardRef, roundTime, scoreStr, grossScore, relToPar, cours
           <Text style={f.statLabel}>{relToPar != null ? relToPar : 'GOLF'}</Text>
         </View>
       </View>
+      {courseName && courseName !== 'Quick Play' && (
+        <View style={{ alignItems: 'center', marginBottom: 6 }}>
+          <CourseAvatar courseName={courseName} size={52} />
+        </View>
+      )}
       <Text style={f.course} numberOfLines={1}>{courseName || 'Unknown Course'}</Text>
     </View>
   );
@@ -88,6 +94,11 @@ function CardOutline({ cardRef, roundTime, scoreStr, grossScore, relToPar, cours
           </View>
         )}
       </View>
+      {courseName && courseName !== 'Quick Play' && (
+        <View style={{ alignItems: 'center', marginBottom: 6 }}>
+          <CourseAvatar courseName={courseName} size={44} />
+        </View>
+      )}
       <Text style={o.bottom} numberOfLines={1}>
         GOLF ON THE CLOCK · {courseName || 'Unknown Course'}
       </Text>

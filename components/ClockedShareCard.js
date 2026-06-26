@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatSecondsLong } from '../lib/clockedSport';
+import CourseAvatar from './CourseAvatar';
 
 const SIZE = Dimensions.get('window').width - 32;
 
@@ -89,7 +90,15 @@ export default function ClockedShareCard({
 
       {/* Course + date */}
       <View style={s.courseBlock}>
-        <Text style={s.courseName} numberOfLines={1}>{courseName || 'Unknown Course'}</Text>
+        {courseName && courseName !== 'Quick Play' && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 6 }}>
+            <CourseAvatar courseName={courseName} size={48} />
+            <Text style={s.courseName} numberOfLines={1}>{courseName}</Text>
+          </View>
+        )}
+        {(!courseName || courseName === 'Quick Play') && (
+          <Text style={s.courseName} numberOfLines={1}>{courseName || 'Unknown Course'}</Text>
+        )}
         <Text style={s.courseDate}>{date || '\u2014'}</Text>
       </View>
 

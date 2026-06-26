@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatSeconds } from '../lib/clockedSport';
+import CourseAvatar from '../components/CourseAvatar';
 
 const BG     = '#090F0A';
 const CARD   = '#0D1A0F';
@@ -111,7 +112,12 @@ export default function ConfirmRoundScreen({ navigation, route }) {
 
       <ScrollView contentContainerStyle={s.content}>
         {/* Round info */}
-        <Text style={s.courseName}>{round.course_name}</Text>
+        {round.course_name && (
+          <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 4 }}>
+            <CourseAvatar courseName={round.course_name} size={40} />
+          </View>
+        )}
+        <Text style={s.courseName}>{round.course_name || 'Quick Play'}</Text>
         <Text style={s.meta}>
           {round.holes} holes {'\u00B7'} {round.transport}
           {round.created_at ? ` \u00B7 ${new Date(round.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
