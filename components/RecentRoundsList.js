@@ -58,7 +58,7 @@ export default function RecentRoundsList({ rounds, navigation, limit = 10 }) {
         >
           <CourseAvatar courseName={r.course_name || ''} size={32} />
           <View style={s.info}>
-            <Text style={s.course} numberOfLines={1}>{r.course_name || '\u2014'}</Text>
+            <Text style={s.course} numberOfLines={1}>{r.course_name || 'Quick Play'}</Text>
             <Text style={s.meta}>
               {formatShortDate(r.created_at)}
               {r.holes ? ` \u00B7 ${r.holes}h` : ''}

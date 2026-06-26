@@ -1230,10 +1230,10 @@ export default function LogScreen({ navigation }) {
       const { count: todayRoundCount } = await supabase
         .from('rounds').select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString());
       if ((todayRoundCount ?? 0) >= 3) {
         setSaving(false);
-        Alert.alert('Daily limit reached', 'You can log a maximum of 3 rounds per day.');
+        Alert.alert('Slow down', "You've logged 3 rounds in the last 12 hours. Take a breather and come back soon!");
         return;
       }
 

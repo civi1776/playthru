@@ -345,9 +345,9 @@ export default function ClockedSetupScreen({ navigation }) {
             <Text style={s.stepSub}>Everyone's scores combine into one team total.</Text>
             {[
               { v: 1, label: 'Solo',          sub: 'Just you vs the clock' },
-              { v: 2, label: '2-Man',         sub: 'Aggregate team score' },
-              { v: 3, label: '3-Man',         sub: 'Aggregate team score' },
-              { v: 4, label: '4-Man',         sub: 'Aggregate team score' },
+              { v: 2, label: '2-Player',      sub: 'Aggregate team score' },
+              { v: 3, label: '3-Player',      sub: 'Aggregate team score' },
+              { v: 4, label: '4-Player',      sub: 'Aggregate team score' },
             ].map(({ v, label, sub }) => (
               <TouchableOpacity
                 key={v}
@@ -525,7 +525,7 @@ export default function ClockedSetupScreen({ navigation }) {
               </View>
               <View style={s.confirmItem}>
                 <Text style={s.confirmLabel}>MODE</Text>
-                <Text style={s.confirmValue}>{mode === 1 ? 'Solo' : `${mode}-Man`}</Text>
+                <Text style={s.confirmValue}>{mode === 1 ? 'Solo' : `${mode}-Player`}</Text>
               </View>
               <View style={s.confirmItem}>
                 <Text style={s.confirmLabel}>TRANSPORT</Text>

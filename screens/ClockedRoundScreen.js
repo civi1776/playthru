@@ -250,9 +250,9 @@ export default function ClockedRoundScreen({ navigation, route }) {
       const { count: todayCount } = await supabase
         .from('rounds').select('id', { count: 'exact', head: true })
         .eq('user_id', uid)
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString());
       if ((todayCount ?? 0) >= 3) {
-        Alert.alert('Daily limit reached', 'You can log a maximum of 3 rounds per day.');
+        Alert.alert('Slow down', "You've logged 3 rounds in the last 12 hours. Take a breather and come back soon!");
         return;
       }
 
@@ -451,7 +451,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
           <Text style={st.scTitle}>SCORECARD</Text>
           <Text style={st.scHint}>Tap a hole to edit</Text>
           <View style={st.scHeaderRow}>
-            <Text style={[st.scCell, st.scCellHole]}>HOLE</Text>
+            <Text style={[st.scCell, st.scCellHole]} numberOfLines={1}>HOLE</Text>
             <Text style={[st.scCell, st.scCellPar]}>PAR</Text>
             {playerDefs.map((p, i) => (
               <Text key={i} style={[st.scCell, st.scCellPlayer]} numberOfLines={1}>{p.name.split(' ')[0]}</Text>
@@ -460,7 +460,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
             <Text style={[st.scCell, st.scCellPen]}>PEN</Text>
             <Text style={[st.scCell, st.scCellScore]}>SCORE</Text>
           </View>
-          {holeResults.map((r, i) => (
+          {holeResults.filter((_, i) => i < holeCount).map((r, i) => (
             <TouchableOpacity key={i} style={st.scRow} onPress={() => setEditHoleIdx(i)} activeOpacity={0.7}>
               <Text style={[st.scCell, st.scCellHole, st.scValText]}>{i + 1}</Text>
               <Text style={[st.scCell, st.scCellPar, st.scValText]}>{r.par}</Text>
@@ -566,7 +566,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
               return (
                 <View key={i} style={st.playerStrokeRow}>
                   <View style={st.playerInfo}>
-                    <Text style={st.playerName} numberOfLines={1}>{p.name}</Text>
+                    <Text style={st.playerName} numberOfLines={1}>{(p.name || '').split(' ')[0] || p.name}</Text>
                   </View>
                   <View style={st.strokeControls}>
                     <TouchableOpacity style={[st.adjBtn, strokes <= 1 && st.adjBtnDisabled]} onPress={() => adjustStrokes(i, -1)} disabled={strokes <= 1} activeOpacity={0.7}>

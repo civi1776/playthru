@@ -141,8 +141,8 @@ function AmbassadorRow({ entry, navigation }) {
 }
 
 // ─── Board configs ───────────────────────────────────────────────────────────
-const CLOCKED_FILTERS = ['OVERALL', 'GAME', 'TEAMMATE', 'BY COURSE', 'AMBASSADORS'];
-const PACE_FILTERS    = ['GLOBAL', 'FRIENDS', 'BY COURSE', 'CADDIES'];
+const CLOCKED_FILTERS = ['OVERALL', 'GAME', 'TEAMMATE', 'COURSE', 'AMBASS.'];
+const PACE_FILTERS    = ['GLOBAL', 'FRIENDS', 'COURSE', 'CADDIES'];
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function LeaderboardScreen({ navigation }) {
@@ -177,7 +177,7 @@ export default function LeaderboardScreen({ navigation }) {
 
   // ── Course search for per-course board ──
   useEffect(() => {
-    if (filter !== 'BY COURSE' || courseQuery.trim().length < 2) { setCourseResults([]); return; }
+    if (filter !== 'COURSE' || courseQuery.trim().length < 2) { setCourseResults([]); return; }
     const t = setTimeout(async () => {
       const { data: courses } = await supabase
         .from('courses')
@@ -201,7 +201,7 @@ export default function LeaderboardScreen({ navigation }) {
         .eq('flagged', false)
         .not('hole_scores', 'is', null);
 
-      if (sortKey === 'BY COURSE' && course) {
+      if (sortKey === 'COURSE' && course) {
         query = query.eq('course_name', course.name);
       }
 
@@ -345,7 +345,7 @@ export default function LeaderboardScreen({ navigation }) {
           handle: p.username ? `@${p.username}` : '', pop: p.pop_score, isYou: p.id === uid,
         }));
         rankVal = rows.find(r => r.isYou)?.rank ?? null;
-      } else if (tab === 'BY COURSE') {
+      } else if (tab === 'COURSE') {
         const { data: courseData } = await supabase.from('courses')
           .select('id, name, city, state, pop_score, total_rounds, avg_time')
           .gt('total_rounds', 0).not('pop_score', 'is', null)
@@ -425,8 +425,8 @@ export default function LeaderboardScreen({ navigation }) {
   // ── Fetch dispatch ──
   const fetchForCurrentState = useCallback((f, c) => {
     if (board === 'CLOCKED') {
-      if (f === 'AMBASSADORS') return fetchAmbassadorBoard();
-      if (f === 'BY COURSE' && !c) return;
+      if (f === 'AMBASS.') return fetchAmbassadorBoard();
+      if (f === 'COURSE' && !c) return;
       return fetchClockedBoard(f, c);
     }
     return fetchPaceBoard(f);
@@ -440,7 +440,7 @@ export default function LeaderboardScreen({ navigation }) {
   const isEmpty = !loading && !error && data.length === 0;
   const isClocked = board === 'CLOCKED';
   const activeFilters = isClocked && !isCaddy ? CLOCKED_FILTERS : PACE_FILTERS;
-  const showCourseSearch = isClocked && filter === 'BY COURSE';
+  const showCourseSearch = isClocked && filter === 'COURSE';
 
   return (
     <SafeAreaView style={s.container}>
@@ -465,7 +465,7 @@ export default function LeaderboardScreen({ navigation }) {
       <View style={s.filterRow}>
         {activeFilters.map(f => (
           <TouchableOpacity key={f} style={[s.filterBtn, filter === f && s.filterBtnActive]}
-            onPress={() => { setFilter(f); if (f !== 'BY COURSE') { setSelectedCourse(null); setCourseQuery(''); } }}>
+            onPress={() => { setFilter(f); if (f !== 'COURSE') { setSelectedCourse(null); setCourseQuery(''); } }}>
             <Text style={[s.filterText, filter === f && s.filterTextActive]}>{f}</Text>
           </TouchableOpacity>
         ))}

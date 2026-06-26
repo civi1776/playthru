@@ -1098,35 +1098,8 @@ export default function ProfileScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <View style={{ flex: 1 }}>
+        <View style={s.headerTop}>
           <Text style={s.wordmark}>CLOCKED</Text>
-          {loading
-            ? <>
-                <SkeletonLoader width={140} height={14} style={{ marginTop: 6, marginBottom: 6 }} />
-                <SkeletonLoader width={180} height={20} style={{ marginBottom: 4 }} />
-                <SkeletonLoader width={120} height={11} />
-              </>
-            : <>
-                <Text style={s.username}>{'@' + (profile?.username ?? '')}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                  <Text style={s.name}>{profile?.full_name ?? ''}</Text>
-                  {isCaddy && (
-                    <View style={s.caddyBadge}>
-                      <Text style={s.caddyBadgeText}>CADDY</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={s.handle}>
-                  {isCaddy && profile?.caddy_course
-                    ? profile.caddy_course
-                    : profile?.created_at
-                      ? 'Member since ' + new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                      : ''}
-                </Text>
-              </>
-          }
-        </View>
-        <View style={s.headerRight}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity style={s.iconBtn} onPress={() => navigation.navigate('SearchUsers')} activeOpacity={0.7} accessibilityLabel="Search golfers" accessibilityRole="button">
               <Ionicons name="search" size={18} color="#C9A84C" />
@@ -1135,8 +1108,27 @@ export default function ProfileScreen({ navigation }) {
               <Ionicons name="settings-outline" size={18} color="#C9A84C" />
             </TouchableOpacity>
           </View>
-          <InitialsAvatar name={profile?.full_name} size={52} avatarUrl={profile?.avatar_url} username={profile?.username} />
         </View>
+        {loading
+          ? <View style={{ paddingHorizontal: 22, paddingBottom: 16 }}>
+              <SkeletonLoader width={140} height={14} style={{ marginTop: 6, marginBottom: 6 }} />
+              <SkeletonLoader width={180} height={20} style={{ marginBottom: 4 }} />
+            </View>
+          : <View style={s.headerIdentity}>
+              <InitialsAvatar name={profile?.full_name} size={48} avatarUrl={profile?.avatar_url} username={profile?.username} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.name}>{profile?.full_name ?? ''}</Text>
+                <Text style={s.username}>{'@' + (profile?.username ?? '')}</Text>
+                <Text style={s.handle}>
+                  {isCaddy && profile?.caddy_course
+                    ? profile.caddy_course
+                    : profile?.created_at
+                      ? 'Member since ' + new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                      : ''}
+                </Text>
+              </View>
+            </View>
+        }
       </View>
 
       {/* Account under review banner */}
@@ -1191,8 +1183,9 @@ export default function ProfileScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container:        { flex: 1, backgroundColor: '#090F0A' },
-  header:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', padding: 22, paddingTop: 16, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
-  headerRight:      { alignItems: 'flex-end', gap: 8 },
+  header:           { borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
+  headerTop:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 16, paddingBottom: 6 },
+  headerIdentity:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, paddingBottom: 16 },
   iconBtn:          { width: 44, height: 44, borderRadius: 22, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
   wordmark:         { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 2 },
   username:         { fontSize: 11, color: '#C9A84C', fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },

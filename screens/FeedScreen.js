@@ -531,11 +531,11 @@ export default function FeedScreen({ navigation }) {
         <View style={s.plusMenu}>
           <TouchableOpacity style={s.plusMenuItem} onPress={() => { setShowPlusMenu(false); navigation.navigate('Log'); }} activeOpacity={0.8}>
             <Ionicons name="add-circle-outline" size={16} color="#7A6E58" />
-            <Text style={s.plusMenuText}>Log pace round</Text>
+            <Text style={s.plusMenuText}>Log a round</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.plusMenuItem} onPress={() => { setShowPlusMenu(false); navigation.navigate('LiveRound'); }} activeOpacity={0.8}>
             <Ionicons name="play-outline" size={16} color="#7A6E58" />
-            <Text style={s.plusMenuText}>Live round</Text>
+            <Text style={s.plusMenuText}>Play on the clock</Text>
           </TouchableOpacity>
         </View>
       )}
