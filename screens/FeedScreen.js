@@ -55,7 +55,14 @@ function formatClockDelta(totalElapsed, totalTimePar) {
   return delta >= 0 ? `beat the clock by ${timeStr}` : `over by ${timeStr}`;
 }
 
-// ─── Round Content Card (redesigned) ─────────────────────────────────────────
+function paceScoreColor(pop) {
+  if (pop >= 4.5) return '#7DC87A';
+  if (pop >= 4.0) return '#C9A84C';
+  if (pop >= 3.5) return '#F0CB5B';
+  return '#E85D4A';
+}
+
+// ─── Round Content Card ──────────────────────────────────────────────────────
 function RoundContentCard({ content, navigation }) {
   const isOnTheClock = content?.round_format === 'clocked';
   const pop = content?.pop_score;
@@ -68,34 +75,40 @@ function RoundContentCard({ content, navigation }) {
     content?.duration_minutes ? formatTime(content.duration_minutes) : null,
   ].filter(Boolean);
 
-  // Clock result for on-the-clock rounds
   const clockResult = isOnTheClock
     ? formatClockDelta(content?.total_elapsed, content?.total_time_par)
     : null;
 
   return (
     <TouchableOpacity
-      style={s.roundCard}
-      onPress={() => navigation?.navigate('CourseProfile', { course: { name: content?.course_name } })}
+      style={[s.roundCard, isOnTheClock && s.roundCardClocked]}
+      onPress={() => content?.course_name && navigation?.navigate('CourseProfile', { course: { name: content.course_name } })}
       activeOpacity={0.85}
     >
+      {/* Clock badge for on-the-clock rounds */}
+      {isOnTheClock && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+          <Ionicons name="timer-outline" size={11} color="#C9A84C" />
+          <Text style={{ fontSize: 10, color: '#C9A84C', fontWeight: '700', letterSpacing: 1.5 }}>ON THE CLOCK</Text>
+        </View>
+      )}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ flex: 1 }}>
-          <Text style={s.roundCourse} numberOfLines={1}>{content?.course_name ?? '\u2014'}</Text>
+          <Text style={s.roundCourse} numberOfLines={1}>{content?.course_name || 'Quick Play'}</Text>
           {parts.length > 0 && <Text style={s.roundDetails}>{parts.join(' \u00B7 ')}</Text>}
           {clockResult && <Text style={s.clockResult}>{clockResult}</Text>}
         </View>
         {/* Score badge */}
         {isOnTheClock && teamScore != null ? (
-          <View style={s.scoreBadge}>
-            <Text style={[s.scoreBadgeNum, { color: teamScore >= 0 ? '#7DC87A' : '#E85D4A' }]}>
+          <View style={[s.scoreBadge, { borderColor: '#C9A84C44', minHeight: 52 }]}>
+            <Text style={[s.scoreBadgeNum, { color: '#C9A84C', fontSize: 22 }]}>
               {teamScore > 0 ? `+${teamScore}` : teamScore}
             </Text>
-            <Text style={s.scoreBadgeLabel}>team pts</Text>
+            <Text style={[s.scoreBadgeLabel, { color: '#C9A84C' }]}>PTS</Text>
           </View>
         ) : pop != null ? (
-          <View style={[s.scoreBadge, { borderColor: popColor(pop) + '66' }]}>
-            <Text style={[s.scoreBadgeNum, { color: popColor(pop) }]}>{pop.toFixed(1)}</Text>
+          <View style={[s.scoreBadge, { borderColor: paceScoreColor(pop) + '44', minHeight: 52 }]}>
+            <Text style={[s.scoreBadgeNum, { color: paceScoreColor(pop), fontSize: 22 }]}>{pop.toFixed(1)}</Text>
             <Text style={s.scoreBadgeLabel}>pace</Text>
           </View>
         ) : null}
@@ -160,9 +173,14 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
           )}
 
           {item.type === 'milestone' && item.content?.title && (
-            <View style={s.milestoneBanner}>
-              <Ionicons name="star" size={14} color="#C9A84C" />
-              <Text style={s.milestoneText}>{item.content.title}</Text>
+            <View style={s.milestoneCard}>
+              <View style={s.milestoneIcon}>
+                <Ionicons name="star" size={20} color="#C9A84C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.milestoneTitle}>{item.content.title}</Text>
+                {item.content.body && <Text style={s.milestoneBody}>{item.content.body}</Text>}
+              </View>
             </View>
           )}
 
@@ -560,6 +578,10 @@ export default function FeedScreen({ navigation }) {
           : <View style={s.emptyState}>
               <Text style={s.emptyText}>No activity yet.</Text>
               <Text style={s.emptyHint}>Follow players or play a round to fill your feed.</Text>
+              <Text style={s.emptyFollowHint}>Follow players to see their rounds here.</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('SearchUsers')} style={s.emptyFollowBtn} activeOpacity={0.8}>
+                <Text style={s.emptyFollowBtnText}>FIND GOLFERS</Text>
+              </TouchableOpacity>
             </View>
         }
         ListFooterComponent={loadingMore ? <ActivityIndicator color="#C9A84C" style={{ paddingVertical: 20 }} /> : null}
@@ -620,6 +642,7 @@ const s = StyleSheet.create({
 
   // Round card
   roundCard:      { marginTop: 6, backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#7DC87A14' },
+  roundCardClocked: { borderColor: '#C9A84C44' },
   roundCourse:    { fontSize: 13, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
   roundDetails:   { fontSize: 10, color: '#B8A882' },
   clockResult:    { fontSize: 10, color: '#7DC87A', marginTop: 2, fontWeight: '500' },
@@ -634,9 +657,11 @@ const s = StyleSheet.create({
   liveDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: '#7DC87A' },
   liveLabel:     { fontSize: 12, color: '#F5EDD8', fontWeight: '600' },
 
-  // Milestone
-  milestoneBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0D1A0F', borderRadius: 8, padding: 8, marginTop: 6, borderWidth: 1, borderColor: '#C9A84C33' },
-  milestoneText:   { flex: 1, fontSize: 13, color: '#F5EDD8', lineHeight: 18 },
+  // Milestone card
+  milestoneCard:   { marginTop: 6, backgroundColor: '#C9A84C18', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  milestoneIcon:   { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C9A84C22', alignItems: 'center', justifyContent: 'center' },
+  milestoneTitle:  { fontSize: 14, fontWeight: '700', color: '#F5EDD8', marginBottom: 2 },
+  milestoneBody:   { fontSize: 12, color: '#B8A882', lineHeight: 17 },
 
   // Actions
   actionBar:     { flexDirection: 'row', gap: 16, marginTop: 8 },
@@ -644,7 +669,10 @@ const s = StyleSheet.create({
   actionCount:   { fontSize: 12, color: '#7A6E58' },
 
   // States
-  emptyState:    { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  emptyText:     { fontSize: 15, color: '#7A6E58', fontWeight: '500', marginBottom: 6 },
-  emptyHint:     { fontSize: 12, color: '#7A6E5888', textAlign: 'center', lineHeight: 18 },
+  emptyState:      { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 32 },
+  emptyText:       { fontSize: 15, color: '#7A6E58', fontWeight: '500', marginBottom: 6 },
+  emptyHint:       { fontSize: 12, color: '#7A6E5888', textAlign: 'center', lineHeight: 18 },
+  emptyFollowHint: { fontSize: 13, color: '#7A6E58', textAlign: 'center', marginTop: 8, marginBottom: 20 },
+  emptyFollowBtn:  { backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
+  emptyFollowBtnText: { fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 1 },
 });
