@@ -225,7 +225,7 @@ export default function LeaderboardScreen({ navigation }) {
       if (roundIds.length) {
         const { data: parts } = await supabase
           .from('round_participants')
-          .select('round_id, user_id, player_key')
+          .select('round_id, user_id, player_key, hole_scores, total_points')
           .eq('status', 'confirmed')
           .in('round_id', roundIds);
         participations = parts ?? [];

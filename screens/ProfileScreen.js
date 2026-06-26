@@ -1045,7 +1045,7 @@ export default function ProfileScreen({ navigation }) {
       try {
         const { data: myParts } = await supabase
           .from('round_participants')
-          .select('round_id, player_key')
+          .select('round_id, player_key, hole_scores, total_points')
           .eq('user_id', profile.id)
           .eq('status', 'confirmed');
         if (myParts?.length) {

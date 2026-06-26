@@ -289,17 +289,25 @@ export default function ClockedRoundScreen({ navigation, route }) {
         row = rest;
       }
 
-      // Create round_participants for linked players
+      // Create round_participants for linked players (with per-player hole_scores)
       if (savedRoundId) {
         const participantRows = playerDefs
           .map((p, i) => {
             if (!p.userId) return null; // guest — no account
+            // Build this player's hole_scores from the results
+            const playerHoleScores = results.map((r, hi) => {
+              const pr = r.playerResults?.[i];
+              return { hole: hi + 1, par: r.par, grossStrokes: pr?.grossStrokes, points: pr?.points, label: pr?.label };
+            });
+            const totalPoints = playerHoleScores.reduce((s, h) => s + (h.points ?? 0), 0);
             return {
-              round_id:   savedRoundId,
-              user_id:    p.userId,
-              player_key: p.name,
-              status:     p.userId === uid ? 'confirmed' : 'pending',
+              round_id:     savedRoundId,
+              user_id:      p.userId,
+              player_key:   p.name,
+              status:       p.userId === uid ? 'confirmed' : 'pending',
               confirmed_at: p.userId === uid ? new Date().toISOString() : null,
+              hole_scores:  playerHoleScores,
+              total_points: totalPoints,
             };
           })
           .filter(Boolean);

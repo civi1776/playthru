@@ -88,16 +88,22 @@ export default function ConfirmRoundScreen({ navigation, route }) {
   }
 
   const myKey = participation.player_key ?? playerKey;
-  const holeScores = round.hole_scores ?? [];
   const alreadyHandled = participation.status !== 'pending';
 
-  // Extract this player's holes
-  const myHoles = holeScores.map((h, i) => {
-    const me = h.players?.find(p => p.name === myKey);
-    return { hole: i + 1, par: h.par, strokes: me?.grossStrokes, points: me?.points, label: me?.label, elapsed: h.elapsed, timePar: h.timePar, penalty: h.penalty };
-  });
+  // Prefer per-player hole_scores from round_participants (if saved), fall back to round's hole_scores
+  const partHoleScores = participation.hole_scores;
+  const roundHoleScores = round.hole_scores ?? [];
+  const hasParticipantScores = partHoleScores && partHoleScores.length > 0;
 
-  const totalPoints = myHoles.reduce((s, h) => s + (h.points ?? 0), 0);
+  const myHoles = hasParticipantScores
+    ? partHoleScores.map(h => ({ hole: h.hole, par: h.par, strokes: h.grossStrokes, points: h.points, label: h.label }))
+    : roundHoleScores.map((h, i) => {
+        const me = h.players?.find(p => p.name === myKey);
+        return { hole: i + 1, par: h.par, strokes: me?.grossStrokes, points: me?.points, label: me?.label, elapsed: h.elapsed, timePar: h.timePar, penalty: h.penalty };
+      });
+
+  const hasScores = myHoles.some(h => h.strokes != null);
+  const totalPoints = participation.total_points ?? myHoles.reduce((s, h) => s + (h.points ?? 0), 0);
 
   return (
     <SafeAreaView style={s.container}>
@@ -132,8 +138,15 @@ export default function ConfirmRoundScreen({ navigation, route }) {
         )}
 
         {/* Your scorecard */}
-        <Text style={s.sectionLabel}>YOUR SCORES ({myKey})</Text>
-        <View style={s.card}>
+        {!hasScores && (
+          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: '#7A6E58', textAlign: 'center', lineHeight: 19 }}>
+              Your scores weren't recorded for this round.{'\n'}You can still confirm your participation.
+            </Text>
+          </View>
+        )}
+        {hasScores && <Text style={s.sectionLabel}>YOUR SCORES ({myKey})</Text>}
+        {hasScores && <View style={s.card}>
           <View style={s.scHeaderRow}>
             <Text style={[s.scCell, s.scHole]}>HOLE</Text>
             <Text style={[s.scCell, s.scPar]}>PAR</Text>
@@ -161,15 +174,19 @@ export default function ConfirmRoundScreen({ navigation, route }) {
             </Text>
             <Text style={[s.scCell, s.scLabel]}></Text>
           </View>
-        </View>
+        </View>}
 
         {/* Actions */}
         {!alreadyHandled && (
           <View style={s.actions}>
-            <Text style={s.actionsHint}>Confirming adds this on-the-clock round to your Clocked Score and history.</Text>
+            <Text style={s.actionsHint}>
+              {hasScores
+                ? 'Confirming adds this round and your scores to your Clocked Score.'
+                : 'Confirming adds this round to your history.'}
+            </Text>
             <TouchableOpacity style={s.confirmBtn} onPress={handleConfirm} disabled={submitting} activeOpacity={0.85}>
               <Ionicons name="checkmark-circle" size={20} color={BG} />
-              <Text style={s.confirmBtnText}>CONFIRM</Text>
+              <Text style={s.confirmBtnText}>{hasScores ? 'CONFIRM & CLAIM SCORE' : 'CONFIRM'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.declineBtn} onPress={handleDecline} disabled={submitting} activeOpacity={0.85}>
               <Text style={s.declineBtnText}>Decline</Text>
