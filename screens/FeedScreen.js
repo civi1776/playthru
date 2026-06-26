@@ -107,7 +107,7 @@ function RoundContentCard({ content, navigation }) {
             <Text style={[s.scoreBadgeLabel, { color: '#C9A84C' }]}>PTS</Text>
           </View>
         ) : pop != null ? (
-          <View style={[s.scoreBadge, { borderColor: paceScoreColor(pop) + '44', minHeight: 52 }]}>
+          <View style={[s.scoreBadge, { minHeight: 52 }]}>
             <Text style={[s.scoreBadgeNum, { color: paceScoreColor(pop), fontSize: 22 }]}>{pop.toFixed(1)}</Text>
             <Text style={s.scoreBadgeLabel}>pace</Text>
           </View>

@@ -1579,8 +1579,8 @@ export default function LiveRoundScreen({ navigation }) {
             const wasAlreadyLeader = prevBest?.user_id === uid;
             if (beatsAll && !wasAlreadyLeader) {
               const handle = profile?.username ? `@${profile.username}` : 'a player';
-              await sendPushToUser(uid, `You're the fastest at ${course.name} 🏆`, `Your Clocked Score of ${pop.toFixed(1)} is now #1 at ${course.name}. Own it.`, 'course_leader');
-              supabase.from('activity_feed').insert({ user_id: uid, type: 'course_leader', content: { description: `${handle} is now the fastest player at ${course.name} 🏆`, course_name: course.name, pop_score: pop } }).then(() => {});
+              await sendPushToUser(uid, `You're the fastest at ${course.name}`, `Your Clocked Score of ${pop.toFixed(1)} is now #1 at ${course.name}. Own it.`, 'course_leader');
+              supabase.from('activity_feed').insert({ user_id: uid, type: 'course_leader', content: { description: `${handle} is now the fastest player at ${course.name}`, course_name: course.name, pop_score: pop } }).then(() => {});
             }
           } catch (e) { /* silent fail */ }
         }
@@ -1628,8 +1628,8 @@ export default function LiveRoundScreen({ navigation }) {
               const { data: opp } = await supabase.from('profiles').select('username').eq('id', opponentId).maybeSingle();
               const myHandle  = profile?.username ? `@${profile.username}` : 'a player';
               const oppHandle = opp?.username ? `@${opp.username}` : 'their opponent';
-              await sendPushToUser(uid, iWin ? `You won the challenge at ${course.name} 🏆` : `You lost the challenge at ${course.name}`, iWin ? `Your ${pop.toFixed(1)} beat the ${otherScore.toFixed(1)}. Own it.` : `${oppHandle} had a better score. Rematch?`, 'challenge_result');
-              await sendPushToUser(opponentId, iWin ? `You lost the challenge at ${course.name}` : `You won the challenge at ${course.name} 🏆`, iWin ? `${myHandle} had a better score. Rematch?` : `Your score held up! ${myHandle} couldn't beat it.`, 'challenge_result');
+              await sendPushToUser(uid, iWin ? `You won the challenge at ${course.name}` : `You lost the challenge at ${course.name}`, iWin ? `Your ${pop.toFixed(1)} beat the ${otherScore.toFixed(1)}. Own it.` : `${oppHandle} had a better score. Rematch?`, 'challenge_result');
+              await sendPushToUser(opponentId, iWin ? `You lost the challenge at ${course.name}` : `You won the challenge at ${course.name}`, iWin ? `${myHandle} had a better score. Rematch?` : `Your score held up! ${myHandle} couldn't beat it.`, 'challenge_result');
               supabase.from('activity_feed').insert({ user_id: winnerId, type: 'challenge_won', content: { description: `${iWin ? myHandle : oppHandle} beat ${iWin ? oppHandle : myHandle}'s challenge at ${course.name}`, course_name: course.name, winner_score: iWin ? pop : otherScore } }).then(() => {}).catch(() => {});
             } else {
               await supabase.from('challenges').update({ [updateField]: pop, [roundField]: newRoundId }).eq('id', ch.id);
