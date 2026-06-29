@@ -1466,13 +1466,13 @@ export default function LogScreen({ navigation }) {
         } catch { /* silent fail */ }
       }
 
-      // Schedule POPScore notification for 1h 45m after round (6300 seconds)
+      // Re-engagement nudge 1 hour after round save
       Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Your round has been scored!',
-          body: 'Tap to see your updated Clocked Score →',
+          title: 'Check your Clocked Score',
+          body: 'Your round is logged. See how it moved your score →',
         },
-        trigger: { seconds: 18000, repeats: false },
+        trigger: { seconds: 3600, repeats: false },
       }).catch(() => {});
       // Auto-post to activity feed — fire and forget, never block round save
       try {

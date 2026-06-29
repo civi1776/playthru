@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { formatSeconds } from '../lib/clockedSport';
+import { sendPushToUser } from '../lib/notifications';
 import CourseAvatar from '../components/CourseAvatar';
 
 const BG     = '#090F0A';
@@ -55,6 +56,20 @@ export default function ConfirmRoundScreen({ navigation, route }) {
     await supabase.from('round_participants')
       .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
       .eq('round_id', roundId).eq('user_id', user.id);
+
+    // Notify the round logger that their partner confirmed
+    if (round?.user_id && round.user_id !== user.id) {
+      const { data: me } = await supabase.from('profiles').select('full_name, username').eq('id', user.id).maybeSingle();
+      const partnerName = me?.username ? `@${me.username}` : (me?.full_name?.split(' ')[0] ?? 'Your partner');
+      sendPushToUser(
+        round.user_id,
+        'Partner confirmed',
+        `${partnerName} confirmed their scores for your round.`,
+        'round_confirm',
+        { round_id: roundId },
+      ).catch(() => {});
+    }
+
     navigation.goBack();
   };
 

@@ -15,7 +15,8 @@ import {
   DEFAULT_SCORING_SCALE, DEFAULT_CLOCK_COEFFICIENTS, DEFAULT_PENALTY_PARAMS,
 } from '../lib/clockedSport';
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
-import { sendPushToUser } from '../lib/notifications';
+import { sendPushToUser, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
+import * as Notifications from 'expo-notifications';
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const BG       = '#090F0A';
@@ -157,6 +158,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     setDisplayElapsed(0);
     setHoleFrozenTime(null);
     setClockRunning(true);
+    scheduleInteractionLadder(course?.name ?? 'your course').catch(() => {});
   };
 
   const stopClock = () => {
@@ -362,6 +364,26 @@ export default function ClockedRoundScreen({ navigation, route }) {
         }); } catch {} })();
       }
 
+      // Cancel interaction ladder + schedule post-round notifications
+      cancelInteractionLadder().catch(() => {});
+
+      // Milestone + rank move + inactivity (fire-and-forget, never block save)
+      (async () => {
+        try {
+          const { count: totalRoundsCount } = await supabase
+            .from('rounds').select('id', { count: 'exact', head: true })
+            .eq('user_id', uid).not('flagged', 'is', true);
+          await checkAndSendMilestone(totalRoundsCount ?? 1, summary.totalScore, 0, uid);
+        } catch {}
+        scheduleInactivityReminder().catch(() => {});
+      })();
+
+      // Re-engagement nudge 1 hour after save
+      Notifications.scheduleNotificationAsync({
+        content: { title: 'Check your Clocked Score', body: 'Your round is logged. See how it moved your score →' },
+        trigger: { seconds: 3600, repeats: false },
+      }).catch(() => {});
+
       AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
       const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       navigation.navigate('Share', {
@@ -371,9 +393,6 @@ export default function ClockedRoundScreen({ navigation, route }) {
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty,
         playerTotals: summary.playerTotals, formatBadge: formatBadge(playerCount),
       });
-
-      // 8. End of save
-      console.log('CLOCKED_SAVE_DONE');
     } catch (e) {
       // 7. Catch block
       console.log('CLOCKED_SAVE_CATCH', { message: e?.message, stack: e?.stack });
@@ -385,6 +404,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     Alert.alert('Abandon Round?', 'Your progress will be lost.', [
       { text: 'Stay', style: 'cancel' },
       { text: 'Leave', style: 'destructive', onPress: () => {
+        cancelInteractionLadder().catch(() => {});
         AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
         navigation.goBack();
       }},
