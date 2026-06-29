@@ -126,6 +126,7 @@ export default function ShareScreen({ navigation, route }) {
   const playerTotals      = route.params?.playerTotals      ?? null;
   const isUnranked        = route.params?.isUnranked        ?? false;
   const formatBadgeStr    = route.params?.formatBadge       ?? '';
+  const holeScores        = route.params?.holeScores        ?? null;
 
   const isClocked = roundFormat === 'clocked';
 
@@ -245,13 +246,11 @@ export default function ShareScreen({ navigation, route }) {
                 <View ref={stickerRef} collapsable={false}>
                   <ClockedShareCard
                     teamScore={teamScore}
-                    totalElapsed={totalElapsed}
-                    totalTimePar={totalTimePar}
                     playerTotals={playerTotals}
-                    formatBadge={formatBadgeStr}
                     courseName={courseName}
                     date={route.params?.date}
-                    isUnranked={isUnranked}
+                    holes={holes}
+                    holeScores={holeScores}
                   />
                 </View>
               </View>

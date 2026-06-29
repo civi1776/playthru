@@ -392,6 +392,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
         teamScore: summary.totalScore, totalTimePar: summary.totalTimePar,
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty,
         playerTotals: summary.playerTotals, formatBadge: formatBadge(playerCount),
+        holeScores: results.slice(0, holeCount),
       });
     } catch (e) {
       // 7. Catch block
