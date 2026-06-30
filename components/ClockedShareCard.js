@@ -1,26 +1,27 @@
-// ─── ClockedShareCard — Instagram-worthy round card ──────────────────────────
+// ─── ClockedShareCard — Strava-style photo overlay share card ────────────────
+import { useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, Dimensions } from 'react-native';
-import CourseAvatar from './CourseAvatar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { getCoursePhoto } from '../lib/googlePlaces';
 
-const SIZE = Dimensions.get('window').width - 32;
+const W = Dimensions.get('window').width - 32;
+const H = Math.round(W * (11 / 9)); // 9:11 portrait aspect
 
 const GOLD  = '#C9A84C';
 const CREAM = '#F5EDD8';
 const MUTED = '#B8A882';
-const BG    = '#090F0A';
-const CARD  = '#0D1A0F';
 const GREEN = '#7DC87A';
 const RED   = '#E85D4A';
 const DIM   = '#7A6E58';
 
 function scoreColor(v) { return v >= 0 ? GREEN : RED; }
 
-function holePill(holeScore) {
-  // holeScore = sum of all players' points for that hole (before penalty)
-  if (holeScore >= 3) return { bg: GREEN + '22', border: GREEN, text: GREEN, label: holeScore >= 6 ? 'E' : 'B' };
-  if (holeScore >= 1) return { bg: GOLD + '22', border: GOLD + '44', text: GOLD + '88', label: 'P' };
-  if (holeScore === 0) return { bg: 'transparent', border: CREAM + '22', text: CREAM + '55', label: '\u00B7' };
-  return { bg: RED + '22', border: RED, text: RED, label: '\u2212' };
+function formatNames(playerTotals) {
+  if (!playerTotals || playerTotals.length <= 1) return null;
+  const names = playerTotals.map(p => (p.name ?? '').split(' ')[0]).filter(Boolean);
+  if (names.length === 2) return `${names[0]} & ${names[1]}`;
+  const last = names.pop();
+  return `${names.join(', ')} & ${last}`;
 }
 
 export default function ClockedShareCard({
@@ -32,143 +33,89 @@ export default function ClockedShareCard({
   holeScores,
 }) {
   const scoreStr = teamScore != null ? (teamScore > 0 ? `+${teamScore}` : String(teamScore)) : '--';
-
-  // Compute stats from hole data
   const holeData = holeScores ?? [];
-  const birdiesPlus = holeData.filter(h => h.teamPointsBeforePenalty >= 3).length;
   const penalties = holeData.filter(h => h.penalty < 0).length;
+  const partnerLine = formatNames(playerTotals);
+  const isQuickPlay = !courseName || courseName === 'Quick Play';
+
+  // Fetch course photo
+  const [photoUrl, setPhotoUrl] = useState(null);
+  useEffect(() => {
+    if (isQuickPlay) return;
+    getCoursePhoto(courseName).then(url => { if (url) setPhotoUrl(url); });
+  }, [courseName]);
 
   return (
     <View style={s.card}>
+      {/* Background */}
+      {photoUrl ? (
+        <Image source={{ uri: photoUrl }} style={s.bgImage} resizeMode="cover" />
+      ) : (
+        <LinearGradient colors={['#1a2e1c', '#0d1a0f']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.bgImage} />
+      )}
 
-      {/* ── TOP BAR ── */}
+      {/* Gradient scrim over the bottom 65% */}
+      <LinearGradient
+        colors={['transparent', 'rgba(9,15,10,0.55)', 'rgba(9,15,10,0.88)', 'rgba(9,15,10,0.95)']}
+        locations={[0, 0.3, 0.6, 1]}
+        style={s.scrim}
+      />
+
+      {/* ── TOP BAR (on raw photo) ── */}
       <View style={s.topBar}>
-        <Image
-          source={require('../assets/PlayThru_AppIcon.png')}
-          style={s.logoMark}
-          resizeMode="contain"
-        />
-        <Text style={s.topLabel}>GOLF ON THE CLOCK</Text>
+        <Text style={s.topLeft}>CLOCKED</Text>
+        <Text style={s.topRight}>{holes ?? '9'} HOLES</Text>
       </View>
 
-      {/* ── COURSE HERO ── */}
-      <View style={s.courseHero}>
-        {courseName && courseName !== 'Quick Play' ? (
-          <View style={s.coursePhotoWrap}>
-            <CourseAvatar courseName={courseName} size={SIZE - 2} />
-            <View style={s.courseScrim}>
-              <Text style={s.courseHeroName} numberOfLines={1}>{courseName}</Text>
-            </View>
-          </View>
-        ) : (
-          <View style={s.coursePlaceholder}>
-            <Text style={{ fontSize: 32 }}>{'\u26F3'}</Text>
-            <Text style={s.coursePlaceholderText}>Quick Play</Text>
-          </View>
-        )}
-      </View>
+      {/* ── BOTTOM CONTENT (inside scrim) ── */}
+      <View style={s.bottomContent}>
+        {/* Course name */}
+        <Text style={s.courseLabel}>{isQuickPlay ? 'ON THE CLOCK' : courseName?.toUpperCase()}</Text>
 
-      {/* ── SCORE HERO ── */}
-      <View style={s.scoreBlock}>
-        <Text style={[s.scoreHero, { color: scoreColor(teamScore ?? 0) }]}>
-          {scoreStr}
-        </Text>
+        {/* Partner names */}
+        {partnerLine && <Text style={s.partnerLine}>{partnerLine}</Text>}
+
+        {/* Score hero */}
+        <Text style={[s.scoreHero, { color: scoreColor(teamScore ?? 0) }]}>{scoreStr}</Text>
         <Text style={s.scoreSub}>PTS</Text>
-      </View>
 
-      {/* ── HOLE BREAKDOWN ── */}
-      {holeData.length > 0 && (
-        <View style={s.pillRow}>
-          {holeData.map((h, i) => {
-            const pts = h.teamPointsBeforePenalty ?? 0;
-            const p = holePill(pts);
-            return (
-              <View key={i} style={[s.pill, { backgroundColor: p.bg, borderColor: p.border }]}>
-                <Text style={[s.pillText, { color: p.text }]}>{p.label}</Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* ── STATS ROW ── */}
-      <View style={s.statsRow}>
-        <View style={s.statChip}>
-          <Text style={s.statLabel}>BIRDIES+</Text>
-          <Text style={[s.statNum, { color: birdiesPlus > 0 ? GREEN : DIM }]}>{birdiesPlus}</Text>
-        </View>
-        <View style={s.statChip}>
-          <Text style={s.statLabel}>PENALTIES</Text>
-          <Text style={[s.statNum, { color: penalties > 0 ? RED : DIM }]}>{penalties}</Text>
-        </View>
-        <View style={s.statChip}>
-          <Text style={s.statLabel}>HOLES</Text>
-          <Text style={[s.statNum, { color: GOLD }]}>{holes ?? '9'}</Text>
-        </View>
-      </View>
-
-      {/* ── PLAYER BREAKDOWN (2+ players) ── */}
-      {playerTotals && playerTotals.length > 1 && (
-        <Text style={s.playerLine}>
-          {playerTotals.map((p, i) => {
-            const name = (p.name ?? '').split(' ')[0];
-            const pts = p.totalPoints > 0 ? `+${p.totalPoints}` : p.totalPoints;
-            return `${name} ${pts}`;
-          }).join('  \u00B7  ')}
+        {/* Penalty line */}
+        <Text style={[s.penaltyLine, { color: penalties > 0 ? RED : DIM }]}>
+          {penalties > 0 ? `${penalties} ${penalties === 1 ? 'penalty' : 'penalties'}` : 'no penalties'}
         </Text>
-      )}
 
-      {/* ── BOTTOM ── */}
-      <View style={s.bottomBlock}>
-        <Text style={s.dateText}>{date ?? ''}</Text>
-        <View style={s.bottomDivider} />
+        {/* Date */}
+        <Text style={s.dateLine}>{date ?? ''}</Text>
       </View>
-
     </View>
   );
 }
 
 const s = StyleSheet.create({
   card: {
-    width: SIZE, backgroundColor: BG, borderRadius: 20,
-    borderWidth: 1, borderColor: GOLD + '33',
-    overflow: 'hidden',
+    width: W, height: H, borderRadius: 20,
+    overflow: 'hidden', backgroundColor: '#0d1a0f',
   },
 
+  bgImage: { position: 'absolute', width: W, height: H },
+
+  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: H * 0.7 },
+
   // Top bar
-  topBar:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
-  logoMark:  { width: 32, height: 32, opacity: 0.9 },
-  topLabel:  { fontSize: 9, fontWeight: '700', color: GOLD, letterSpacing: 3 },
+  topBar:   { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14 },
+  topLeft:  { fontSize: 9, fontWeight: '700', color: GOLD, letterSpacing: 2, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  topRight: { fontSize: 9, fontWeight: '700', color: CREAM + 'CC', letterSpacing: 2, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
 
-  // Course hero
-  courseHero:       { width: '100%', height: 120, backgroundColor: CARD },
-  coursePhotoWrap:  { width: '100%', height: 120, overflow: 'hidden' },
-  courseScrim:      { position: 'absolute', bottom: 0, left: 0, right: 0, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: 'rgba(9,15,10,0.7)' },
-  courseHeroName:   { fontSize: 16, fontWeight: '700', color: '#fff' },
-  coursePlaceholder: { width: '100%', height: 120, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
-  coursePlaceholderText: { fontSize: 12, color: DIM, marginTop: 4 },
+  // Bottom content
+  bottomContent: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center', paddingBottom: 24, paddingHorizontal: 20 },
 
-  // Score
-  scoreBlock: { alignItems: 'center', paddingVertical: 16 },
-  scoreHero:  { fontSize: 96, fontWeight: '700', fontVariant: ['tabular-nums'], lineHeight: 100, letterSpacing: -3 },
-  scoreSub:   { fontSize: 11, fontWeight: '700', color: GOLD, letterSpacing: 4, marginTop: -4 },
+  courseLabel:  { fontSize: 11, fontWeight: '700', color: GOLD, letterSpacing: 2, marginBottom: 6 },
+  partnerLine: { fontSize: 13, color: CREAM + 'DD', marginBottom: 10 },
 
-  // Hole pills
-  pillRow:    { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4, paddingHorizontal: 16, marginBottom: 14 },
-  pill:       { width: 28, height: 28, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  pillText:   { fontSize: 10, fontWeight: '700' },
+  scoreHero: { fontSize: 52, fontWeight: '700', fontVariant: ['tabular-nums'], lineHeight: 56, letterSpacing: -2 },
+  scoreSub:  { fontSize: 9, fontWeight: '700', color: GOLD, letterSpacing: 4, marginTop: -2, marginBottom: 8 },
 
-  // Stats
-  statsRow:   { flexDirection: 'row', justifyContent: 'center', gap: 10, paddingHorizontal: 16, marginBottom: 14 },
-  statChip:   { backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 8, paddingHorizontal: 14, alignItems: 'center' },
-  statLabel:  { fontSize: 7, fontWeight: '700', color: DIM, letterSpacing: 1.5, marginBottom: 2 },
-  statNum:    { fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  penaltyLine: { fontSize: 11, fontWeight: '600', letterSpacing: 1, marginBottom: 12 },
 
-  // Players
-  playerLine: { fontSize: 12, color: MUTED, textAlign: 'center', marginBottom: 12, paddingHorizontal: 16 },
-
-  // Bottom
-  bottomBlock:   { alignItems: 'center', paddingBottom: 16, paddingHorizontal: 16 },
-  dateText:      { fontSize: 11, color: MUTED, marginBottom: 8, letterSpacing: 1 },
-  bottomDivider: { width: 40, height: 1, backgroundColor: GOLD + '44' },
+  dateLine: { fontSize: 10, color: MUTED + 'AA', letterSpacing: 1 },
 });
