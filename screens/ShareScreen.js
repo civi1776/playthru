@@ -137,6 +137,7 @@ export default function ShareScreen({ navigation, route }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [saving,      setSaving]      = useState(false);
   const [toast,       setToast]       = useState('');
+  const [detailedMode, setDetailedMode] = useState(false);
 
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
 
@@ -228,6 +229,25 @@ export default function ShareScreen({ navigation, route }) {
         <View style={{ width: 48 }} />
       </View>
 
+      {/* Simple / Detailed toggle (clocked rounds only) */}
+      {isClocked && (
+        <View style={ss.toggleRow}>
+          {['SIMPLE', 'DETAILED'].map(label => {
+            const active = label === 'DETAILED' ? detailedMode : !detailedMode;
+            return (
+              <TouchableOpacity
+                key={label}
+                style={[ss.togglePill, active && ss.togglePillActive]}
+                onPress={() => setDetailedMode(label === 'DETAILED')}
+                activeOpacity={0.7}
+              >
+                <Text style={[ss.toggleText, active && ss.toggleTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       {/* Carousel — fixed height, horizontal paging */}
       <View style={[ss.carouselWrap, { height: CARD_HEIGHT }]}>
         <ScrollView
@@ -251,6 +271,7 @@ export default function ShareScreen({ navigation, route }) {
                     date={route.params?.date}
                     holes={holes}
                     holeScores={holeScores}
+                    detailed={detailedMode}
                   />
                 </View>
               </View>
@@ -410,6 +431,11 @@ const ss = StyleSheet.create({
   title:        { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 4 },
   carouselWrap: { overflow: 'hidden' },
   page:         { width: SW, alignItems: 'center', justifyContent: 'center' },
+  toggleRow:      { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 8 },
+  togglePill:     { paddingVertical: 6, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: '#C9A84C55' },
+  togglePillActive: { backgroundColor: '#C9A84C', borderColor: '#C9A84C' },
+  toggleText:     { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+  toggleTextActive: { color: '#090F0A' },
   dotsRow:      { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingTop: 10 },
   dot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: '#C9A84C33' },
   dotActive:    { backgroundColor: '#C9A84C', width: 18, borderRadius: 3 },
