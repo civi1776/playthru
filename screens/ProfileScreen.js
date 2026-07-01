@@ -14,7 +14,6 @@ import SkeletonLoader from '../components/SkeletonLoader';
 import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
 import VerificationBadge from '../components/VerificationBadge';
-import ClockedScoreCard from '../components/ClockedScoreCard';
 import RecentRoundsList from '../components/RecentRoundsList';
 import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
 
@@ -1093,9 +1092,13 @@ export default function ProfileScreen({ navigation }) {
 
   const handleSettings = () => navigation.navigate('Settings');
 
+  const bestRound = rounds
+    .filter(r => r.round_format === 'clocked' && r.team_score != null)
+    .sort((a, b) => (b.team_score ?? 0) - (a.team_score ?? 0))[0];
+
   return (
     <SafeAreaView style={s.container}>
-      {/* Header */}
+      {/* Header — fixed at top */}
       <View style={s.header}>
         <View style={s.headerTop}>
           <Text style={s.wordmark}>CLOCKED</Text>
@@ -1130,80 +1133,133 @@ export default function ProfileScreen({ navigation }) {
         }
       </View>
 
-      {/* Account under review banner */}
-      {(rounds.filter(r => r.flagged).length >= 3) && (
-        <View style={s.reviewBanner}>
-          <Ionicons name="warning-outline" size={14} color="#C07A6A" style={{ marginRight: 6 }} />
-          <Text style={s.reviewBannerText}>Account under review — contact hello@clocked.golf</Text>
-        </View>
-      )}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Account under review banner */}
+        {(rounds.filter(r => r.flagged).length >= 3) && (
+          <View style={s.reviewBanner}>
+            <Ionicons name="warning-outline" size={14} color="#C07A6A" style={{ marginRight: 6 }} />
+            <Text style={s.reviewBannerText}>Account under review — contact hello@clocked.golf</Text>
+          </View>
+        )}
 
-      {isCertified && (
-        <View style={s.certifiedBanner}>
-          <Ionicons name="checkmark-circle" size={13} color="#090F0A" style={{ marginRight: 5 }} />
-          <Text style={s.certifiedBannerText}>CLOCKED CERTIFIED ✓</Text>
-        </View>
-      )}
+        {isCertified && (
+          <View style={s.certifiedBanner}>
+            <Ionicons name="checkmark-circle" size={13} color="#090F0A" style={{ marginRight: 5 }} />
+            <Text style={s.certifiedBannerText}>CLOCKED CERTIFIED</Text>
+          </View>
+        )}
 
-      {/* Clocked Score — simplified single number */}
-      {!isCaddy && !loading && (
-        <View style={s.scoreCard}>
-          <Text style={s.scoreCardLabel}>CLOCKED SCORE</Text>
-          {clockedRating.clockedScore != null ? (
-            <View style={s.scoreCardRow}>
-              <Text style={[s.scoreCardNum, clockedRating.isProvisional && { color: '#7A6E58' }]}>{clockedRating.clockedScore}</Text>
-              <Text style={s.scoreCardMax}>/100</Text>
+        {/* Hero score section */}
+        {!isCaddy && !loading && (
+          <View style={s.heroScore}>
+            <Text style={s.heroLabel}>CLOCKED SCORE</Text>
+            <View style={s.heroRow}>
+              <Text style={s.heroNum}>
+                {clockedRating.clockedScore ?? '\u2014'}
+              </Text>
+              {clockedRating.clockedScore != null && (
+                <Text style={s.heroMax}>/100</Text>
+              )}
+              {clockedRating.isProvisional && (
+                <View style={s.heroProv}>
+                  <Text style={s.heroProvText}>PROVISIONAL</Text>
+                </View>
+              )}
             </View>
+
+            {/* Progress bar */}
+            <View style={s.heroBarTrack}>
+              <View style={[s.heroBarFill, { width: `${clockedRating.clockedScore ?? 0}%` }]} />
+            </View>
+
+            {/* Sub-components or provisional hint */}
+            {!clockedRating.isProvisional ? (
+              <View style={s.heroSubRow}>
+                <View>
+                  <Text style={s.heroSubLabel}>SCORING</Text>
+                  <Text style={s.heroSubVal}>
+                    {clockedRating.scoring != null ? Math.round(clockedRating.scoring) : '\u2014'}
+                  </Text>
+                </View>
+                <Text style={s.heroSubDot}>{'\u00B7'}</Text>
+                <View>
+                  <Text style={s.heroSubLabel}>CLOCK</Text>
+                  <Text style={s.heroSubVal}>
+                    {clockedRating.clock != null ? Math.round(clockedRating.clock) : '\u2014'}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={s.heroProvHint}>
+                {clockedRating.roundsUsed === 0
+                  ? 'Play your first round to start building your score'
+                  : `${clockedRating.roundsNeeded} more round${clockedRating.roundsNeeded !== 1 ? 's' : ''} to establish your score`}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Stat chips row */}
+        {!loading && !isCaddy && (
+          <View style={s.statChipsRow}>
+            <View style={s.statChip}>
+              <Text style={s.statChipLabel}>ROUNDS</Text>
+              <Text style={s.statChipNum}>{rounds.filter(r => r.round_format === 'clocked').length}</Text>
+            </View>
+            <View style={[s.statChip, profile?.national_rank && s.statChipGold]}>
+              <Text style={s.statChipLabel}>RANK</Text>
+              <Text style={s.statChipNum}>{profile?.national_rank ? `#${profile.national_rank}` : '\u2014'}</Text>
+            </View>
+            <View style={s.statChip}>
+              <Text style={s.statChipLabel}>FOLLOWING</Text>
+              <Text style={s.statChipNum}>{profile?.following_count ?? '\u2014'}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Best round callout */}
+        {!loading && bestRound && (
+          <View style={s.bestRound}>
+            <View>
+              <Text style={s.bestRoundLabel}>BEST ROUND</Text>
+              <Text style={s.bestRoundCourse}>
+                {bestRound.course_name ?? 'Quick Play'}
+                <Text style={s.bestRoundMeta}>{' \u00B7 '}{bestRound.holes}h</Text>
+              </Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={s.bestRoundScore}>
+                {bestRound.team_score > 0 ? '+' : ''}{bestRound.team_score}
+              </Text>
+              <Text style={s.bestRoundScoreLabel}>team pts</Text>
+            </View>
+          </View>
+        )}
+
+        {/* National Rankings row */}
+        {!isCaddy && (
+          <TouchableOpacity style={s.rankingsRow} onPress={() => navigation.navigate('Leaderboard')} activeOpacity={0.8}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Ionicons name="trophy-outline" size={18} color="#C9A84C" />
+              <Text style={s.rankingsRowText}>National Rankings</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#7A6E58" />
+          </TouchableOpacity>
+        )}
+
+        {/* Recent clocked rounds */}
+        {!loading && (() => {
+          const clockedRounds = rounds.filter(r => r.round_format === 'clocked');
+          return clockedRounds.length > 0 ? (
+            <RecentRoundsList rounds={clockedRounds.slice(0, 8)} navigation={navigation} />
           ) : (
-            <Text style={s.scoreCardEmpty}>Play your first round to earn a score</Text>
-          )}
-          {clockedRating.isProvisional && clockedRating.roundsUsed > 0 && (
-            <View style={s.provBadge}><Text style={s.provText}>PROVISIONAL</Text></View>
-          )}
-        </View>
-      )}
-
-      {/* Stat chips row */}
-      {!loading && !isCaddy && (
-        <View style={s.statChipsRow}>
-          <View style={s.statChip}>
-            <Text style={s.statChipLabel}>ROUNDS</Text>
-            <Text style={s.statChipNum}>{rounds.filter(r => r.round_format === 'clocked').length}</Text>
-          </View>
-          <View style={s.statChip}>
-            <Text style={s.statChipLabel}>RANK</Text>
-            <Text style={s.statChipNum}>{profile?.national_rank ? `#${profile.national_rank}` : '\u2014'}</Text>
-          </View>
-          <View style={s.statChip}>
-            <Text style={s.statChipLabel}>FOLLOWING</Text>
-            <Text style={s.statChipNum}>{profile?.following_count ?? '\u2014'}</Text>
-          </View>
-        </View>
-      )}
-
-      {/* National Rankings row */}
-      {!isCaddy && (
-        <TouchableOpacity style={s.rankingsRow} onPress={() => navigation.navigate('Leaderboard')} activeOpacity={0.8}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Ionicons name="trophy-outline" size={18} color="#C9A84C" />
-            <Text style={s.rankingsRowText}>National Rankings</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#7A6E58" />
-        </TouchableOpacity>
-      )}
-
-      {/* Recent clocked rounds */}
-      {!loading && (() => {
-        const clockedRounds = rounds.filter(r => r.round_format === 'clocked');
-        return clockedRounds.length > 0 ? (
-          <RecentRoundsList rounds={clockedRounds.slice(0, 8)} navigation={navigation} />
-        ) : (
-          <View style={s.emptyRounds}>
-            <Ionicons name="timer-outline" size={32} color="#C9A84C44" />
-            <Text style={s.emptyRoundsText}>No rounds yet — tap PLAY to start</Text>
-          </View>
-        );
-      })()}
+            <View style={s.emptyRounds}>
+              <Ionicons name="timer-outline" size={32} color="#C9A84C44" />
+              <Text style={s.emptyRoundsText}>No rounds yet — tap PLAY to start</Text>
+            </View>
+          );
+        })()}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -1215,21 +1271,36 @@ const s = StyleSheet.create({
   headerIdentity:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, paddingBottom: 16 },
   iconBtn:          { width: 44, height: 44, borderRadius: 22, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
 
-  // Simplified score card
-  scoreCard:        { marginHorizontal: 16, marginVertical: 12, backgroundColor: '#0D1A0F', borderRadius: 18, borderWidth: 1, borderColor: '#C9A84C33', padding: 20, alignItems: 'center' },
-  scoreCardLabel:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 8 },
-  scoreCardRow:     { flexDirection: 'row', alignItems: 'baseline' },
-  scoreCardNum:     { fontSize: 64, fontWeight: '200', color: '#C9A84C', fontVariant: ['tabular-nums'] },
-  scoreCardMax:     { fontSize: 18, fontWeight: '300', color: '#7A6E58', marginLeft: 4 },
-  scoreCardEmpty:   { fontSize: 13, color: '#7A6E58', fontStyle: 'italic' },
-  provBadge:        { marginTop: 8, backgroundColor: '#C9A84C18', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: '#C9A84C33' },
-  provText:         { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+  // Hero score section
+  heroScore:        { backgroundColor: '#0D1A0F', paddingHorizontal: 22, paddingTop: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
+  heroLabel:        { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 8 },
+  heroRow:          { flexDirection: 'row', alignItems: 'baseline', marginBottom: 12 },
+  heroNum:          { fontSize: 72, fontWeight: '200', color: '#C9A84C', fontVariant: ['tabular-nums'], lineHeight: 76 },
+  heroMax:          { fontSize: 22, fontWeight: '300', color: '#7A6E58', marginLeft: 4, marginBottom: 4 },
+  heroProv:         { marginLeft: 12, backgroundColor: '#C9A84C18', borderRadius: 6, borderWidth: 1, borderColor: '#C9A84C33', paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
+  heroProvText:     { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+  heroBarTrack:     { height: 3, backgroundColor: '#1A2E1C', borderRadius: 2, marginBottom: 16 },
+  heroBarFill:      { height: 3, backgroundColor: '#C9A84C', borderRadius: 2 },
+  heroSubRow:       { flexDirection: 'row', gap: 20 },
+  heroSubLabel:     { fontSize: 8, color: '#7A6E58', letterSpacing: 1.5, marginBottom: 2 },
+  heroSubVal:       { fontSize: 16, fontWeight: '600', color: '#F5EDD8' },
+  heroSubDot:       { fontSize: 16, color: '#7A6E58', alignSelf: 'flex-end', marginBottom: 2 },
+  heroProvHint:     { fontSize: 12, color: '#7A6E58', fontStyle: 'italic' },
 
   // Stat chips
-  statChipsRow:     { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingHorizontal: 16, marginBottom: 12 },
+  statChipsRow:     { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   statChip:         { alignItems: 'center', flex: 1 },
+  statChipGold:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 10, paddingVertical: 6 },
   statChipLabel:    { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
   statChipNum:      { fontSize: 20, fontWeight: '300', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
+
+  // Best round
+  bestRound:        { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#C9A84C22', paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  bestRoundLabel:   { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
+  bestRoundCourse:  { fontSize: 15, fontWeight: '600', color: '#F5EDD8' },
+  bestRoundMeta:    { fontSize: 12, color: '#7A6E58' },
+  bestRoundScore:   { fontSize: 24, fontWeight: '700', color: '#7DC87A' },
+  bestRoundScoreLabel: { fontSize: 9, color: '#7A6E58' },
 
   // Rankings row
   rankingsRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginBottom: 14, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, paddingHorizontal: 16 },

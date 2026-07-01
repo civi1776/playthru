@@ -35,7 +35,7 @@ function resultText(round) {
 }
 
 function resultLabel(round) {
-  return round.round_format === 'clocked' ? 'team pts' : 'pace';
+  return round.round_format === 'clocked' ? 'PTS' : 'pace';
 }
 
 function formatLabel(round) {
@@ -78,11 +78,11 @@ export default function RecentRoundsList({ rounds, navigation, limit = 10 }) {
 const s = StyleSheet.create({
   container:  { paddingHorizontal: 16, marginBottom: 8 },
   header:     { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 8 },
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A18', padding: 10, marginBottom: 6 },
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0D1A0F', borderRadius: 10, borderWidth: 1, borderColor: '#7DC87A18', borderLeftWidth: 3, borderLeftColor: '#C9A84C', padding: 10, marginBottom: 6 },
   info:       { flex: 1 },
   course:     { fontSize: 13, fontWeight: '500', color: '#F5EDD8', marginBottom: 2 },
   meta:       { fontSize: 10, color: '#B8A882' },
   resultCol:  { alignItems: 'flex-end', minWidth: 44 },
-  resultNum:  { fontSize: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  resultLabel:{ fontSize: 7, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginTop: 1 },
+  resultNum:  { fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  resultLabel:{ fontSize: 9, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginTop: 1 },
 });
