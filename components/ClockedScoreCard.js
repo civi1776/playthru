@@ -32,7 +32,7 @@ function Bar({ value, color }) {
 
 // ─── Full Card (You tab headline) ────────────────────────────────────────────
 
-export default function ClockedScoreCard({ clockedScore, game, teammate, isProvisional, roundsUsed, roundsNeeded }) {
+export default function ClockedScoreCard({ clockedScore, scoring, clock, isProvisional, roundsUsed, roundsNeeded }) {
   const hasScore = clockedScore != null;
   const displayScore = hasScore ? String(clockedScore) : '\u2014';
 
@@ -58,30 +58,30 @@ export default function ClockedScoreCard({ clockedScore, game, teammate, isProvi
 
       {/* Sub-stats */}
       <View style={s.statsRow}>
-        {/* GAME */}
+        {/* SCORING */}
         <View style={s.statCol}>
           <View style={s.statHeader}>
-            <Text style={s.statLabel}>GAME</Text>
-            <Text style={[s.statValue, { color: scoreColor(game) }]}>
-              {game != null ? Math.round(game) : '\u2014'}
+            <Text style={s.statLabel}>SCORING</Text>
+            <Text style={[s.statValue, { color: scoreColor(scoring) }]}>
+              {scoring != null ? Math.round(scoring) : '\u2014'}
             </Text>
           </View>
-          <Bar value={game} color={scoreColor(game)} />
-          <Text style={s.statDesc}>Sport skill</Text>
+          <Bar value={scoring} color={scoreColor(scoring)} />
+          <Text style={s.statDesc}>Avg points per hole</Text>
         </View>
 
         <View style={s.statDivider} />
 
-        {/* TEAMMATE */}
+        {/* CLOCK */}
         <View style={s.statCol}>
           <View style={s.statHeader}>
-            <Text style={s.statLabel}>TEAMMATE</Text>
-            <Text style={[s.statValue, { color: scoreColor(teammate) }]}>
-              {teammate != null ? Math.round(teammate) : '\u2014'}
+            <Text style={s.statLabel}>CLOCK</Text>
+            <Text style={[s.statValue, { color: scoreColor(clock) }]}>
+              {clock != null ? Math.round(clock) : '\u2014'}
             </Text>
           </View>
-          <Bar value={teammate} color={scoreColor(teammate)} />
-          <Text style={s.statDesc}>Partnership value</Text>
+          <Bar value={clock} color={scoreColor(clock)} />
+          <Text style={s.statDesc}>% holes under time par</Text>
         </View>
       </View>
 
@@ -99,7 +99,7 @@ export default function ClockedScoreCard({ clockedScore, game, teammate, isProvi
 
 // ─── Compact Card (for use in lists / share previews) ────────────────────────
 
-export function ClockedScoreCardCompact({ clockedScore, game, teammate, isProvisional, playerName }) {
+export function ClockedScoreCardCompact({ clockedScore, scoring, clock, isProvisional, playerName }) {
   return (
     <View style={sc.card}>
       <View style={sc.top}>
@@ -110,9 +110,9 @@ export function ClockedScoreCardCompact({ clockedScore, game, teammate, isProvis
         {clockedScore != null ? clockedScore : '\u2014'}
       </Text>
       <View style={sc.stats}>
-        <Text style={sc.stat}>G {game != null ? Math.round(game) : '\u2014'}</Text>
+        <Text style={sc.stat}>S {scoring != null ? Math.round(scoring) : '\u2014'}</Text>
         <Text style={sc.dot}>{'\u00B7'}</Text>
-        <Text style={sc.stat}>T {teammate != null ? Math.round(teammate) : '\u2014'}</Text>
+        <Text style={sc.stat}>C {clock != null ? Math.round(clock) : '\u2014'}</Text>
       </View>
     </View>
   );

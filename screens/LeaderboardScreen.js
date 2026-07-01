@@ -64,9 +64,9 @@ function ClockedRow({ entry, navigation }) {
       <View style={s.rowInfo}>
         <Text style={[s.rowName, isYou && { color: '#C9A84C' }]} numberOfLines={1}>{entry.name}</Text>
         <View style={s.rowSubStats}>
-          <Text style={s.rowSubStat}>G {entry.game != null ? Math.round(entry.game) : '\u2014'}</Text>
+          <Text style={s.rowSubStat}>S {entry.scoring != null ? Math.round(entry.scoring) : '\u2014'}</Text>
           <Text style={s.rowSubDot}>{'\u00B7'}</Text>
-          <Text style={s.rowSubStat}>T {entry.teammate != null ? Math.round(entry.teammate) : '\u2014'}</Text>
+          <Text style={s.rowSubStat}>C {entry.clock != null ? Math.round(entry.clock) : '\u2014'}</Text>
           {entry.roundsUsed != null && <Text style={s.rowRoundsLabel}>{'\u00B7'} {entry.roundsUsed}r</Text>}
         </View>
       </View>
@@ -255,14 +255,14 @@ export default function LeaderboardScreen({ navigation }) {
           const key = r._playerKey ?? playerName;
           return extractPlayerRoundStats(r.hole_scores, key);
         }).filter(Boolean);
-        const rating = computeFullRating({ roundStats, startedRounds: rounds.length, handicapIndex: prof?.handicap_index });
+        const rating = computeFullRating({ roundStats, handicapIndex: prof?.handicap_index });
         return { userId, name: playerName, handle: prof?.username ? `@${prof.username}` : '', avatarUrl: prof?.avatar_url, rating, isYou: userId === uid };
       }).filter(e => e.rating.clockedScore != null);
 
       // Sort key
-      const getKey = sortKey === 'GAME' ? 'game' : sortKey === 'TEAMMATE' ? 'teammate' : 'clockedScore';
+      const getKey = sortKey === 'SCORING' ? 'scoring' : sortKey === 'CLOCK' ? 'clock' : 'clockedScore';
       const getSortVal = (e) => e.rating[getKey] ?? 0;
-      const sortLabel = sortKey === 'GAME' ? 'GAME' : sortKey === 'TEAMMATE' ? 'TEAM' : 'CLK';
+      const sortLabel = sortKey === 'SCORING' ? 'SCORE' : sortKey === 'CLOCK' ? 'CLOCK' : 'CLK';
 
       // Separate established from provisional
       const established = allEntries.filter(e => !e.rating.isProvisional);
@@ -274,7 +274,7 @@ export default function LeaderboardScreen({ navigation }) {
       const rows = established.slice(0, 50).map((e, i) => ({
         rank: i + 1, userId: e.userId, name: e.name, handle: e.handle,
         sortVal: getSortVal(e), sortLabel,
-        clockedScore: e.rating.clockedScore, game: e.rating.game, teammate: e.rating.teammate,
+        clockedScore: e.rating.clockedScore, scoring: e.rating.scoring, clock: e.rating.clock,
         roundsUsed: e.rating.roundsUsed, avatarUrl: e.avatarUrl, isYou: e.isYou,
       }));
 

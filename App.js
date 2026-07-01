@@ -104,9 +104,10 @@ const RootStack = createNativeStackNavigator();
 
 // ─── Tab bar ─────────────────────────────────────────────────────────────────
 const PLAYER_TABS = [
-  { name: 'Feed',        icon: 'flash-outline',  label: 'FEED' },
-  { name: 'Play',        icon: 'timer-outline',  label: 'PLAY', isPlay: true },
-  { name: 'You',         icon: 'person-outline',  label: 'YOU' },
+  { name: 'Feed',  icon: 'flash-outline',  label: 'FEED' },
+  { name: 'Rules', icon: 'book-outline',   label: 'RULES' },
+  { name: 'Play',  icon: 'timer-outline',  label: 'PLAY', isPlay: true },
+  { name: 'You',   icon: 'person-outline', label: 'YOU' },
 ];
 const CADDY_TABS = [
   { name: 'Home',        icon: 'shield-outline', label: 'HUB' },
@@ -275,9 +276,10 @@ function MainApp() {
           tabBar={props => <BottomNav {...props} />}
           screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
         >
-          <Tab.Screen name="Feed"        component={FeedScreen} />
-          <Tab.Screen name="Play"        component={FeedScreen} />
-          <Tab.Screen name="You"         component={ProfileScreen} />
+          <Tab.Screen name="Feed"  component={FeedScreen} />
+          <Tab.Screen name="Rules" component={RulesScreen} />
+          <Tab.Screen name="Play"  component={FeedScreen} />
+          <Tab.Screen name="You"   component={ProfileScreen} />
           {/* Hidden: reachable via navigate() from stack, no visible tab */}
           <Tab.Screen name="Log"         component={LogScreen} />
         </Tab.Navigator>
@@ -545,7 +547,8 @@ function AppNavigator() {
         <RootStack.Screen name="Paywall"        component={PaywallScreen} />
         <RootStack.Screen name="Notifications"  component={NotificationCenterScreen} />
         <RootStack.Screen name="Onboarding"     component={OnboardingScreen} />
-        <RootStack.Screen name="RulesScreen"    component={RulesScreen} />
+        <RootStack.Screen name="RulesScreen" component={RulesScreen}
+          options={{ headerShown: true, headerTitle: '', headerStyle: { backgroundColor: '#090F0A' }, headerTintColor: '#C9A84C', headerShadowVisible: false }} />
         <RootStack.Screen name="Leaderboard"   component={LeaderboardScreen} />
         <RootStack.Screen name="ClockedSetup"   component={ClockedSetupScreen} />
         <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} />

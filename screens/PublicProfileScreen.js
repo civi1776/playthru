@@ -111,7 +111,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [activityItems, setActivityItems]   = useState([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [challengerBestScore, setChallengerBestScore] = useState(null);
-  const [clockedRating, setClockedRating] = useState({ clockedScore: null, game: null, teammate: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
+  const [clockedRating, setClockedRating] = useState({ clockedScore: null, scoring: null, clock: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
 
   useEffect(() => {
     const load = async () => {
@@ -148,7 +148,6 @@ export default function PublicProfileScreen({ navigation, route }) {
         .filter(Boolean);
       const rating = computeFullRating({
         roundStats,
-        startedRounds: clockedRounds.length,
         handicapIndex: profileData?.handicap_index,
       });
       setClockedRating(rating);
@@ -361,8 +360,8 @@ export default function PublicProfileScreen({ navigation, route }) {
         {!isCaddy && (
           <ClockedScoreCard
             clockedScore={clockedRating.clockedScore}
-            game={clockedRating.game}
-            teammate={clockedRating.teammate}
+            scoring={clockedRating.scoring}
+            clock={clockedRating.clock}
             isProvisional={clockedRating.isProvisional}
             roundsUsed={clockedRating.roundsUsed}
             roundsNeeded={clockedRating.roundsNeeded}

@@ -995,7 +995,7 @@ export default function ProfileScreen({ navigation }) {
   const [rounds, setRounds]     = useState([]);
   const [roundCount, setRoundCount] = useState(0);
   const [stats, setStats]       = useState({});
-  const [clockedRating, setClockedRating] = useState({ clockedScore: null, game: null, teammate: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
+  const [clockedRating, setClockedRating] = useState({ clockedScore: null, scoring: null, clock: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
 
   useEffect(() => {
     if (!user) navigation.replace('Welcome');
@@ -1075,7 +1075,6 @@ export default function ProfileScreen({ navigation }) {
         .filter(Boolean);
       const rating = computeFullRating({
         roundStats,
-        startedRounds: allClockedRounds.length,
         handicapIndex: profile?.handicap_index,
       });
       setClockedRating(rating);
