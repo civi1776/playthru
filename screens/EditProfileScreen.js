@@ -102,11 +102,10 @@ export default function EditProfileScreen({ navigation }) {
         return;
       }
 
-      const finalUrl = `${publicUrl}?t=${Date.now()}`;
-      await supabase.from('profiles').update({ avatar_url: finalUrl }).eq('id', authUser.id);
-      setAvatarUrl(finalUrl);
+      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', authUser.id);
+      setAvatarUrl(publicUrl);
       await refreshProfile();
-      console.log('AVATAR_UPLOAD_SUCCESS', { filePath, finalUrl });
+      console.log('AVATAR_UPLOAD_SUCCESS', { filePath, publicUrl });
     } catch (e) {
       console.log('AVATAR_UPLOAD_CATCH', e?.message);
       Alert.alert('Error', 'Could not upload photo.');
