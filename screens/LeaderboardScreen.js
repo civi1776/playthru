@@ -4,9 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import SkeletonLoader from '../components/SkeletonLoader';
-import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
-import { ClockedScoreCardCompact } from '../components/ClockedScoreCard';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { computeFullRating, extractPlayerRoundStats, DEFAULT_PROVISIONAL_ROUNDS } from '../lib/clockedRating';
@@ -32,13 +30,7 @@ function LeaderboardSkeleton() {
   );
 }
 
-// ─── Color helpers ───────────────────────────────────────────────────────────
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
-  return '#C07A6A';
-}
-
+// ─── Color helper ───────────────────────────────────────────────────────────
 function clockedColor(v) {
   if (v == null) return '#7A6E58';
   if (v >= 70) return '#7DC87A';
@@ -46,7 +38,7 @@ function clockedColor(v) {
   return '#B8A882';
 }
 
-// ─── Clocked Row (uses ClockedScoreCardCompact layout inline) ────────────────
+// ─── Clocked Row ────────────────────────────────────────────────────────────
 function ClockedRow({ entry, navigation }) {
   const isYou = entry.isYou;
   const tappable = entry.userId && !isYou;
@@ -80,82 +72,19 @@ function ClockedRow({ entry, navigation }) {
   );
 }
 
-// ─── Pace Row (existing) ─────────────────────────────────────────────────────
-function PaceRow({ entry, navigation }) {
-  const isYou = entry.isYou;
-  const tappable = entry.courseData || (entry.userId && !isYou);
-  const Wrapper = tappable ? TouchableOpacity : View;
-  const onPress = entry.courseData
-    ? () => navigation?.navigate('CourseProfile', { course: entry.courseData })
-    : () => navigation?.navigate('PublicProfile', { userId: entry.userId });
-  return (
-    <Wrapper style={[s.row, isYou && s.rowYou]} onPress={tappable ? onPress : undefined} activeOpacity={0.8}>
-      <Text style={s.rowRank}>#{entry.rank}</Text>
-      <View style={[s.rowAvatar, isYou && { borderColor: '#C9A84C' }]}>
-        {entry.isCourse
-          ? <CourseAvatar courseName={entry.name} size={34} />
-          : <InitialsAvatar name={entry.name} size={34} />
-        }
-      </View>
-      <View style={s.rowInfo}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={[s.rowName, isYou && { color: '#C9A84C' }]} numberOfLines={1}>{entry.name}</Text>
-          {entry.isCaddy && <View style={s.caddyBadge}><Text style={s.caddyBadgeText}>CADDY</Text></View>}
-        </View>
-        <Text style={s.rowHandle}>{entry.handle}</Text>
-      </View>
-      <View style={s.rowRight}>
-        <Text style={[s.rowScore, { color: popColor(entry.pop) }]}>{entry.pop?.toFixed(1) ?? '\u2014'}</Text>
-      </View>
-    </Wrapper>
-  );
-}
-
-// ─── Ambassador Row ──────────────────────────────────────────────────────────
-function AmbassadorRow({ entry, navigation }) {
-  const tappable = entry.userId && !entry.isYou;
-  const Wrapper = tappable ? TouchableOpacity : View;
-  return (
-    <Wrapper style={[s.row, entry.isYou && s.rowYou]}
-      onPress={tappable ? () => navigation?.navigate('PublicProfile', { userId: entry.userId }) : undefined}
-      activeOpacity={0.8}>
-      <Text style={s.rowRank}>#{entry.rank}</Text>
-      <View style={[s.rowAvatar, entry.isYou && { borderColor: '#C9A84C' }]}>
-        <InitialsAvatar name={entry.name} size={34} avatarUrl={entry.avatarUrl} />
-      </View>
-      <View style={s.rowInfo}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={[s.rowName, entry.isYou && { color: '#C9A84C' }]} numberOfLines={1}>{entry.name}</Text>
-          <View style={s.ambassadorBadge}><Text style={s.ambassadorBadgeText}>AMB</Text></View>
-        </View>
-        <Text style={s.rowHandle}>
-          {entry.roundsOperated} rounds operated {'\u00B7'} {entry.playersReferred} referred
-        </Text>
-      </View>
-      <View style={s.rowRight}>
-        <Text style={[s.rowScore, { color: '#C9A84C' }]}>{entry.score}</Text>
-        <Text style={s.rowScoreLabel}>PTS</Text>
-      </View>
-    </Wrapper>
-  );
-}
-
-// ─── Board configs ───────────────────────────────────────────────────────────
-const CLOCKED_FILTERS = ['OVERALL', 'COURSE'];
-const PACE_FILTERS    = ['GLOBAL', 'FRIENDS', 'COURSE', 'CADDIES'];
+// ─── Filters ─────────────────────────────────────────────────────────────────
+const FILTERS = ['OVERALL', 'COURSE'];
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function LeaderboardScreen({ navigation }) {
   const { session, profile } = useAuth();
   const uid = session?.user?.id ?? null;
-  const isCaddy = profile?.account_type === 'caddy';
 
-  const [board, setBoard]       = useState('CLOCKED');
   const [filter, setFilter]     = useState('OVERALL');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(false);
   const [data, setData]         = useState([]);
-  const [myProjected, setMyProjected] = useState(null); // provisional user's projected rank
+  const [myProjected, setMyProjected] = useState(null);
   const [myRank, setMyRank]     = useState(null);
 
   // Per-course selector state
@@ -165,17 +94,8 @@ export default function LeaderboardScreen({ navigation }) {
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
-  const boardRef = useRef(board);
-  boardRef.current = board;
 
-  const switchBoard = (b) => {
-    setBoard(b);
-    setFilter(b === 'CLOCKED' ? 'OVERALL' : 'GLOBAL');
-    setSelectedCourse(null);
-    setCourseQuery('');
-  };
-
-  // ── Course search for per-course board ──
+  // ── Course search ──
   useEffect(() => {
     if (filter !== 'COURSE' || courseQuery.trim().length < 2) { setCourseResults([]); return; }
     const t = setTimeout(async () => {
@@ -189,14 +109,14 @@ export default function LeaderboardScreen({ navigation }) {
     return () => clearTimeout(t);
   }, [courseQuery, filter]);
 
-  // ── Fetch clocked boards ──
-  const fetchClockedBoard = useCallback(async (sortKey, course) => {
+  // ── Fetch clocked board ──
+  const fetchBoard = useCallback(async (sortKey, course) => {
     setLoading(true);
     setError(false);
     try {
       let query = supabase
         .from('rounds')
-        .select('user_id, hole_scores, course_name')
+        .select('id, user_id, hole_scores, course_name')
         .eq('round_format', 'clocked')
         .eq('flagged', false)
         .not('hole_scores', 'is', null);
@@ -259,10 +179,9 @@ export default function LeaderboardScreen({ navigation }) {
         return { userId, name: playerName, handle: prof?.username ? `@${prof.username}` : '', avatarUrl: prof?.avatar_url, rating, isYou: userId === uid };
       }).filter(e => e.rating.clockedScore != null);
 
-      // Sort key
-      const getKey = sortKey === 'SCORING' ? 'scoring' : sortKey === 'CLOCK' ? 'clock' : 'clockedScore';
-      const getSortVal = (e) => e.rating[getKey] ?? 0;
-      const sortLabel = sortKey === 'SCORING' ? 'SCORE' : sortKey === 'CLOCK' ? 'CLOCK' : 'CLK';
+      // Sort by clockedScore
+      const getSortVal = (e) => e.rating.clockedScore ?? 0;
+      const sortLabel = 'CLK';
 
       // Separate established from provisional
       const established = allEntries.filter(e => !e.rating.isProvisional);
@@ -304,143 +223,21 @@ export default function LeaderboardScreen({ navigation }) {
     }
   }, [uid]);
 
-  // ── Fetch pace boards (existing logic, unchanged) ──
-  const fetchPaceBoard = useCallback(async (tab) => {
-    setLoading(true);
-    setError(false);
-    setMyProjected(null);
-    try {
-      let rows = [];
-      let rankVal = null;
-
-      if (tab === 'GLOBAL') {
-        const { data: profiles, error: err } = await supabase
-          .from('profiles').select('id, full_name, username, pop_score')
-          .eq('account_type', 'golfer').not('pop_score', 'is', null)
-          .order('pop_score', { ascending: false }).limit(25);
-        if (err) throw err;
-        rows = (profiles || []).map((p, i) => ({
-          rank: i + 1, userId: p.id, name: p.full_name || p.username || 'Player',
-          handle: p.username ? `@${p.username}` : '', pop: p.pop_score, isYou: p.id === uid,
-        }));
-        if (uid) {
-          const { data: me } = await supabase.from('profiles').select('pop_score').eq('id', uid).maybeSingle();
-          if (me?.pop_score != null) {
-            const { count } = await supabase.from('profiles').select('id', { count: 'exact', head: true })
-              .eq('account_type', 'golfer').gt('pop_score', me.pop_score);
-            rankVal = (count ?? 0) + 1;
-          }
-        }
-      } else if (tab === 'FRIENDS') {
-        if (!uid) { setData([]); setMyRank(null); setLoading(false); return; }
-        const { data: follows } = await supabase.from('follows')
-          .select('following_id, profiles!follows_following_id_fkey(id, full_name, username, pop_score)')
-          .eq('follower_id', uid);
-        const friends = (follows || []).map(f => f.profiles).filter(Boolean);
-        const { data: me } = await supabase.from('profiles').select('id, full_name, username, pop_score').eq('id', uid).maybeSingle();
-        const all = me ? [me, ...friends] : [...friends];
-        all.sort((a, b) => (parseFloat(b.pop_score) || 0) - (parseFloat(a.pop_score) || 0));
-        rows = all.map((p, i) => ({
-          rank: i + 1, userId: p.id, name: p.full_name || p.username || 'Player',
-          handle: p.username ? `@${p.username}` : '', pop: p.pop_score, isYou: p.id === uid,
-        }));
-        rankVal = rows.find(r => r.isYou)?.rank ?? null;
-      } else if (tab === 'COURSE') {
-        const { data: courseData } = await supabase.from('courses')
-          .select('id, name, city, state, pop_score, total_rounds, avg_time')
-          .gt('total_rounds', 0).not('pop_score', 'is', null)
-          .order('pop_score', { ascending: false, nullsFirst: false }).limit(50);
-        rows = (courseData || []).map((c, i) => ({
-          rank: i + 1, name: c.name, isCourse: true, courseData: c,
-          handle: [c.city, c.state].filter(Boolean).join(', ') + (c.total_rounds ? ` \u00B7 ${c.total_rounds} rounds` : ''),
-          pop: parseFloat(c.pop_score), isYou: false,
-        }));
-      } else if (tab === 'CADDIES') {
-        const { data: profiles } = await supabase.from('profiles')
-          .select('id, full_name, username, caddy_rating, caddy_course')
-          .eq('account_type', 'caddy').not('caddy_rating', 'is', null)
-          .order('caddy_rating', { ascending: false }).limit(25);
-        rows = (profiles || []).map((p, i) => ({
-          rank: i + 1, userId: p.id, name: p.full_name || p.username || 'Caddy',
-          handle: p.username ? `@${p.username}` : '', pop: p.caddy_rating,
-          course: p.caddy_course, isYou: p.id === uid, isCaddy: true,
-        }));
-      }
-
-      setData(rows);
-      setMyRank(rankVal);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [uid]);
-
-  // ── Fetch ambassador board ──
-  const fetchAmbassadorBoard = useCallback(async () => {
-    setLoading(true);
-    setError(false);
-    setMyProjected(null);
-    try {
-      // Count rounds operated per caddy
-      const { data: caddyRounds } = await supabase
-        .from('rounds')
-        .select('caddy_id')
-        .eq('round_format', 'clocked')
-        .not('caddy_id', 'is', null);
-
-      const roundCounts = {};
-      (caddyRounds ?? []).forEach(r => { roundCounts[r.caddy_id] = (roundCounts[r.caddy_id] ?? 0) + 1; });
-
-      // Fetch caddy profiles with referral stats
-      const { data: caddies } = await supabase
-        .from('profiles')
-        .select('id, full_name, username, referral_count, caddy_course')
-        .eq('account_type', 'caddy');
-
-      const entries = (caddies ?? []).map(c => ({
-        userId: c.id,
-        name: c.full_name || c.username || 'Ambassador',
-        handle: c.username ? `@${c.username}` : '',
-        roundsOperated: roundCounts[c.id] ?? 0,
-        playersReferred: c.referral_count ?? 0,
-        course: c.caddy_course,
-        score: (roundCounts[c.id] ?? 0) + (c.referral_count ?? 0), // activity score
-        isYou: c.id === uid,
-        isAmbassador: true,
-      }));
-
-      entries.sort((a, b) => b.score - a.score);
-      const rows = entries.slice(0, 25).map((e, i) => ({ ...e, rank: i + 1 }));
-
-      setData(rows);
-      setMyRank(rows.find(r => r.isYou)?.rank ?? null);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [uid]);
-
   // ── Fetch dispatch ──
-  const fetchForCurrentState = useCallback((f, c) => {
-    if (board === 'CLOCKED') {
-      if (f === 'AMBASS.') return fetchAmbassadorBoard();
-      if (f === 'COURSE' && !c) return;
-      return fetchClockedBoard(f, c);
-    }
-    return fetchPaceBoard(f);
-  }, [board, fetchClockedBoard, fetchPaceBoard, fetchAmbassadorBoard]);
+  useEffect(() => {
+    if (filter === 'COURSE' && !selectedCourse) return;
+    fetchBoard(filter, selectedCourse);
+  }, [filter, selectedCourse]);
 
-  useEffect(() => { fetchForCurrentState(filter, selectedCourse); }, [filter, board, selectedCourse]);
-  useFocusEffect(useCallback(() => { fetchForCurrentState(filterRef.current, selectedCourse); }, []));
+  useFocusEffect(useCallback(() => {
+    if (filterRef.current === 'COURSE' && !selectedCourse) return;
+    fetchBoard(filterRef.current, selectedCourse);
+  }, []));
 
   useEffect(() => { if (!session) navigation.replace('Welcome'); }, [session]);
 
   const isEmpty = !loading && !error && data.length === 0;
-  const isClocked = board === 'CLOCKED';
-  const activeFilters = isClocked && !isCaddy ? CLOCKED_FILTERS : PACE_FILTERS;
-  const showCourseSearch = isClocked && filter === 'COURSE';
+  const showCourseSearch = filter === 'COURSE';
 
   return (
     <SafeAreaView style={s.container}>
@@ -453,21 +250,9 @@ export default function LeaderboardScreen({ navigation }) {
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Board switcher */}
-      {!isCaddy && (
-        <View style={s.boardRow}>
-          {['CLOCKED', 'PACE'].map(b => (
-            <TouchableOpacity key={b} style={[s.boardBtn, board === b && s.boardBtnActive]}
-              onPress={() => switchBoard(b)} activeOpacity={0.7}>
-              <Text style={[s.boardText, board === b && s.boardTextActive]}>{b}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Sub-filters */}
+      {/* Filters */}
       <View style={s.filterRow}>
-        {activeFilters.map(f => (
+        {FILTERS.map(f => (
           <TouchableOpacity key={f} style={[s.filterBtn, filter === f && s.filterBtnActive]}
             onPress={() => { setFilter(f); if (f !== 'COURSE') { setSelectedCourse(null); setCourseQuery(''); } }}>
             <Text style={[s.filterText, filter === f && s.filterTextActive]}>{f}</Text>
@@ -475,7 +260,7 @@ export default function LeaderboardScreen({ navigation }) {
         ))}
       </View>
 
-      {/* Course search (per-course clocked board) */}
+      {/* Course search */}
       {showCourseSearch && (
         <View style={s.courseSearchWrap}>
           <TextInput
@@ -517,55 +302,37 @@ export default function LeaderboardScreen({ navigation }) {
         <View style={s.emptyState}>
           <Ionicons name="cloud-offline-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
           <Text style={s.emptyText}>Could not load rankings.</Text>
-          <TouchableOpacity style={s.ctaBtn} onPress={() => {
-            if (isClocked) fetchClockedBoard(filter, selectedCourse);
-            else fetchPaceBoard(filter);
-          }} activeOpacity={0.8}>
+          <TouchableOpacity style={s.ctaBtn} onPress={() => fetchBoard(filter, selectedCourse)} activeOpacity={0.8}>
             <Text style={s.ctaBtnText}>RETRY</Text>
           </TouchableOpacity>
         </View>
       ) : isEmpty ? (
         <View style={s.emptyState}>
           <Ionicons name="trophy-outline" size={56} color="rgba(201,168,76,0.2)" style={{ marginBottom: 18 }} />
-          {isClocked ? (
-            <>
-              <Text style={s.emptyTitle}>Be the first.</Text>
-              <Text style={s.emptyText}>No one's ranked here yet. Play a round and claim the top spot.</Text>
-              <TouchableOpacity style={s.ctaBtn} onPress={() => {
-                const root = navigation.getParent();
-                if (root) root.navigate('ClockedSetup');
-                else navigation.navigate('ClockedSetup');
-              }} activeOpacity={0.85}>
-                <Ionicons name="timer-outline" size={16} color="#090F0A" style={{ marginRight: 6 }} />
-                <Text style={s.ctaBtnText}>PLAY</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={s.emptyText}>
-                {filter === 'FRIENDS' ? 'Follow players to see their rankings.' : 'No data yet.'}
-              </Text>
-              {filter === 'FRIENDS' && (
-                <TouchableOpacity style={s.ctaBtn} onPress={() => navigation?.navigate('SearchUsers')} activeOpacity={0.8}>
-                  <Text style={s.ctaBtnText}>FIND PLAYERS</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
+          <Text style={s.emptyTitle}>Be the first.</Text>
+          <Text style={s.emptyText}>No one's ranked here yet. Play a round and claim the top spot.</Text>
+          <TouchableOpacity style={s.ctaBtn} onPress={() => {
+            const root = navigation.getParent();
+            if (root) root.navigate('ClockedSetup');
+            else navigation.navigate('ClockedSetup');
+          }} activeOpacity={0.85}>
+            <Ionicons name="timer-outline" size={16} color="#090F0A" style={{ marginRight: 6 }} />
+            <Text style={s.ctaBtnText}>PLAY</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
 
           {/* Your rank card */}
-          {isClocked && myRank != null && (
+          {myRank != null && (
             <View style={s.yourRankCard}>
-              <Text style={s.yourRankLabel}>YOUR RANK</Text>
+              <Text style={s.yourRankLabel}>YOUR GLOBAL RANK</Text>
               <Text style={s.yourRankValue}>#{myRank}</Text>
             </View>
           )}
 
           {/* Provisional projection */}
-          {isClocked && myProjected && (
+          {myProjected && (
             <View style={s.provCard}>
               <Text style={s.provCardLabel}>YOUR PROJECTED RANK</Text>
               <Text style={s.provCardValue}>~#{myProjected.projectedRank}</Text>
@@ -575,22 +342,12 @@ export default function LeaderboardScreen({ navigation }) {
             </View>
           )}
 
-          {!isClocked && myRank != null && (
-            <View style={s.yourRankCard}>
-              <Text style={s.yourRankLabel}>{filter === 'FRIENDS' ? 'YOUR RANK AMONG FRIENDS' : 'YOUR GLOBAL RANK'}</Text>
-              <Text style={s.yourRankValue}>#{myRank}</Text>
-            </View>
-          )}
-
           {/* Rows */}
           <View style={s.listSection}>
             <Text style={s.sectionLabel}>RANKINGS</Text>
-            {data.map((entry, i) => entry.isAmbassador
-              ? <AmbassadorRow key={entry.userId ?? i} entry={entry} navigation={navigation} />
-              : isClocked
-              ? <ClockedRow key={entry.userId ?? i} entry={entry} navigation={navigation} />
-              : <PaceRow key={entry.userId ?? entry.name + i} entry={entry} navigation={navigation} />
-            )}
+            {data.map((entry, i) => (
+              <ClockedRow key={entry.userId ?? i} entry={entry} navigation={navigation} />
+            ))}
           </View>
         </ScrollView>
       )}
@@ -603,13 +360,6 @@ const s = StyleSheet.create({
   container:     { flex: 1, backgroundColor: '#090F0A' },
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
   wordmark:      { fontSize: 24, fontWeight: '300', color: '#F5EDD8', fontFamily: 'Georgia' },
-
-  // Board switcher
-  boardRow:       { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 8 },
-  boardBtn:       { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  boardBtnActive: { borderBottomColor: '#C9A84C' },
-  boardText:      { fontSize: 12, fontWeight: '700', color: '#7A6E58', letterSpacing: 2 },
-  boardTextActive:{ color: '#C9A84C' },
 
   // Filters
   filterRow:       { flexDirection: 'row', paddingHorizontal: 16, gap: 6, marginBottom: 8 },
@@ -628,14 +378,13 @@ const s = StyleSheet.create({
   courseSelectedChip:{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
   courseSelectedText:{ fontSize: 12, fontWeight: '600', color: '#C9A84C' },
 
-  // Rows (shared)
+  // Rows
   row:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, gap: 10 },
   rowYou:       { borderColor: '#C9A84C44', backgroundColor: '#C9A84C0A' },
   rowRank:      { fontSize: 12, fontWeight: '700', color: '#B8A882', width: 28 },
   rowAvatar:    { width: 36, height: 36, borderRadius: 18, backgroundColor: '#7DC87A11', borderWidth: 1, borderColor: '#7DC87A33', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   rowInfo:      { flex: 1 },
   rowName:      { fontSize: 14, fontWeight: '500', color: '#F5EDD8' },
-  rowHandle:    { fontSize: 10, color: '#B8A88288', marginTop: 2 },
   rowRight:     { alignItems: 'flex-end', minWidth: 40 },
   rowScore:     { fontSize: 22, fontWeight: '300', fontVariant: ['tabular-nums'] },
   rowScoreLabel:{ fontSize: 7, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginTop: 1 },
@@ -667,10 +416,4 @@ const s = StyleSheet.create({
   emptyText:     { fontSize: 15, color: '#7A6E58', textAlign: 'center', lineHeight: 22, marginBottom: 20 },
   ctaBtn:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#C9A84C', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
   ctaBtnText:    { fontSize: 12, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
-
-  // Caddy badge
-  caddyBadge:    { backgroundColor: '#C9A84C', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  caddyBadgeText:{ fontSize: 7, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
-  ambassadorBadge:    { backgroundColor: '#7DC87A', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  ambassadorBadgeText:{ fontSize: 7, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
 });

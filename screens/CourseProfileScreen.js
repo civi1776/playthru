@@ -152,7 +152,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     if (initialCourse.id != null) {
       const { data } = await supabase
         .from('courses')
-        .select('id, name, city, state, par, pop_score, total_rounds, description, website')
+        .select('id, name, city, state, par, pop_score, total_rounds, avg_time, description, website')
         .eq('id', initialCourse.id)
         .maybeSingle();
       course = data;
@@ -160,7 +160,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     if (!course && initialCourse.name) {
       const { data } = await supabase
         .from('courses')
-        .select('id, name, city, state, par, pop_score, total_rounds, description, website')
+        .select('id, name, city, state, par, pop_score, total_rounds, avg_time, description, website')
         .eq('name', initialCourse.name)
         .maybeSingle();
       course = data;
@@ -399,6 +399,21 @@ export default function CourseProfileScreen({ navigation, route }) {
               <Text style={s.statLabel}>FASTEST</Text>
             </View>
           </View>
+
+          {/* Average Round Time */}
+          {(courseData?.avg_time || avgDuration) && (
+            <View style={s.avgTimeCard}>
+              <Text style={s.avgTimeLabel}>AVERAGE ROUND TIME</Text>
+              <Text style={s.avgTimeValue}>
+                {formatDuration(courseData?.avg_time ?? avgDuration)}
+              </Text>
+              {totalRounds > 0 && (
+                <Text style={s.avgTimeSub}>
+                  based on {totalRounds} round{totalRounds === 1 ? '' : 's'}
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Description */}
           {!!description && (
@@ -644,6 +659,12 @@ const s = StyleSheet.create({
   statValue:          { fontSize: 15, fontWeight: '500', color: '#F5EDD8', marginBottom: 4 },
   statLabel:          { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5, textAlign: 'center' },
   statDivider:        { width: 1, backgroundColor: '#7DC87A22', marginVertical: 4 },
+
+  // Average Round Time
+  avgTimeCard:        { backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#C9A84C22', padding: 16, marginHorizontal: 16, marginBottom: 12 },
+  avgTimeLabel:       { fontSize: 9, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 6 },
+  avgTimeValue:       { fontSize: 28, fontWeight: '300', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
+  avgTimeSub:         { fontSize: 11, color: '#7A6E58', marginTop: 2 },
 
   // Section
   section:            { paddingHorizontal: 16, marginBottom: 10 },
