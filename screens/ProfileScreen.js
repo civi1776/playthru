@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { getReferralStats } from '../lib/referrals';
@@ -1154,7 +1155,14 @@ export default function ProfileScreen({ navigation }) {
           <View style={s.heroScore}>
             <Text style={s.heroLabel}>CLOCKED SCORE</Text>
             <View style={s.heroRow}>
-              <Text style={s.heroNum}>
+              <Text style={[s.heroNum, { color: (() => {
+                const sc = clockedRating.clockedScore;
+                if (sc == null) return '#7A6E58';
+                if (sc >= 80) return '#F0CB5B';
+                if (sc >= 60) return '#C9A84C';
+                if (sc >= 40) return '#E8A838';
+                return '#E85D4A';
+              })() }]}>
                 {clockedRating.clockedScore ?? '\u2014'}
               </Text>
               {clockedRating.clockedScore != null && (
@@ -1167,9 +1175,14 @@ export default function ProfileScreen({ navigation }) {
               )}
             </View>
 
-            {/* Progress bar */}
+            {/* Gradient progress bar */}
             <View style={s.heroBarTrack}>
-              <View style={[s.heroBarFill, { width: `${clockedRating.clockedScore ?? 0}%` }]} />
+              <LinearGradient
+                colors={['#7DC87A', '#C9A84C', '#F0CB5B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[s.heroBarFill, { width: `${clockedRating.clockedScore ?? 0}%` }]}
+              />
             </View>
 
             {/* Sub-components or provisional hint */}
@@ -1275,12 +1288,12 @@ const s = StyleSheet.create({
   heroScore:        { backgroundColor: '#0D1A0F', paddingHorizontal: 22, paddingTop: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
   heroLabel:        { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 8 },
   heroRow:          { flexDirection: 'row', alignItems: 'baseline', marginBottom: 12 },
-  heroNum:          { fontSize: 72, fontWeight: '200', color: '#C9A84C', fontVariant: ['tabular-nums'], lineHeight: 76 },
+  heroNum:          { fontSize: 72, fontWeight: '200', fontVariant: ['tabular-nums'], lineHeight: 76 },
   heroMax:          { fontSize: 22, fontWeight: '300', color: '#7A6E58', marginLeft: 4, marginBottom: 4 },
   heroProv:         { marginLeft: 12, backgroundColor: '#C9A84C18', borderRadius: 6, borderWidth: 1, borderColor: '#C9A84C33', paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
   heroProvText:     { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
-  heroBarTrack:     { height: 3, backgroundColor: '#1A2E1C', borderRadius: 2, marginBottom: 16 },
-  heroBarFill:      { height: 3, backgroundColor: '#C9A84C', borderRadius: 2 },
+  heroBarTrack:     { height: 6, backgroundColor: '#1A2E1C', borderRadius: 3, marginTop: 12, marginBottom: 16, overflow: 'hidden' },
+  heroBarFill:      { height: 6, borderRadius: 3 },
   heroSubRow:       { flexDirection: 'row', gap: 20 },
   heroSubLabel:     { fontSize: 8, color: '#7A6E58', letterSpacing: 1.5, marginBottom: 2 },
   heroSubVal:       { fontSize: 16, fontWeight: '600', color: '#F5EDD8' },

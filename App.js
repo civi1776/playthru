@@ -107,6 +107,7 @@ const PLAYER_TABS = [
   { name: 'Feed',  icon: 'flash-outline',  label: 'FEED' },
   { name: 'Rules', icon: 'book-outline',   label: 'RULES' },
   { name: 'Play',  icon: 'timer-outline',  label: 'PLAY', isPlay: true },
+  { name: 'Ranks', icon: 'trophy-outline', label: 'RANKS' },
   { name: 'You',   icon: 'person-outline', label: 'YOU' },
 ];
 const CADDY_TABS = [
@@ -279,6 +280,7 @@ function MainApp() {
           <Tab.Screen name="Feed"  component={FeedScreen} />
           <Tab.Screen name="Rules" component={RulesScreen} />
           <Tab.Screen name="Play"  component={FeedScreen} />
+          <Tab.Screen name="Ranks" component={LeaderboardScreen} />
           <Tab.Screen name="You"   component={ProfileScreen} />
           {/* Hidden: reachable via navigate() from stack, no visible tab */}
           <Tab.Screen name="Log"         component={LogScreen} />
