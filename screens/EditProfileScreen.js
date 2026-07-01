@@ -63,7 +63,8 @@ export default function EditProfileScreen({ navigation }) {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.7,
+        base64: true,
       });
 
       if (result.canceled || !result.assets?.[0]?.uri) return;
@@ -79,14 +80,18 @@ export default function EditProfileScreen({ navigation }) {
       // 3. Log before upload
       console.log('AVATAR_UPLOAD', { authUid: authUser.id, filePath, contentType });
 
-      // Fetch the image as a blob
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
+      // Decode base64 to binary
+      const base64Data = asset.base64;
+      if (!base64Data) throw new Error('No image data returned from picker');
 
-      // 4. Upload with explicit contentType + upsert, log full error
+      const binaryStr = atob(base64Data);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+      // 4. Upload with explicit contentType + upsert
       const { error: upErr } = await supabase.storage
         .from('avatars')
-        .upload(filePath, blob, { contentType, upsert: true });
+        .upload(filePath, bytes, { contentType, upsert: true });
 
       if (upErr) {
         console.log('AVATAR_UPLOAD_ERROR', JSON.stringify(upErr));
