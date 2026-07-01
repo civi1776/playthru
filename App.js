@@ -45,6 +45,7 @@ import NotificationCenterScreen  from './screens/NotificationCenterScreen';
 import ClockedSetupScreen        from './screens/ClockedSetupScreen';
 import ClockedRoundScreen        from './screens/ClockedRoundScreen';
 import ConfirmRoundScreen        from './screens/ConfirmRoundScreen';
+import OnboardingScreen          from './screens/OnboardingScreen';
 
 // ─── Deep link helpers ────────────────────────────────────────────────────────
 function parseUrlParams(url) {
@@ -104,10 +105,8 @@ const RootStack = createNativeStackNavigator();
 // ─── Tab bar ─────────────────────────────────────────────────────────────────
 const PLAYER_TABS = [
   { name: 'Feed',        icon: 'flash-outline',  label: 'FEED' },
-  { name: 'Rules',       icon: 'book-outline',   label: 'RULES' },
   { name: 'Play',        icon: 'timer-outline',  label: 'PLAY', isPlay: true },
-  { name: 'Ranks',       icon: 'trophy',         label: 'RANKS' },
-  { name: 'You',         icon: 'person',         label: 'YOU' },
+  { name: 'You',         icon: 'person-outline',  label: 'YOU' },
 ];
 const CADDY_TABS = [
   { name: 'Home',        icon: 'shield-outline', label: 'HUB' },
@@ -277,12 +276,9 @@ function MainApp() {
           screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
         >
           <Tab.Screen name="Feed"        component={FeedScreen} />
-          <Tab.Screen name="Rules"       component={RulesScreen} />
-          {/* Play tab has no screen — the BottomNav button pushes ClockedSetup on the root stack */}
           <Tab.Screen name="Play"        component={FeedScreen} />
-          <Tab.Screen name="Ranks"       component={LeaderboardScreen} />
           <Tab.Screen name="You"         component={ProfileScreen} />
-          {/* Hidden: reachable via navigate() from links/FABs, no visible tab */}
+          {/* Hidden: reachable via navigate() from stack, no visible tab */}
           <Tab.Screen name="Log"         component={LogScreen} />
         </Tab.Navigator>
       )}
@@ -422,7 +418,7 @@ function AppNavigator() {
         break;
       case 'rank_move':
       case 'course_leader':
-        navRef.current.navigate('Ranks');
+        navRef.current.navigate('Leaderboard');
         break;
       case 'still_playing':
       case 'interaction_ladder':
@@ -470,8 +466,16 @@ function AppNavigator() {
     }
 
     if (session && profile) {
-      if (topRoute !== 'Main') {
-        navRef.current?.reset({ index: 0, routes: [{ name: 'Main' }] });
+      if (topRoute !== 'Main' && topRoute !== 'Onboarding') {
+        // Check if onboarding is needed
+        AsyncStorage.getItem('onboarding_complete').then(val => {
+          if (!val) {
+            navRef.current?.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
+          } else {
+            navRef.current?.reset({ index: 0, routes: [{ name: 'Main' }] });
+          }
+        });
+        return;
       }
       // Set up push notifications once after auth is confirmed
       if (!notificationsSetupRef.current) {
@@ -540,6 +544,9 @@ function AppNavigator() {
         <RootStack.Screen name="EditProfile"    component={EditProfileScreen} />
         <RootStack.Screen name="Paywall"        component={PaywallScreen} />
         <RootStack.Screen name="Notifications"  component={NotificationCenterScreen} />
+        <RootStack.Screen name="Onboarding"     component={OnboardingScreen} />
+        <RootStack.Screen name="RulesScreen"    component={RulesScreen} />
+        <RootStack.Screen name="Leaderboard"   component={LeaderboardScreen} />
         <RootStack.Screen name="ClockedSetup"   component={ClockedSetupScreen} />
         <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} />
         <RootStack.Screen name="ConfirmRound"  component={ConfirmRoundScreen} />

@@ -1146,37 +1146,65 @@ export default function ProfileScreen({ navigation }) {
         </View>
       )}
 
-      {/* Clocked Score — headline card */}
+      {/* Clocked Score — simplified single number */}
+      {!isCaddy && !loading && (
+        <View style={s.scoreCard}>
+          <Text style={s.scoreCardLabel}>CLOCKED SCORE</Text>
+          {clockedRating.clockedScore != null ? (
+            <View style={s.scoreCardRow}>
+              <Text style={[s.scoreCardNum, clockedRating.isProvisional && { color: '#7A6E58' }]}>{clockedRating.clockedScore}</Text>
+              <Text style={s.scoreCardMax}>/100</Text>
+            </View>
+          ) : (
+            <Text style={s.scoreCardEmpty}>Play your first round to earn a score</Text>
+          )}
+          {clockedRating.isProvisional && clockedRating.roundsUsed > 0 && (
+            <View style={s.provBadge}><Text style={s.provText}>PROVISIONAL</Text></View>
+          )}
+        </View>
+      )}
+
+      {/* Stat chips row */}
+      {!loading && !isCaddy && (
+        <View style={s.statChipsRow}>
+          <View style={s.statChip}>
+            <Text style={s.statChipLabel}>ROUNDS</Text>
+            <Text style={s.statChipNum}>{rounds.filter(r => r.round_format === 'clocked').length}</Text>
+          </View>
+          <View style={s.statChip}>
+            <Text style={s.statChipLabel}>RANK</Text>
+            <Text style={s.statChipNum}>{profile?.national_rank ? `#${profile.national_rank}` : '\u2014'}</Text>
+          </View>
+          <View style={s.statChip}>
+            <Text style={s.statChipLabel}>FOLLOWING</Text>
+            <Text style={s.statChipNum}>{profile?.following_count ?? '\u2014'}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* National Rankings row */}
       {!isCaddy && (
-        <ClockedScoreCard
-          clockedScore={clockedRating.clockedScore}
-          game={clockedRating.game}
-          teammate={clockedRating.teammate}
-          isProvisional={clockedRating.isProvisional}
-          roundsUsed={clockedRating.roundsUsed}
-          roundsNeeded={clockedRating.roundsNeeded}
-        />
+        <TouchableOpacity style={s.rankingsRow} onPress={() => navigation.navigate('Leaderboard')} activeOpacity={0.8}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="trophy-outline" size={18} color="#C9A84C" />
+            <Text style={s.rankingsRowText}>National Rankings</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#7A6E58" />
+        </TouchableOpacity>
       )}
 
-      {/* Recent rounds (compact, above tabs) */}
-      {!loading && rounds.length > 0 && (
-        <RecentRoundsList rounds={rounds.slice(0, 10)} navigation={navigation} />
-      )}
-
-      {/* Tab bar */}
-      <View style={s.tabBar}>
-        {tabs.map(t => (
-          <TouchableOpacity key={t} style={[s.tabBtn, tab === t && s.tabBtnActive]} onPress={() => setTab(t)} accessibilityRole="tab" accessibilityState={{ selected: tab === t }} accessibilityLabel={tabLabel(t)}>
-            <Text style={[s.tabBtnText, tab === t && s.tabBtnTextActive]}>{tabLabel(t)}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {tab === 'stats'   && (loading ? <StatTabSkeleton /> : <StatTab stats={stats} roundCount={roundCount} rounds={rounds} navigation={navigation} />)}
-      {tab === 'caddy'   && <CaddyDashboard caddyCourse={profile?.caddy_course || ''} navigation={navigation} />}
-      {tab === 'rounds'  && <RoundsTab navigation={navigation} rounds={rounds} loading={loading} />}
-      {tab === 'friends'  && <FriendsTab navigation={navigation} />}
-      {tab === 'activity' && <ActivityTab userId={user?.id} />}
+      {/* Recent clocked rounds */}
+      {!loading && (() => {
+        const clockedRounds = rounds.filter(r => r.round_format === 'clocked');
+        return clockedRounds.length > 0 ? (
+          <RecentRoundsList rounds={clockedRounds.slice(0, 8)} navigation={navigation} />
+        ) : (
+          <View style={s.emptyRounds}>
+            <Ionicons name="timer-outline" size={32} color="#C9A84C44" />
+            <Text style={s.emptyRoundsText}>No rounds yet — tap PLAY to start</Text>
+          </View>
+        );
+      })()}
     </SafeAreaView>
   );
 }
@@ -1187,6 +1215,30 @@ const s = StyleSheet.create({
   headerTop:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 16, paddingBottom: 6 },
   headerIdentity:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, paddingBottom: 16 },
   iconBtn:          { width: 44, height: 44, borderRadius: 22, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
+
+  // Simplified score card
+  scoreCard:        { marginHorizontal: 16, marginVertical: 12, backgroundColor: '#0D1A0F', borderRadius: 18, borderWidth: 1, borderColor: '#C9A84C33', padding: 20, alignItems: 'center' },
+  scoreCardLabel:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 8 },
+  scoreCardRow:     { flexDirection: 'row', alignItems: 'baseline' },
+  scoreCardNum:     { fontSize: 64, fontWeight: '200', color: '#C9A84C', fontVariant: ['tabular-nums'] },
+  scoreCardMax:     { fontSize: 18, fontWeight: '300', color: '#7A6E58', marginLeft: 4 },
+  scoreCardEmpty:   { fontSize: 13, color: '#7A6E58', fontStyle: 'italic' },
+  provBadge:        { marginTop: 8, backgroundColor: '#C9A84C18', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 3, borderWidth: 1, borderColor: '#C9A84C33' },
+  provText:         { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+
+  // Stat chips
+  statChipsRow:     { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingHorizontal: 16, marginBottom: 12 },
+  statChip:         { alignItems: 'center', flex: 1 },
+  statChipLabel:    { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
+  statChipNum:      { fontSize: 20, fontWeight: '300', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
+
+  // Rankings row
+  rankingsRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginBottom: 14, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, paddingHorizontal: 16 },
+  rankingsRowText:  { fontSize: 14, fontWeight: '500', color: '#F5EDD8' },
+
+  // Empty rounds
+  emptyRounds:      { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 10 },
+  emptyRoundsText:  { fontSize: 13, color: '#7A6E58' },
   wordmark:         { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 2 },
   username:         { fontSize: 11, color: '#C9A84C', fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },
   name:             { fontSize: 22, fontWeight: '600', color: '#F5EDD8' },

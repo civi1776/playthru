@@ -139,9 +139,10 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
   })();
 
   const isLive = item.type === 'live_round_started';
+  const isPaceRound = item.type === 'round_logged' && !isOnTheClock;
 
   return (
-    <View style={[s.feedCard, isLive && s.feedCardLive]}>
+    <View style={[s.feedCard, isLive && s.feedCardLive, isPaceRound && { opacity: 0.6 }]}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
         <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: item.user_id })} activeOpacity={0.8}>
           <View>
@@ -160,7 +161,10 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
           {actionLabel && <Text style={s.actionLabel}>{actionLabel}</Text>}
 
           {item.type === 'round_logged' && item.content && (
-            <RoundContentCard content={item.content} navigation={navigation} />
+            <>
+              {isPaceRound && <Text style={{ fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 }}>PACE</Text>}
+              <RoundContentCard content={item.content} navigation={navigation} />
+            </>
           )}
 
           {item.type === 'user_post' && item.content?.text && (
@@ -186,17 +190,19 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
             </View>
           )}
 
-          {/* Actions */}
-          <View style={s.actionBar}>
-            <TouchableOpacity style={s.actionBtn} onPress={() => onLike(item, liked)} activeOpacity={0.7}>
-              <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={liked ? '#7DC87A' : '#7A6E58'} />
-              {item.likes > 0 && <Text style={[s.actionCount, liked && { color: '#7DC87A' }]}>{item.likes}</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={s.actionBtn} onPress={() => onComment(item)} activeOpacity={0.7}>
-              <Ionicons name="chatbubble-outline" size={13} color="#7A6E58" />
-              {cCount > 0 && <Text style={s.actionCount}>{cCount}</Text>}
-            </TouchableOpacity>
-          </View>
+          {/* Actions (hidden for pace rounds) */}
+          {!isPaceRound && (
+            <View style={s.actionBar}>
+              <TouchableOpacity style={s.actionBtn} onPress={() => onLike(item, liked)} activeOpacity={0.7}>
+                <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={liked ? '#7DC87A' : '#7A6E58'} />
+                {item.likes > 0 && <Text style={[s.actionCount, liked && { color: '#7DC87A' }]}>{item.likes}</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={s.actionBtn} onPress={() => onComment(item)} activeOpacity={0.7}>
+                <Ionicons name="chatbubble-outline" size={13} color="#7A6E58" />
+                {cCount > 0 && <Text style={s.actionCount}>{cCount}</Text>}
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
     </View>

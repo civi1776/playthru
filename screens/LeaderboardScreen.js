@@ -141,7 +141,7 @@ function AmbassadorRow({ entry, navigation }) {
 }
 
 // ─── Board configs ───────────────────────────────────────────────────────────
-const CLOCKED_FILTERS = ['OVERALL', 'GAME', 'TEAMMATE', 'COURSE', 'AMBASS.'];
+const CLOCKED_FILTERS = ['OVERALL', 'COURSE'];
 const PACE_FILTERS    = ['GLOBAL', 'FRIENDS', 'COURSE', 'CADDIES'];
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -446,7 +446,11 @@ export default function LeaderboardScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.wordmark}>RANKS</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ width: 40, height: 40, justifyContent: 'center' }} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={20} color="#C9A84C" />
+        </TouchableOpacity>
+        <Text style={s.wordmark}>RANKINGS</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Board switcher */}
@@ -597,7 +601,7 @@ export default function LeaderboardScreen({ navigation }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   container:     { flex: 1, backgroundColor: '#090F0A' },
-  header:        { paddingHorizontal: 22, paddingTop: 8, paddingBottom: 8 },
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
   wordmark:      { fontSize: 24, fontWeight: '300', color: '#F5EDD8', fontFamily: 'Georgia' },
 
   // Board switcher

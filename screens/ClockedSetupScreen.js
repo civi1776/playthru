@@ -202,7 +202,9 @@ export default function ClockedSetupScreen({ navigation }) {
           <Ionicons name={phase === PHASE.COURSE ? 'close' : 'arrow-back'} size={20} color="#C9A84C" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>CLOCKED</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity onPress={() => navigation.navigate('RulesScreen')} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }} activeOpacity={0.7}>
+          <Ionicons name="help-circle-outline" size={22} color="#C9A84C" />
+        </TouchableOpacity>
       </View>
 
       {/* Step dots */}

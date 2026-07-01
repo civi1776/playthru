@@ -3,7 +3,7 @@
     "name": "Clocked",
     "slug": "playthru",
     "scheme": "playthru",
-    "version": "1.5.0",
+    "version": "1.5.2",
     "orientation": "portrait",
     "icon": "./assets/PlayThru_AppIcon.png",
     "userInterfaceStyle": "light",
@@ -25,7 +25,7 @@
         "NSPhotoLibraryAddUsageDescription": "Clocked saves your Clocked Score share card to your photo library.",
         "NSMicrophoneUsageDescription": "Clocked may use the microphone when recording video content."
       },
-      "version": "1.5.1"
+      "version": "1.5.2"
     },
     "android": {
       "adaptiveIcon": {

@@ -469,9 +469,14 @@ export default function ClockedRoundScreen({ navigation, route }) {
             Par {curHoleData.par}{curHoleData.yardage ? `  ·  ${curHoleData.yardage} yds` : ''}
           </Text>
         </View>
-        <TouchableOpacity onPress={() => setShowScorecard(!showScorecard)} style={st.headerBtn} accessibilityLabel="Toggle scorecard">
-          <Ionicons name={showScorecard ? 'timer-outline' : 'list-outline'} size={20} color={GOLD} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          <TouchableOpacity onPress={() => navigation.navigate('RulesScreen')} style={st.headerBtn} accessibilityLabel="Rules">
+            <Ionicons name="help-circle-outline" size={20} color={GOLD} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowScorecard(!showScorecard)} style={st.headerBtn} accessibilityLabel="Toggle scorecard">
+            <Ionicons name={showScorecard ? 'timer-outline' : 'list-outline'} size={20} color={GOLD} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Scorecard overlay ── */}
