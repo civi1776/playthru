@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import SkeletonLoader from '../components/SkeletonLoader';
 import InitialsAvatar from '../components/InitialsAvatar';
+import CourseAvatar from '../components/CourseAvatar';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { computeFullRating, extractPlayerRoundStats, DEFAULT_PROVISIONAL_ROUNDS } from '../lib/clockedRating';
@@ -30,12 +31,19 @@ function LeaderboardSkeleton() {
   );
 }
 
-// ─── Color helper ───────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function clockedColor(v) {
   if (v == null) return '#7A6E58';
   if (v >= 70) return '#7DC87A';
   if (v >= 40) return '#C9A84C';
   return '#B8A882';
+}
+
+function formatAvgTime(minutes) {
+  if (!minutes) return '\u2014';
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 // ─── Clocked Row ────────────────────────────────────────────────────────────
@@ -72,6 +80,29 @@ function ClockedRow({ entry, navigation }) {
   );
 }
 
+// ─── Course Row ──────────────────────────────────────────────────────────────
+function CourseRow({ course, navigation }) {
+  return (
+    <TouchableOpacity
+      style={s.courseRow}
+      onPress={() => navigation?.navigate('CourseProfile', { course: { id: course.id, name: course.name } })}
+      activeOpacity={0.8}
+    >
+      <CourseAvatar courseName={course.name} size={44} />
+      <View style={s.courseInfo}>
+        <Text style={s.courseName} numberOfLines={1}>{course.name}</Text>
+        <Text style={s.courseMeta}>{[course.city, course.state].filter(Boolean).join(', ')}</Text>
+      </View>
+      <View style={s.courseRight}>
+        <Text style={s.courseTime}>{formatAvgTime(course.avg_time)}</Text>
+        <Text style={s.courseRounds}>
+          {course.total_rounds} {course.total_rounds === 1 ? 'round' : 'rounds'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 // ─── Filters ─────────────────────────────────────────────────────────────────
 const FILTERS = ['OVERALL', 'COURSE'];
 
@@ -87,50 +118,27 @@ export default function LeaderboardScreen({ navigation }) {
   const [myProjected, setMyProjected] = useState(null);
   const [myRank, setMyRank]     = useState(null);
 
-  // Per-course selector state
-  const [courseQuery, setCourseQuery]     = useState('');
-  const [courseResults, setCourseResults] = useState([]);
-  const [selectedCourse, setSelectedCourse] = useState(null);
+  // Course filter search (client-side)
+  const [courseQuery, setCourseQuery] = useState('');
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
 
-  // ── Course search ──
-  useEffect(() => {
-    if (filter !== 'COURSE' || courseQuery.trim().length < 2) { setCourseResults([]); return; }
-    const t = setTimeout(async () => {
-      const { data: courses } = await supabase
-        .from('courses')
-        .select('id, name, city, state')
-        .ilike('name', `%${courseQuery.trim()}%`)
-        .limit(10);
-      setCourseResults(courses ?? []);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [courseQuery, filter]);
-
-  // ── Fetch clocked board ──
-  const fetchBoard = useCallback(async (sortKey, course) => {
+  // ── Fetch player board (OVERALL) ──
+  const fetchPlayerBoard = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      let query = supabase
+      const { data: clockedRounds, error: err } = await supabase
         .from('rounds')
         .select('id, user_id, hole_scores, course_name')
         .eq('round_format', 'clocked')
         .eq('flagged', false)
         .not('hole_scores', 'is', null);
-
-      if (sortKey === 'COURSE' && course) {
-        query = query.eq('course_name', course.name);
-      }
-
-      const { data: clockedRounds, error: err } = await query;
       if (err) throw err;
 
       if (!clockedRounds?.length) { setData([]); setMyRank(null); setMyProjected(null); setLoading(false); return; }
 
-      // Group by logger (user_id)
       const byUser = {};
       const roundMap = {};
       for (const r of clockedRounds) {
@@ -139,7 +147,6 @@ export default function LeaderboardScreen({ navigation }) {
         roundMap[r.id ?? ''] = r;
       }
 
-      // Fetch confirmed participations to credit non-loggers
       const roundIds = clockedRounds.map(r => r.id).filter(Boolean);
       let participations = [];
       if (roundIds.length) {
@@ -151,7 +158,6 @@ export default function LeaderboardScreen({ navigation }) {
         participations = parts ?? [];
       }
 
-      // Merge: for each confirmed participant, add the round to their set
       for (const p of participations) {
         if (!byUser[p.user_id]) byUser[p.user_id] = [];
         const already = byUser[p.user_id].some(r => (r.id ?? r.round_id) === p.round_id);
@@ -166,7 +172,6 @@ export default function LeaderboardScreen({ navigation }) {
       const profileMap = {};
       (profiles ?? []).forEach(p => { profileMap[p.id] = p; });
 
-      // Compute ratings for all users
       const allEntries = userIds.map(userId => {
         const prof = profileMap[userId];
         const playerName = prof?.full_name || prof?.username || 'Player';
@@ -179,38 +184,27 @@ export default function LeaderboardScreen({ navigation }) {
         return { userId, name: playerName, handle: prof?.username ? `@${prof.username}` : '', avatarUrl: prof?.avatar_url, rating, isYou: userId === uid };
       }).filter(e => e.rating.clockedScore != null);
 
-      // Sort by clockedScore
       const getSortVal = (e) => e.rating.clockedScore ?? 0;
-      const sortLabel = 'CLK';
 
-      // Separate established from provisional
       const established = allEntries.filter(e => !e.rating.isProvisional);
       const provisional = allEntries.filter(e => e.rating.isProvisional);
-
       established.sort((a, b) => getSortVal(b) - getSortVal(a));
 
-      // Ranked rows: only established players
       const rows = established.slice(0, 50).map((e, i) => ({
         rank: i + 1, userId: e.userId, name: e.name, handle: e.handle,
-        sortVal: getSortVal(e), sortLabel,
+        sortVal: getSortVal(e), sortLabel: 'CLK',
         clockedScore: e.rating.clockedScore, scoring: e.rating.scoring, clock: e.rating.clock,
         roundsUsed: e.rating.roundsUsed, avatarUrl: e.avatarUrl, isYou: e.isYou,
       }));
 
-      // My entry
       const myEstablished = rows.find(r => r.isYou);
       setMyRank(myEstablished?.rank ?? null);
 
-      // Provisional projection for current user
       const myProv = provisional.find(e => e.isYou);
       if (myProv && !myEstablished) {
         const myVal = getSortVal(myProv);
         const ahead = established.filter(e => getSortVal(e) > myVal).length;
-        setMyProjected({
-          projectedRank: ahead + 1,
-          roundsNeeded: myProv.rating.roundsNeeded,
-          score: Math.round(myVal),
-        });
+        setMyProjected({ projectedRank: ahead + 1, roundsNeeded: myProv.rating.roundsNeeded, score: Math.round(myVal) });
       } else {
         setMyProjected(null);
       }
@@ -223,21 +217,49 @@ export default function LeaderboardScreen({ navigation }) {
     }
   }, [uid]);
 
-  // ── Fetch dispatch ──
-  useEffect(() => {
-    if (filter === 'COURSE' && !selectedCourse) return;
-    fetchBoard(filter, selectedCourse);
-  }, [filter, selectedCourse]);
+  // ── Fetch course board ──
+  const fetchCourseBoard = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    setMyRank(null);
+    setMyProjected(null);
+    try {
+      const { data: courses, error: err } = await supabase
+        .from('courses')
+        .select('id, name, city, state, avg_time, total_rounds, pop_score')
+        .gt('total_rounds', 0)
+        .order('total_rounds', { ascending: false })
+        .limit(50);
+      if (err) throw err;
+      setData(courses ?? []);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  useFocusEffect(useCallback(() => {
-    if (filterRef.current === 'COURSE' && !selectedCourse) return;
-    fetchBoard(filterRef.current, selectedCourse);
-  }, []));
+  // ── Fetch dispatch ──
+  const fetchCurrent = useCallback(() => {
+    if (filter === 'COURSE') fetchCourseBoard();
+    else fetchPlayerBoard();
+  }, [filter, fetchPlayerBoard, fetchCourseBoard]);
+
+  useEffect(() => { fetchCurrent(); }, [filter]);
+  useFocusEffect(useCallback(() => { fetchCurrent(); }, []));
 
   useEffect(() => { if (!session) navigation.replace('Welcome'); }, [session]);
 
+  const isCourse = filter === 'COURSE';
   const isEmpty = !loading && !error && data.length === 0;
-  const showCourseSearch = filter === 'COURSE';
+
+  // Client-side course filtering
+  const filteredCourses = isCourse && courseQuery.length > 1
+    ? data.filter(c =>
+        c.name?.toLowerCase().includes(courseQuery.toLowerCase()) ||
+        (c.city && c.city.toLowerCase().includes(courseQuery.toLowerCase()))
+      )
+    : data;
 
   return (
     <SafeAreaView style={s.container}>
@@ -254,44 +276,24 @@ export default function LeaderboardScreen({ navigation }) {
       <View style={s.filterRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f} style={[s.filterBtn, filter === f && s.filterBtnActive]}
-            onPress={() => { setFilter(f); if (f !== 'COURSE') { setSelectedCourse(null); setCourseQuery(''); } }}>
+            onPress={() => { setFilter(f); setCourseQuery(''); }}>
             <Text style={[s.filterText, filter === f && s.filterTextActive]}>{f}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Course search */}
-      {showCourseSearch && (
+      {/* Course search bar */}
+      {isCourse && !loading && data.length > 0 && (
         <View style={s.courseSearchWrap}>
           <TextInput
             style={s.courseSearchInput}
-            placeholder="Search a course..."
-            placeholderTextColor="#B8A88266"
+            placeholder="Search courses..."
+            placeholderTextColor="#7A6E58"
             value={courseQuery}
-            onChangeText={t => { setCourseQuery(t); setSelectedCourse(null); }}
+            onChangeText={setCourseQuery}
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {courseResults.length > 0 && !selectedCourse && (
-            <View style={s.courseDropdown}>
-              {courseResults.map(c => (
-                <TouchableOpacity key={c.id} style={s.courseDropdownRow}
-                  onPress={() => { setSelectedCourse(c); setCourseQuery(c.name); setCourseResults([]); }}
-                  activeOpacity={0.8}>
-                  <Text style={s.courseDropdownName} numberOfLines={1}>{c.name}</Text>
-                  {(c.city || c.state) && <Text style={s.courseDropdownSub}>{[c.city, c.state].filter(Boolean).join(', ')}</Text>}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-          {selectedCourse && (
-            <View style={s.courseSelectedChip}>
-              <Text style={s.courseSelectedText}>{selectedCourse.name}</Text>
-              <TouchableOpacity onPress={() => { setSelectedCourse(null); setCourseQuery(''); }} activeOpacity={0.7}>
-                <Ionicons name="close-circle" size={16} color="#C9A84C" />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
       )}
 
@@ -302,7 +304,7 @@ export default function LeaderboardScreen({ navigation }) {
         <View style={s.emptyState}>
           <Ionicons name="cloud-offline-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
           <Text style={s.emptyText}>Could not load rankings.</Text>
-          <TouchableOpacity style={s.ctaBtn} onPress={() => fetchBoard(filter, selectedCourse)} activeOpacity={0.8}>
+          <TouchableOpacity style={s.ctaBtn} onPress={fetchCurrent} activeOpacity={0.8}>
             <Text style={s.ctaBtnText}>RETRY</Text>
           </TouchableOpacity>
         </View>
@@ -320,10 +322,20 @@ export default function LeaderboardScreen({ navigation }) {
             <Text style={s.ctaBtnText}>PLAY</Text>
           </TouchableOpacity>
         </View>
+      ) : isCourse ? (
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+          <Text style={s.courseListHeader}>Courses ranked by rounds played</Text>
+          <View style={s.listSection}>
+            {filteredCourses.map((course, i) => (
+              <CourseRow key={course.id ?? i} course={course} navigation={navigation} />
+            ))}
+            {filteredCourses.length === 0 && courseQuery.length > 1 && (
+              <Text style={s.noResults}>No courses match "{courseQuery}"</Text>
+            )}
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-
-          {/* Your rank card */}
           {myRank != null && (
             <View style={s.yourRankCard}>
               <Text style={s.yourRankLabel}>YOUR GLOBAL RANK</Text>
@@ -331,7 +343,6 @@ export default function LeaderboardScreen({ navigation }) {
             </View>
           )}
 
-          {/* Provisional projection */}
           {myProjected && (
             <View style={s.provCard}>
               <Text style={s.provCardLabel}>YOUR PROJECTED RANK</Text>
@@ -342,7 +353,6 @@ export default function LeaderboardScreen({ navigation }) {
             </View>
           )}
 
-          {/* Rows */}
           <View style={s.listSection}>
             <Text style={s.sectionLabel}>RANKINGS</Text>
             {data.map((entry, i) => (
@@ -371,14 +381,8 @@ const s = StyleSheet.create({
   // Course search
   courseSearchWrap:  { paddingHorizontal: 16, marginBottom: 8 },
   courseSearchInput: { backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 10, padding: 10, color: '#F5EDD8', fontSize: 13 },
-  courseDropdown:    { backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#C9A84C33', borderRadius: 10, marginTop: 4, overflow: 'hidden' },
-  courseDropdownRow: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#7DC87A11' },
-  courseDropdownName:{ fontSize: 13, fontWeight: '500', color: '#F5EDD8' },
-  courseDropdownSub: { fontSize: 10, color: '#B8A882', marginTop: 2 },
-  courseSelectedChip:{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  courseSelectedText:{ fontSize: 12, fontWeight: '600', color: '#C9A84C' },
 
-  // Rows
+  // Player rows
   row:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, gap: 10 },
   rowYou:       { borderColor: '#C9A84C44', backgroundColor: '#C9A84C0A' },
   rowRank:      { fontSize: 12, fontWeight: '700', color: '#B8A882', width: 28 },
@@ -388,12 +392,21 @@ const s = StyleSheet.create({
   rowRight:     { alignItems: 'flex-end', minWidth: 40 },
   rowScore:     { fontSize: 22, fontWeight: '300', fontVariant: ['tabular-nums'] },
   rowScoreLabel:{ fontSize: 7, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginTop: 1 },
-
-  // Clocked row sub-stats
   rowSubStats:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   rowSubStat:   { fontSize: 10, fontWeight: '600', color: '#7A6E58' },
   rowSubDot:    { fontSize: 10, color: '#7A6E58' },
   rowRoundsLabel:{ fontSize: 9, color: '#7A6E5866' },
+
+  // Course rows
+  courseRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8 },
+  courseInfo:    { flex: 1, marginLeft: 2 },
+  courseName:   { fontSize: 14, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
+  courseMeta:   { fontSize: 11, color: '#B8A882' },
+  courseRight:   { alignItems: 'flex-end', marginLeft: 8 },
+  courseTime:    { fontSize: 18, fontWeight: '700', color: '#C9A84C', fontVariant: ['tabular-nums'] },
+  courseRounds:  { fontSize: 10, color: '#7A6E58', marginTop: 2 },
+  courseListHeader: { fontSize: 11, color: '#7A6E58', paddingHorizontal: 20, paddingVertical: 12, letterSpacing: 1 },
+  noResults:    { fontSize: 13, color: '#7A6E58', textAlign: 'center', paddingVertical: 20 },
 
   // Your rank
   yourRankCard:  { marginHorizontal: 16, marginBottom: 8, backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#C9A84C44', paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' },
