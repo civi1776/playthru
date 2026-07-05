@@ -23,7 +23,8 @@
         "NSPhotoLibraryUsageDescription": "Clocked uses your photo library so you can set a profile picture.",
         "NSCameraUsageDescription": "Clocked uses your camera to take a profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Clocked saves your Clocked Score share card to your photo library.",
-        "NSMicrophoneUsageDescription": "Clocked may use the microphone when recording video content."
+        "NSMicrophoneUsageDescription": "Clocked may use the microphone when recording video content.",
+        "UIBackgroundModes": ["fetch", "remote-notification"]
       },
       "buildNumber": "2",
       "version": "1.5.3"
@@ -100,7 +101,9 @@
         {
           "locationWhenInUsePermission": "Clocked uses your location to show nearby courses first."
         }
-      ]
+      ],
+      "expo-task-manager",
+      "expo-keep-awake"
     ],
     "extra": {
       "eas": {

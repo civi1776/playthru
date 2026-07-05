@@ -15,8 +15,9 @@ import {
   DEFAULT_SCORING_SCALE, DEFAULT_CLOCK_COEFFICIENTS, DEFAULT_PENALTY_PARAMS,
 } from '../lib/clockedSport';
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
-import { sendPushToUser, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
+import { sendPushToUser, sendLocalNotification, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
 import * as Notifications from 'expo-notifications';
+import * as KeepAwake from 'expo-keep-awake';
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const BG       = '#090F0A';
@@ -68,18 +69,19 @@ function parseTimeInput(str) {
 export default function ClockedRoundScreen({ navigation, route }) {
   const { user } = useAuth();
   const params = route.params;
+  const resumeState  = params.resumeState ?? null;
 
-  const course       = params.course;
-  const holeCount    = parseInt(params.holes, 10);
-  const transport    = params.transport;
-  const difficulty   = params.difficulty ?? 'intermediate';
-  const mode         = params.mode;
-  const configSnap   = params.configSnapshot ?? {};
+  const course       = resumeState?.course ?? params.course;
+  const holeCount    = resumeState?.holeCount ?? parseInt(params.holes, 10);
+  const transport    = resumeState?.transport ?? params.transport;
+  const difficulty   = resumeState?.difficulty ?? params.difficulty ?? 'intermediate';
+  const mode         = resumeState?.mode ?? params.mode;
+  const configSnap   = resumeState?.configSnap ?? params.configSnapshot ?? {};
   const scoringScale = configSnap.scoringScale      ?? DEFAULT_SCORING_SCALE;
   const clockCoeffs  = configSnap.clockCoefficients  ?? DEFAULT_CLOCK_COEFFICIENTS;
   const penaltyParams = configSnap.penaltyParams     ?? DEFAULT_PENALTY_PARAMS;
 
-  const playerDefs       = params.players;
+  const playerDefs       = resumeState?.playerDefs ?? params.players;
   const playerCount      = playerDefs.length;
   const operatingCaddyId = params.operatingCaddyId ?? null;
 
@@ -153,6 +155,62 @@ export default function ClockedRoundScreen({ navigation, route }) {
     })).catch(() => {});
   }, [currentHole, holeResults, playerStrokes, clockRunning, holeFrozenTime, holeDataState]);
 
+  // ── Resume from saved state ──
+  useEffect(() => {
+    if (!resumeState) return;
+    setCurrentHole(resumeState.currentHole ?? 1);
+    setHoleResults(resumeState.holeResults ?? []);
+    setPlayerStrokes(resumeState.playerStrokes ?? playerDefs.map(() => 4));
+    setClockRunning(resumeState.clockRunning ?? false);
+    setHoleFrozenTime(resumeState.holeFrozenTime ?? null);
+    if (resumeState.holeDataState) setHoleDataState(resumeState.holeDataState);
+    if (resumeState.clockRunning && resumeState.clockStartedAt) {
+      setClockStartedAt(resumeState.clockStartedAt);
+    }
+    sendLocalNotification('Round Resumed', `Back on hole ${resumeState.currentHole}.`);
+  }, []);
+
+  // ── Keep screen awake during round ──
+  useEffect(() => {
+    KeepAwake.activateKeepAwakeAsync('clocked-round');
+    return () => {
+      KeepAwake.deactivateKeepAwake('clocked-round');
+      Notifications.dismissNotificationAsync('live-round-clock').catch(() => {});
+      Notifications.cancelScheduledNotificationAsync('live-round-clock').catch(() => {});
+    };
+  }, []);
+
+  // ── Live lock-screen notification ──
+  const updateLiveNotification = useCallback(async (hole, remaining, tp) => {
+    const isOver = remaining < 0;
+    const timeStr = isOver ? `OVER by ${formatSeconds(Math.abs(remaining))}` : formatSeconds(remaining);
+    await Notifications.scheduleNotificationAsync({
+      identifier: 'live-round-clock',
+      content: {
+        title: `Hole ${hole} — ${isOver ? 'OVER' : timeStr + ' left'}`,
+        body: isOver ? `Time par was ${formatSeconds(tp)}. Finish up!` : `Time par: ${formatSeconds(tp)}. Keep moving!`,
+        sound: false, sticky: true, autoDismiss: false,
+        data: { type: 'live_round' },
+      },
+      trigger: null,
+    }).catch(() => {});
+  }, []);
+
+  const cancelLiveNotification = useCallback(async () => {
+    await Notifications.dismissNotificationAsync('live-round-clock').catch(() => {});
+    await Notifications.cancelScheduledNotificationAsync('live-round-clock').catch(() => {});
+  }, []);
+
+  // Update live notification every 30s while clock runs
+  useEffect(() => {
+    if (!clockRunning) return;
+    const interval = setInterval(() => {
+      const el = Math.floor((Date.now() - clockStartedAt) / 1000);
+      updateLiveNotification(currentHole, curTimePar - el, curTimePar);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [clockRunning, currentHole, clockStartedAt, curTimePar]);
+
   // ── Clock controls ──
   const startClock = () => {
     setClockStartedAt(Date.now());
@@ -160,6 +218,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     setHoleFrozenTime(null);
     setClockRunning(true);
     scheduleInteractionLadder(course?.name ?? 'your course').catch(() => {});
+    updateLiveNotification(currentHole, curTimePar, curTimePar);
   };
 
   const stopClock = () => {
@@ -167,6 +226,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     setDisplayElapsed(elapsed);
     setHoleFrozenTime(elapsed);
     setClockRunning(false);
+    cancelLiveNotification();
   };
 
   // ── Change par for current hole ──
@@ -225,6 +285,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
   // ── Finish round ──
   const finishRound = async (results) => {
+    cancelLiveNotification();
+    KeepAwake.deactivateKeepAwake('clocked-round');
     const summary = summarizeRound(results);
     const holeScoresJson = results.map((r, i) => ({
       hole: i + 1, par: r.par, yardage: r.yardage, yardsUsed: r.yardsUsed,
@@ -408,6 +470,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
       { text: 'Stay', style: 'cancel' },
       { text: 'Leave', style: 'destructive', onPress: () => {
         cancelInteractionLadder().catch(() => {});
+        cancelLiveNotification();
+        KeepAwake.deactivateKeepAwake('clocked-round');
         AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
         navigation.goBack();
       }},
@@ -557,21 +621,32 @@ export default function ClockedRoundScreen({ navigation, route }) {
             )}
           </View>
 
-          {/* ── Clock controls ── */}
-          <View style={st.clockControls}>
-            {!clockRunning && !holeStopped && (
-              <TouchableOpacity style={st.startClockBtn} onPress={startClock} activeOpacity={0.85}>
-                <Ionicons name="play" size={24} color={BG} />
-                <Text style={st.startClockText}>START</Text>
-              </TouchableOpacity>
-            )}
-            {clockRunning && (
-              <TouchableOpacity style={st.stopClockBtn} onPress={stopClock} activeOpacity={0.85}>
-                <Ionicons name="stop" size={22} color={CREAM} />
-                <Text style={st.stopClockText}>STOP</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          {/* ── Clock controls — START HOLE / HOLED OUT ── */}
+          {!holeStopped && (
+            <TouchableOpacity
+              style={[st.holedOutBtn, clockRunning ? st.holedOutBtnActive : st.holedOutBtnIdle]}
+              onPress={clockRunning ? stopClock : startClock}
+              activeOpacity={0.85}
+            >
+              {!clockRunning ? (
+                <>
+                  <Text style={{ fontSize: 20 }}>{'\u25B6'}</Text>
+                  <View>
+                    <Text style={st.holedOutLabel}>START HOLE</Text>
+                    <Text style={st.holedOutSub}>Tap when group tees off</Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 20 }}>{'\u26F3'}</Text>
+                  <View>
+                    <Text style={[st.holedOutLabel, { color: BG }]}>HOLED OUT</Text>
+                    <Text style={[st.holedOutSub, { color: BG + '88' }]}>Tap when last putt drops</Text>
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* ── Par selector ── */}
           <View style={st.parSelectorWrap}>
@@ -813,11 +888,12 @@ const st = StyleSheet.create({
   penaltyBadge:  { marginTop: 8, backgroundColor: 'rgba(232,93,74,0.12)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(232,93,74,0.3)' },
   penaltyText:   { fontSize: 14, fontWeight: '700', color: RED_WARN, fontVariant: ['tabular-nums'] },
 
-  clockControls: { alignItems: 'center', marginBottom: 16 },
-  startClockBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: GREEN, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 40 },
-  startClockText:{ fontSize: 14, fontWeight: '700', color: BG, letterSpacing: 3 },
-  stopClockBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#3A1A1A', borderWidth: 2, borderColor: RED_WARN, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 36 },
-  stopClockText: { fontSize: 14, fontWeight: '700', color: CREAM, letterSpacing: 3 },
+  // Holed Out button
+  holedOutBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 20, paddingVertical: 20, paddingHorizontal: 40, marginVertical: 16 },
+  holedOutBtnIdle:   { backgroundColor: '#1A3A1C', borderWidth: 2, borderColor: GREEN },
+  holedOutBtnActive: { backgroundColor: GOLD },
+  holedOutLabel:     { fontSize: 16, fontWeight: '700', color: CREAM, letterSpacing: 1 },
+  holedOutSub:       { fontSize: 10, color: DIM, marginTop: 2 },
 
   // Par selector
   parSelectorWrap:  { paddingBottom: 12 },

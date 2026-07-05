@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Constants from 'expo-constants';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, AppState, Animated, AccessibilityInfo } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, AppState, Animated, AccessibilityInfo, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import { supabase } from './lib/supabase';
 import { setupNotifications, refreshPushToken } from './lib/notifications';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CLOCKED_ROUND_STATE_KEY } from './lib/clockedRoundConstants';
 
 import HomeScreen             from './screens/HomeScreen';
 import FeedScreen             from './screens/FeedScreen';
@@ -452,6 +453,35 @@ function AppNavigator() {
       if (response) handleNotificationNav(response);
     });
   }, [navReady, handleNotificationNav]);
+
+  // ── Check for in-progress round to resume ──
+  useEffect(() => {
+    if (!navReady || !session || !profile) return;
+    const checkForActiveRound = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(CLOCKED_ROUND_STATE_KEY);
+        if (!saved) return;
+        const state = JSON.parse(saved);
+        if (!state) return;
+        const age = Date.now() - (state.savedAt ?? 0);
+        if (age > 8 * 60 * 60 * 1000) {
+          await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
+          return;
+        }
+        Alert.alert(
+          'Resume Round?',
+          `You have an active round on hole ${state.currentHole} at ${state.course?.name ?? 'Quick Play'}. Pick up where you left off?`,
+          [
+            { text: 'Abandon', style: 'destructive', onPress: () => AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY) },
+            { text: 'Resume', onPress: () => navRef.current?.navigate('ClockedRound', { resumeState: state }) },
+          ],
+          { cancelable: false },
+        );
+      } catch (e) { console.log('Resume check error:', e); }
+    };
+    const t = setTimeout(checkForActiveRound, 800);
+    return () => clearTimeout(t);
+  }, [navReady, session, profile]);
 
   // Reactively handle all auth state transitions.
   // Guard against resetting to Main on every refreshProfile() call by checking
