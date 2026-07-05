@@ -1,121 +1,75 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function WelcomeScreen({ navigation }) {
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Image
-          source={require('../assets/PlayThru_AppIcon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.wordmark}>CLOCKED</Text>
-        <Text style={styles.subtitle}>ON THE CLOCK</Text>
-        <View style={styles.divider} />
-        <View style={styles.buttons}>
-          <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={() => navigation.navigate('SignUp')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.btnPrimaryText}>CREATE ACCOUNT</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => navigation.navigate('SignIn')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.btnSecondaryText}>SIGN IN</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.btnExplore}
-            onPress={() => navigation.navigate('PreviewMode')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.btnExploreText}>EXPLORE THE APP →</Text>
-          </TouchableOpacity>
-        </View>
+    <SafeAreaView style={s.container}>
+      <View style={s.top}>
+        <Text style={s.wordmark}>CLOCKED</Text>
+        <Text style={s.tagline}>Golf has a shot clock.</Text>
+        <Text style={s.sub}>Track your pace. Own your score.</Text>
       </View>
-    </View>
+
+      <View style={s.buttons}>
+        <TouchableOpacity
+          style={s.btnPrimary}
+          onPress={() => navigation.navigate('SignUp')}
+          activeOpacity={0.85}
+        >
+          <Text style={s.btnPrimaryText}>CREATE ACCOUNT</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.btnSecondary}
+          onPress={() => navigation.navigate('SignIn')}
+          activeOpacity={0.85}
+        >
+          <Text style={s.btnSecondaryText}>SIGN IN</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={s.terms}>
+        By continuing you agree to our Terms of Service and Privacy Policy.
+      </Text>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#090F0A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
+    flex: 1, backgroundColor: '#090F0A',
+    justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 32, paddingTop: 120, paddingBottom: 40,
   },
-  content: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 360,
-    height: 360,
-    marginBottom: -40,
-  },
+  top: { alignItems: 'center' },
   wordmark: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#C9A84C',
-    letterSpacing: 12,
-    marginBottom: 10,
+    fontSize: 32, fontWeight: '700', color: '#C9A84C',
+    letterSpacing: 12, marginBottom: 24,
   },
-  subtitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#C9A84C',
-    letterSpacing: 4,
-    marginBottom: 28,
+  tagline: {
+    fontSize: 26, fontWeight: '300', color: '#F5EDD8',
+    textAlign: 'center', marginBottom: 10, lineHeight: 34,
   },
-  divider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: 'rgba(125,200,122,0.3)',
-    marginBottom: 40,
+  sub: {
+    fontSize: 14, color: '#7A6E58', textAlign: 'center',
   },
-  buttons: {
-    width: '100%',
-    gap: 14,
-  },
+  buttons: { width: '100%', gap: 14 },
   btnPrimary: {
-    backgroundColor: '#C9A84C',
-    borderRadius: 14,
-    paddingVertical: 18,
-    alignItems: 'center',
-    width: '100%',
+    backgroundColor: '#C9A84C', borderRadius: 14,
+    paddingVertical: 18, alignItems: 'center', width: '100%',
   },
   btnPrimaryText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#090F0A',
-    letterSpacing: 2,
+    fontSize: 13, fontWeight: '700', color: '#090F0A', letterSpacing: 2,
   },
   btnSecondary: {
-    borderRadius: 14,
-    paddingVertical: 18,
-    alignItems: 'center',
-    width: '100%',
-    borderWidth: 1,
-    borderColor: '#C9A84C',
+    borderRadius: 14, paddingVertical: 18, alignItems: 'center',
+    width: '100%', borderWidth: 1, borderColor: '#C9A84C',
   },
   btnSecondaryText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#C9A84C',
-    letterSpacing: 2,
+    fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 2,
   },
-  btnExplore: {
-    marginTop: 4,
-    padding: 12,
-    alignItems: 'center',
-  },
-  btnExploreText: {
-    color: '#B8A882',
-    fontSize: 13,
-    letterSpacing: 1,
+  terms: {
+    fontSize: 10, color: '#7A6E5888', textAlign: 'center',
+    marginTop: 20, lineHeight: 16,
   },
 });
