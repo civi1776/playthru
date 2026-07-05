@@ -72,6 +72,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
   const course       = params.course;
   const holeCount    = parseInt(params.holes, 10);
   const transport    = params.transport;
+  const difficulty   = params.difficulty ?? 'intermediate';
   const mode         = params.mode;
   const configSnap   = params.configSnapshot ?? {};
   const scoringScale = configSnap.scoringScale      ?? DEFAULT_SCORING_SCALE;
@@ -140,13 +141,13 @@ export default function ClockedRoundScreen({ navigation, route }) {
   // ── Current hole data ──
   const holeIdx     = currentHole - 1;
   const curHoleData = holeDataState[holeIdx] ?? { par: 4, yardage: null, handicap: 18 };
-  const curTimePar  = computeTimePar(curHoleData.yardage, curHoleData.par, playerCount, transport, clockCoeffs);
+  const curTimePar  = computeTimePar(curHoleData.yardage, curHoleData.par, playerCount, transport, difficulty, clockCoeffs);
 
   // ── Persistence ──
   useEffect(() => {
     if (holeResults.length === 0 && !clockRunning) return;
     AsyncStorage.setItem(CLOCKED_ROUND_STATE_KEY, JSON.stringify({
-      roundStartTs, course, holeCount, transport, mode,
+      roundStartTs, course, holeCount, transport, difficulty, mode,
       holeDataState, playerDefs, configSnap, currentHole, holeResults,
       playerStrokes, clockRunning, clockStartedAt, holeFrozenTime, savedAt: Date.now(),
     })).catch(() => {});
@@ -186,7 +187,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       name: p.name,
       grossStrokes: playerStrokes[i],
     }));
-    const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount };
+    const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount, difficulty };
     const result = scoreHole(playersForScoring, elapsed, curHoleData, config);
     const newResults = [...holeResults, result];
     setHoleResults(newResults);
@@ -214,7 +215,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       name: p.name,
       grossStrokes: newStrokes[i],
     }));
-    const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount };
+    const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount, difficulty };
     const result = scoreHole(playersForScoring, newElapsed, updatedHoleData[idx], config);
 
     const newResults = [...holeResults];
@@ -228,7 +229,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     const holeScoresJson = results.map((r, i) => ({
       hole: i + 1, par: r.par, yardage: r.yardage, yardsUsed: r.yardsUsed,
       yardageSource: r.yardageSource, elapsed: r.elapsed, timePar: r.timePar,
-      penalty: r.penalty, holeScore: r.holeScore,
+      penalty: r.penalty, holeScore: r.holeScore, difficulty,
       players: r.playerResults.map(pr => ({
         name: pr.name, grossStrokes: pr.grossStrokes,
         points: pr.points, label: pr.label,
@@ -260,7 +261,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
       let row = {
         user_id: uid, course_name: course?.name ?? null, holes: String(holeCount), transport,
-        players: String(playerCount), tee_time: new Date(roundStartTs).toISOString(),
+        difficulty, players: String(playerCount), tee_time: new Date(roundStartTs).toISOString(),
         finish_time: new Date().toISOString(), duration_minutes: durationMinutes,
         round_format: 'clocked', hole_scores: holeScoresJson, active_game: activeGameJson,
         flagged: false, verification_level: operatingCaddyId ? 'caddy_operated' : 'self_reported',
@@ -357,6 +358,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
             players:          String(playerCount),
             duration_minutes: durationMinutes,
             round_format:     'clocked',
+            difficulty,
             team_score:       summary.totalScore,
             total_elapsed:    summary.totalElapsed,
             total_time_par:   summary.totalTimePar,

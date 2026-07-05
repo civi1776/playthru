@@ -36,6 +36,7 @@ export default function ClockedSetupScreen({ navigation }) {
   const [selectedNine, setSelectedNine]     = useState('front');
   const [mode, setMode]               = useState(1); // 1=solo, 2/3/4
   const [transport, setTransport]     = useState(null);
+  const [difficulty, setDifficulty]   = useState('intermediate');
   const [players, setPlayers]         = useState([]);
 
   // Pre-fetch remote config on mount
@@ -155,6 +156,7 @@ export default function ClockedSetupScreen({ navigation }) {
       course,
       holes,
       transport,
+      difficulty,
       mode,
       players,
       selectedTee,
@@ -504,6 +506,27 @@ export default function ClockedSetupScreen({ navigation }) {
                 </TouchableOpacity>
               ))}
             </View>
+            {/* Difficulty picker */}
+            <Text style={[s.sectionQ, { marginTop: 24 }]}>SHOT CLOCK DIFFICULTY</Text>
+            <View style={s.difficultyRow}>
+              {[
+                { key: 'beginner',     label: 'BEGINNER', sub: '~4:30 round', color: '#7DC87A' },
+                { key: 'intermediate', label: 'INTER.',   sub: '~3:30 round', color: '#C9A84C' },
+                { key: 'pro',          label: 'PRO',      sub: '~3:00 round', color: '#E85D4A' },
+              ].map(d => (
+                <TouchableOpacity
+                  key={d.key}
+                  style={[s.diffBtn, difficulty === d.key && s.diffBtnActive]}
+                  onPress={() => setDifficulty(d.key)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[s.diffDot, { backgroundColor: d.color }]} />
+                  <Text style={[s.diffLabel, difficulty === d.key && s.diffLabelActive]}>{d.label}</Text>
+                  <Text style={s.diffSub}>{d.sub}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             <TouchableOpacity
               style={[s.primaryBtn, { marginTop: 32 }, !transport && s.primaryBtnDisabled]}
               onPress={handleTransportNext}
@@ -532,6 +555,10 @@ export default function ClockedSetupScreen({ navigation }) {
               <View style={s.confirmItem}>
                 <Text style={s.confirmLabel}>TRANSPORT</Text>
                 <Text style={s.confirmValue}>{transport}</Text>
+              </View>
+              <View style={s.confirmItem}>
+                <Text style={s.confirmLabel}>DIFFICULTY</Text>
+                <Text style={s.confirmValue}>{difficulty === 'pro' ? 'Pro' : difficulty === 'beginner' ? 'Beginner' : 'Intermediate'}</Text>
               </View>
             </View>
 
@@ -632,6 +659,15 @@ const s = StyleSheet.create({
   searchResultName:   { fontSize: 13, fontWeight: '500', color: '#F5EDD8' },
   searchResultHandle: { fontSize: 10, color: '#B8A882' },
   hcpWarning:  { fontSize: 11, color: '#D4844A', marginTop: 8, fontStyle: 'italic' },
+
+  // Difficulty picker
+  difficultyRow:  { flexDirection: 'row', gap: 10 },
+  diffBtn:        { flex: 1, backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, alignItems: 'center', gap: 4 },
+  diffBtnActive:  { borderColor: '#C9A84C', backgroundColor: '#C9A84C0F' },
+  diffDot:        { width: 10, height: 10, borderRadius: 5 },
+  diffLabel:      { fontSize: 11, fontWeight: '700', color: '#7A6E58', letterSpacing: 1 },
+  diffLabelActive:{ color: '#F5EDD8' },
+  diffSub:        { fontSize: 9, color: '#7A6E58' },
 
   // Confirm
   confirmWrap:   { alignItems: 'center', paddingTop: 12 },

@@ -39,7 +39,17 @@ function resultLabel(round) {
 }
 
 function formatLabel(round) {
-  return round.round_format === 'clocked' ? 'on the clock' : 'pace';
+  if (round.round_format !== 'clocked') return 'pace';
+  const d = round.difficulty;
+  if (d === 'pro') return 'PRO';
+  if (d === 'beginner') return 'BEGINNER';
+  return 'INTER.';
+}
+
+function difficultyColor(d) {
+  if (d === 'pro') return '#E85D4A';
+  if (d === 'beginner') return '#7DC87A';
+  return '#C9A84C';
 }
 
 export default function RecentRoundsList({ rounds, navigation, limit = 10 }) {
@@ -62,7 +72,10 @@ export default function RecentRoundsList({ rounds, navigation, limit = 10 }) {
             <Text style={s.meta}>
               {formatShortDate(r.created_at)}
               {r.holes ? ` \u00B7 ${r.holes}h` : ''}
-              {` \u00B7 ${formatLabel(r)}`}
+              {r.round_format === 'clocked' && (
+                <Text style={{ color: difficultyColor(r.difficulty) }}>{` \u00B7 ${formatLabel(r)}`}</Text>
+              )}
+              {r.round_format !== 'clocked' && ` \u00B7 ${formatLabel(r)}`}
             </Text>
           </View>
           <View style={s.resultCol}>

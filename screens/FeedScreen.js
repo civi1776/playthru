@@ -129,7 +129,12 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
 
   const actionLabel = (() => {
     switch (item.type) {
-      case 'round_logged':       return isOnTheClock ? 'played on the clock' : 'logged a pace round';
+      case 'round_logged': {
+        if (!isOnTheClock) return 'logged a pace round';
+        const d = item.content?.difficulty;
+        const diffTag = d === 'pro' ? ' \u00B7 PRO' : d === 'beginner' ? ' \u00B7 BEGINNER' : '';
+        return `played on the clock${diffTag}`;
+      }
       case 'live_round_started': return null;
       case 'milestone':          return null;
       case 'course_review':      return `reviewed ${item.content?.course_name ?? 'a course'}`;
