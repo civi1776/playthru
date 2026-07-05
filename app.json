@@ -102,8 +102,6 @@
           "locationWhenInUsePermission": "Clocked uses your location to show nearby courses first."
         }
       ],
-      "expo-task-manager",
-      "expo-keep-awake"
     ],
     "extra": {
       "eas": {

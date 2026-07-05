@@ -17,7 +17,6 @@ import {
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
 import { sendPushToUser, sendLocalNotification, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
 import * as Notifications from 'expo-notifications';
-import * as KeepAwake from 'expo-keep-awake';
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const BG       = '#090F0A';
@@ -170,11 +169,9 @@ export default function ClockedRoundScreen({ navigation, route }) {
     sendLocalNotification('Round Resumed', `Back on hole ${resumeState.currentHole}.`);
   }, []);
 
-  // ── Keep screen awake during round ──
+  // ── Cleanup live notification on unmount ──
   useEffect(() => {
-    KeepAwake.activateKeepAwakeAsync('clocked-round');
     return () => {
-      KeepAwake.deactivateKeepAwake('clocked-round');
       Notifications.dismissNotificationAsync('live-round-clock').catch(() => {});
       Notifications.cancelScheduledNotificationAsync('live-round-clock').catch(() => {});
     };
@@ -286,7 +283,6 @@ export default function ClockedRoundScreen({ navigation, route }) {
   // ── Finish round ──
   const finishRound = async (results) => {
     cancelLiveNotification();
-    KeepAwake.deactivateKeepAwake('clocked-round');
     const summary = summarizeRound(results);
     const holeScoresJson = results.map((r, i) => ({
       hole: i + 1, par: r.par, yardage: r.yardage, yardsUsed: r.yardsUsed,
@@ -471,7 +467,6 @@ export default function ClockedRoundScreen({ navigation, route }) {
       { text: 'Leave', style: 'destructive', onPress: () => {
         cancelInteractionLadder().catch(() => {});
         cancelLiveNotification();
-        KeepAwake.deactivateKeepAwake('clocked-round');
         AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
         navigation.goBack();
       }},
