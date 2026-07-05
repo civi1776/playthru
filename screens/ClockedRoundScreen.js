@@ -461,14 +461,21 @@ export default function ClockedRoundScreen({ navigation, route }) {
     }
   };
 
+  // Pause round — navigate away without losing state
+  const handlePause = () => {
+    if (clockRunning) stopClock();
+    navigation.navigate('Main');
+  };
+
+  // Abandon round — destructive, clears state
   const handleAbandon = () => {
-    Alert.alert('Abandon Round?', 'Your progress will be lost.', [
-      { text: 'Stay', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: () => {
+    Alert.alert('Abandon Round?', 'This round will not be saved.', [
+      { text: 'Keep Playing', style: 'cancel' },
+      { text: 'Abandon', style: 'destructive', onPress: async () => {
         cancelInteractionLadder().catch(() => {});
         cancelLiveNotification();
-        AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
-        navigation.goBack();
+        await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
+        navigation.navigate('Main');
       }},
     ]);
   };
@@ -521,8 +528,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
     <SafeAreaView style={st.container}>
       {/* ── Header ── */}
       <View style={st.header}>
-        <TouchableOpacity onPress={handleAbandon} style={st.headerBtn} accessibilityLabel="Abandon round">
-          <Ionicons name="close" size={20} color={GOLD} />
+        <TouchableOpacity onPress={handlePause} style={st.headerBtn} accessibilityLabel="Pause round">
+          <Ionicons name="chevron-down-outline" size={22} color={GOLD} />
         </TouchableOpacity>
         <View style={st.headerCenter}>
           <Text style={st.headerTitle}>HOLE {currentHole}</Text>
@@ -589,6 +596,11 @@ export default function ClockedRoundScreen({ navigation, route }) {
               {runningSummary.totalScore > 0 ? `+${runningSummary.totalScore}` : runningSummary.totalScore}
             </Text>
           </View>
+
+          {/* Abandon button — only in scorecard */}
+          <TouchableOpacity style={st.abandonBtn} onPress={handleAbandon} activeOpacity={0.8}>
+            <Text style={st.abandonBtnText}>ABANDON ROUND</Text>
+          </TouchableOpacity>
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={st.mainContent} showsVerticalScrollIndicator={false}>
@@ -946,4 +958,6 @@ const st = StyleSheet.create({
   scCellScore:      { width: 40, fontVariant: ['tabular-nums'] },
   scValText:        { color: CREAM },
   scTotalText:      { fontSize: 12, fontWeight: '700' },
+  abandonBtn:       { marginTop: 24, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E85D4A44', borderRadius: 12 },
+  abandonBtnText:   { color: RED_WARN, fontSize: 13, fontWeight: '600', letterSpacing: 1 },
 });

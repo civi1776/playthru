@@ -250,17 +250,44 @@ const nav = StyleSheet.create({
   gradientSvg: { position: 'absolute', top: 0, left: 0 },
   playIconWrap: { position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 52, height: 52 },
   playLabel: { fontSize: 9, fontFamily: 'Montserrat_700Bold', letterSpacing: 1.5, marginTop: 3, color: PLAY_GOLD },
+
+  // Active round banner
+  roundBanner:       { backgroundColor: PLAY_GOLD, paddingVertical: 10, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  roundBannerText:   { color: '#090F0A', fontWeight: '700', fontSize: 12, letterSpacing: 1 },
+  roundBannerAction: { color: '#090F0A', fontSize: 11 },
 });
 
 // ─── Main app (tab navigator) ─────────────────────────────────────────────────
 // Rendered as the 'Main' screen in the root stack.
-function MainApp() {
+function MainApp({ navigation }) {
   const { profile } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
+  const [hasActiveRound, setHasActiveRound] = useState(false);
   const isCaddy = profile?.account_type === 'caddy';
+
+  useEffect(() => {
+    const check = () => AsyncStorage.getItem(CLOCKED_ROUND_STATE_KEY).then(v => setHasActiveRound(!!v)).catch(() => {});
+    check();
+    const sub = AppState.addEventListener('change', s => { if (s === 'active') check(); });
+    return () => sub.remove();
+  }, []);
+
+  const resumeActiveRound = () => {
+    AsyncStorage.getItem(CLOCKED_ROUND_STATE_KEY).then(saved => {
+      if (!saved) return;
+      const state = JSON.parse(saved);
+      navigation.navigate('ClockedRound', { resumeState: state });
+    }).catch(() => {});
+  };
 
   return (
     <>
+      {hasActiveRound && (
+        <TouchableOpacity style={nav.roundBanner} onPress={resumeActiveRound} activeOpacity={0.9}>
+          <Text style={nav.roundBannerText}>ROUND IN PROGRESS</Text>
+          <Text style={nav.roundBannerAction}>TAP TO RESUME {'\u2192'}</Text>
+        </TouchableOpacity>
+      )}
       {isCaddy ? (
         <Tab.Navigator
           tabBar={props => <BottomNav {...props} isCaddy />}
@@ -473,7 +500,13 @@ function AppNavigator() {
           `You have an active round on hole ${state.currentHole} at ${state.course?.name ?? 'Quick Play'}. Pick up where you left off?`,
           [
             { text: 'Abandon', style: 'destructive', onPress: () => AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY) },
-            { text: 'Resume', onPress: () => navRef.current?.navigate('ClockedRound', { resumeState: state }) },
+            { text: 'Resume', onPress: () => {
+              const tryNav = () => {
+                if (navRef.current) navRef.current.navigate('ClockedRound', { resumeState: state });
+                else setTimeout(tryNav, 100);
+              };
+              tryNav();
+            }},
           ],
           { cancelable: false },
         );
