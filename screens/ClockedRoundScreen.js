@@ -181,16 +181,20 @@ export default function ClockedRoundScreen({ navigation, route }) {
   const updateLiveNotification = useCallback(async (hole, remaining, tp) => {
     const isOver = remaining < 0;
     const timeStr = isOver ? `OVER by ${formatSeconds(Math.abs(remaining))}` : formatSeconds(remaining);
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'live-round-clock',
-      content: {
-        title: `Hole ${hole} — ${isOver ? 'OVER' : timeStr + ' left'}`,
-        body: isOver ? `Time par was ${formatSeconds(tp)}. Finish up!` : `Time par: ${formatSeconds(tp)}. Keep moving!`,
-        sound: false, sticky: true, autoDismiss: false,
-        data: { type: 'live_round' },
-      },
-      trigger: null,
-    }).catch(() => {});
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'live-round-clock',
+        content: {
+          title: `Hole ${hole}`,
+          body: isOver
+            ? `Clock expired \u2014 finish up`
+            : `${timeStr} remaining \u00B7 Time par ${formatSeconds(tp)}`,
+          sound: false,
+          data: { type: 'live_round' },
+        },
+        trigger: null,
+      });
+    } catch {}
   }, []);
 
   const cancelLiveNotification = useCallback(async () => {

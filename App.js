@@ -360,6 +360,7 @@ function AppNavigator() {
   const navRef   = useRef(null);
   const [navReady, setNavReady]             = useState(false);
   const [updateRequired, setUpdateRequired] = useState(false);
+  const [resumeBanner, setResumeBanner]     = useState(null);
   const notificationsSetupRef  = useRef(false);  // only run setupNotifications once per session
 
   useFonts({ Montserrat_700Bold });
@@ -495,21 +496,7 @@ function AppNavigator() {
           await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
           return;
         }
-        Alert.alert(
-          'Resume Round?',
-          `You have an active round on hole ${state.currentHole} at ${state.course?.name ?? 'Quick Play'}. Pick up where you left off?`,
-          [
-            { text: 'Abandon', style: 'destructive', onPress: () => AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY) },
-            { text: 'Resume', onPress: () => {
-              const tryNav = () => {
-                if (navRef.current) navRef.current.navigate('ClockedRound', { resumeState: state });
-                else setTimeout(tryNav, 100);
-              };
-              tryNav();
-            }},
-          ],
-          { cancelable: false },
-        );
+        setResumeBanner(state);
       } catch (e) { console.log('Resume check error:', e); }
     };
     const t = setTimeout(checkForActiveRound, 800);
@@ -580,7 +567,7 @@ function AppNavigator() {
   const initialRouteName = (session && profile) ? 'Main' : 'Welcome';
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: '#090F0A' }}>
     <NavigationContainer ref={navRef} onReady={() => setNavReady(true)}>
       <RootStack.Navigator
         screenOptions={{ headerShown: false }}
@@ -620,7 +607,29 @@ function AppNavigator() {
         <RootStack.Screen name="ConfirmRound"  component={ConfirmRoundScreen} />
       </RootStack.Navigator>
     </NavigationContainer>
-    </>
+
+    {/* Resume round banner */}
+    {resumeBanner && (
+      <View style={styles.resumeBanner}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.resumeTitle}>ROUND IN PROGRESS</Text>
+          <Text style={styles.resumeSub}>Hole {resumeBanner.currentHole} {'\u00B7'} {resumeBanner.course?.name ?? 'Quick Play'}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={styles.resumeAbandonBtn} onPress={async () => { await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY); setResumeBanner(null); }}>
+            <Text style={styles.resumeAbandonText}>ABANDON</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.resumeBtn} onPress={() => {
+            const s = resumeBanner; setResumeBanner(null);
+            const tryNav = () => { if (navRef.current) navRef.current.navigate('ClockedRound', { resumeState: s }); else setTimeout(tryNav, 100); };
+            tryNav();
+          }}>
+            <Text style={styles.resumeBtnText}>RESUME {'\u2192'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    )}
+    </View>
   );
 }
 
@@ -637,4 +646,11 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#090F0A',
     justifyContent: 'center', alignItems: 'center',
   },
+  resumeBanner:     { position: 'absolute', bottom: 90, left: 16, right: 16, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#C9A84C', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 999 },
+  resumeTitle:      { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 1, marginBottom: 2 },
+  resumeSub:        { fontSize: 12, color: '#F5EDD8' },
+  resumeAbandonBtn: { paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#E85D4A33', borderRadius: 8 },
+  resumeAbandonText:{ fontSize: 11, color: '#E85D4A', fontWeight: '600' },
+  resumeBtn:        { paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#C9A84C', borderRadius: 8 },
+  resumeBtnText:    { fontSize: 11, color: '#090F0A', fontWeight: '700' },
 });

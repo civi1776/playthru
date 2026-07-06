@@ -996,6 +996,7 @@ export default function ProfileScreen({ navigation }) {
   const [roundCount, setRoundCount] = useState(0);
   const [stats, setStats]       = useState({});
   const [clockedRating, setClockedRating] = useState({ clockedScore: null, scoring: null, clock: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
+  const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
     if (!user) navigation.replace('Welcome');
@@ -1019,6 +1020,13 @@ export default function ProfileScreen({ navigation }) {
         .order('created_at', { ascending: false });
       setRounds(roundsData ?? []);
       setRoundCount(roundsData?.length ?? 0);
+
+      // Following count
+      const { count: fCount } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', profile.id);
+      setFollowingCount(fCount ?? 0);
 
       if (roundsData && roundsData.length > 0) {
         const avgTime      = roundsData.reduce((sum, r) => sum + (r.duration_minutes || 0), 0) / roundsData.length;
@@ -1225,7 +1233,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
             <View style={s.statChip}>
               <Text style={s.statChipLabel}>FOLLOWING</Text>
-              <Text style={s.statChipNum}>{profile?.following_count ?? '\u2014'}</Text>
+              <Text style={s.statChipNum}>{followingCount}</Text>
             </View>
           </View>
         )}

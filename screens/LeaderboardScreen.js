@@ -182,12 +182,27 @@ export default function LeaderboardScreen({ navigation }) {
         }).filter(Boolean);
         const rating = computeFullRating({ roundStats, handicapIndex: prof?.handicap_index });
         return { userId, name: playerName, handle: prof?.username ? `@${prof.username}` : '', avatarUrl: prof?.avatar_url, rating, isYou: userId === uid };
-      }).filter(e => e.rating.clockedScore != null);
+      }).filter(e => e.rating.clockedScore != null && e.rating.clockedScore > 0);
+
+      // Fetch all profiles so users with zero rounds still appear
+      const { data: allProfiles } = await supabase
+        .from('profiles').select('id, full_name, username, avatar_url, handicap_index')
+        .eq('account_type', 'golfer').not('full_name', 'is', null);
+      const entryUserIds = new Set(allEntries.map(e => e.userId));
+      const baseEntries = (allProfiles ?? [])
+        .filter(p => !entryUserIds.has(p.id))
+        .map(p => {
+          const rating = computeFullRating({ roundStats: [], handicapIndex: p.handicap_index });
+          return { userId: p.id, name: p.full_name || p.username || 'Golfer', handle: p.username ? `@${p.username}` : '', avatarUrl: p.avatar_url, rating, isYou: p.id === uid };
+        })
+        .filter(e => e.rating.clockedScore != null && e.rating.clockedScore > 0);
+
+      const combined = [...allEntries, ...baseEntries];
 
       const getSortVal = (e) => e.rating.clockedScore ?? 0;
 
-      const established = allEntries.filter(e => !e.rating.isProvisional);
-      const provisional = allEntries.filter(e => e.rating.isProvisional);
+      const established = combined.filter(e => !e.rating.isProvisional);
+      const provisional = combined.filter(e => e.rating.isProvisional);
       established.sort((a, b) => getSortVal(b) - getSortVal(a));
 
       const rows = established.slice(0, 50).map((e, i) => ({
@@ -227,8 +242,9 @@ export default function LeaderboardScreen({ navigation }) {
       const { data: courses, error: err } = await supabase
         .from('courses')
         .select('id, name, city, state, avg_time, total_rounds, pop_score')
+        .not('avg_time', 'is', null)
         .gt('total_rounds', 0)
-        .order('total_rounds', { ascending: false })
+        .order('avg_time', { ascending: true })
         .limit(50);
       if (err) throw err;
       setData(courses ?? []);
@@ -324,7 +340,7 @@ export default function LeaderboardScreen({ navigation }) {
         </View>
       ) : isCourse ? (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <Text style={s.courseListHeader}>Courses ranked by rounds played</Text>
+          <Text style={s.courseListHeader}>Courses ranked by fastest average round</Text>
           <View style={s.listSection}>
             {filteredCourses.map((course, i) => (
               <CourseRow key={course.id ?? i} course={course} navigation={navigation} />
