@@ -448,7 +448,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       navigation.navigate('Share', {
         roundFormat: 'clocked', courseName: course?.name ?? 'Quick Play', date: dateStr,
-        holes: String(holeCount), transport, durationMinutes,
+        holes: String(holeCount), transport, difficulty, durationMinutes,
         teamScore: summary.totalScore, totalTimePar: summary.totalTimePar,
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty,
         playerTotals: summary.playerTotals, formatBadge: formatBadge(playerCount),

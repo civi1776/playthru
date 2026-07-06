@@ -1,177 +1,208 @@
-// ─── ClockedShareCard — Strava-style photo overlay share card ────────────────
-import { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+// ─── ClockedShareCard — STAT + ROUND share cards ─────────────────────────────
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { getCoursePhoto } from '../lib/googlePlaces';
 
-const W = Dimensions.get('window').width - 32;
-const H = Math.round(W * (11 / 9));
-
-const GOLD  = '#C9A84C';
-const CREAM = '#F5EDD8';
-const MUTED = '#B8A882';
-const GREEN = '#7DC87A';
-const RED   = '#E85D4A';
-const DIM   = '#7A6E58';
-
-function scoreColor(v) { return v >= 0 ? GREEN : RED; }
-
-function formatNames(playerTotals) {
-  if (!playerTotals || playerTotals.length <= 1) return null;
-  const names = playerTotals.map(p => (p.name ?? '').split(' ')[0]).filter(Boolean);
-  if (names.length === 2) return `${names[0]} & ${names[1]}`;
-  const last = names.pop();
-  return `${names.join(', ')} & ${last}`;
-}
-
-export default function ClockedShareCard({
-  teamScore,
-  playerTotals,
-  courseName,
-  date,
-  holes,
-  holeScores,
-  detailed = false,
-}) {
-  const scoreStr = teamScore != null ? (teamScore > 0 ? `+${teamScore}` : String(teamScore)) : '--';
-  const holeData = holeScores ?? [];
-  const penalties = holeData.filter(h => h.penalty < 0).length;
-  const birdiesPlus = holeData.filter(h => (h.teamPointsBeforePenalty ?? 0) >= 3).length;
-  const pars = holeData.filter(h => (h.teamPointsBeforePenalty ?? 0) === 1).length;
-  const partnerLine = formatNames(playerTotals);
-  const isQuickPlay = !courseName || courseName === 'Quick Play';
-
-  // Photo state: course photo (default) or user-picked override
-  const [coursePhotoUrl, setCoursePhotoUrl] = useState(null);
-  const [userPhotoUri, setUserPhotoUri] = useState(null);
-
-  useEffect(() => {
-    if (isQuickPlay) return;
-    getCoursePhoto(courseName).then(url => { if (url) setCoursePhotoUrl(url); });
-  }, [courseName]);
-
-  const bgSource = userPhotoUri ?? coursePhotoUrl;
-
-  const pickPhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') return;
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [9, 11],
-        quality: 0.9,
-      });
-      if (!result.canceled && result.assets?.[0]?.uri) {
-        setUserPhotoUri(result.assets[0].uri);
-      }
-    } catch { /* silent */ }
-  };
+// ─── STAT CARD — pure black, giant score hero ───────────────────────────────
+export function StatCard({ score, courseName, players, holes, difficulty, penalties, clockedScore, date }) {
+  const scoreStr = score != null ? (score >= 0 ? `+${score}` : String(score)) : '--';
+  const diffLabel = difficulty === 'pro' ? 'PRO' : difficulty === 'beginner' ? 'BEGINNER' : 'INTER.';
+  const diffColor = difficulty === 'pro' ? '#E85D4A' : difficulty === 'beginner' ? '#7DC87A' : '#C9A84C';
+  const penStr = penalties === 0 ? 'ZERO' : String(penalties);
+  const penColor = penalties === 0 ? '#7DC87A' : '#E85D4A';
 
   return (
-    <View style={s.card}>
-      {/* Background */}
-      {bgSource ? (
-        <Image source={{ uri: bgSource }} style={s.bgImage} resizeMode="cover" />
-      ) : (
-        <LinearGradient colors={['#1a2e1c', '#0d1a0f']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.bgImage} />
-      )}
-
-      {/* Gradient scrim */}
-      <LinearGradient
-        colors={['transparent', 'rgba(9,15,10,0.55)', 'rgba(9,15,10,0.88)', 'rgba(9,15,10,0.95)']}
-        locations={[0, 0.3, 0.6, 1]}
-        style={s.scrim}
-      />
-
-      {/* ── TOP BAR ── */}
-      <View style={s.topBar}>
-        <Text style={s.topLeft}>CLOCKED</Text>
-        <View style={s.topRightRow}>
-          {/* Photo picker */}
-          <TouchableOpacity style={s.cameraBtn} onPress={pickPhoto} activeOpacity={0.7}>
-            <Ionicons name="camera-outline" size={14} color={GOLD} />
-          </TouchableOpacity>
-          {/* Remove custom photo */}
-          {userPhotoUri && (
-            <TouchableOpacity style={s.cameraBtn} onPress={() => setUserPhotoUri(null)} activeOpacity={0.7}>
-              <Ionicons name="close" size={14} color={CREAM} />
-            </TouchableOpacity>
-          )}
-          <Text style={s.topRightText}>{holes ?? '9'} HOLES</Text>
+    <View style={stat.card}>
+      <View style={stat.topBar}>
+        <Text style={stat.wordmark}>CLOCKED</Text>
+        <Text style={stat.topRight}>{date}</Text>
+      </View>
+      <View style={stat.divider} />
+      <Text style={stat.course}>{(courseName ?? 'QUICK PLAY').toUpperCase()}</Text>
+      <Text style={stat.heroNumber}>{scoreStr}</Text>
+      <Text style={stat.ptsLabel}>PTS</Text>
+      <View style={stat.divider} />
+      <View style={stat.bottomRow}>
+        <View>
+          <Text style={stat.statLabel}>PLAYERS</Text>
+          <Text style={stat.statValue}>{players ?? 'Solo'}</Text>
+        </View>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={stat.statLabel}>DIFFICULTY</Text>
+          <Text style={[stat.statValue, { color: diffColor }]}>{diffLabel}</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={stat.statLabel}>PENALTIES</Text>
+          <Text style={[stat.statValue, { color: penColor }]}>{penStr}</Text>
         </View>
       </View>
-
-      {/* ── BOTTOM CONTENT ── */}
-      <View style={s.bottomContent}>
-        <Text style={s.courseLabel}>{isQuickPlay ? 'ON THE CLOCK' : courseName?.toUpperCase()}</Text>
-
-        {partnerLine && <Text style={s.partnerLine}>{partnerLine}</Text>}
-
-        <Text style={[s.scoreHero, { color: scoreColor(teamScore ?? 0) }]}>{scoreStr}</Text>
-        <Text style={s.scoreSub}>PTS</Text>
-
-        {/* Simple mode: single penalty line */}
-        {!detailed && (
-          <Text style={[s.penaltyLine, { color: penalties > 0 ? RED : DIM }]}>
-            {penalties > 0 ? `${penalties} ${penalties === 1 ? 'penalty' : 'penalties'}` : 'no penalties'}
-          </Text>
-        )}
-
-        {/* Detailed mode: birdies · pars · penalties row */}
-        {detailed && (
-          <View style={s.detailRow}>
-            <Text style={[s.detailItem, { color: birdiesPlus > 0 ? GREEN : DIM }]}>
-              {birdiesPlus} {birdiesPlus === 1 ? 'BIRDIE' : 'BIRDIES'}
-            </Text>
-            <Text style={s.detailDot}>{'\u00B7'}</Text>
-            <Text style={[s.detailItem, { color: CREAM + 'CC' }]}>
-              {pars} {pars === 1 ? 'PAR' : 'PARS'}
-            </Text>
-            <Text style={s.detailDot}>{'\u00B7'}</Text>
-            <Text style={[s.detailItem, { color: penalties > 0 ? RED : DIM }]}>
-              {penalties} PEN
-            </Text>
-          </View>
-        )}
-
-        <Text style={s.dateLine}>{date ?? ''}</Text>
+      <View style={stat.divider} />
+      <View style={stat.bottomRow}>
+        <View>
+          <Text style={stat.statLabel}>CLOCKED SCORE</Text>
+          <Text style={[stat.statValue, { color: '#C9A84C', fontSize: 22 }]}>{clockedScore ?? '\u2014'}</Text>
+        </View>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={stat.statLabel}>HOLES</Text>
+          <Text style={stat.statValue}>{holes}H</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={stat.statLabel}>FORMAT</Text>
+          <Text style={stat.statValue}>ON THE CLOCK</Text>
+        </View>
+      </View>
+      <View style={stat.footer}>
+        <Text style={stat.footerText}>CLOCKED GOLF {'\u00B7'} GOLF HAS A SHOT CLOCK.</Text>
       </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  card: { width: W, height: H, borderRadius: 20, overflow: 'hidden', backgroundColor: '#0d1a0f' },
+const stat = StyleSheet.create({
+  card:       { width: 340, backgroundColor: '#090F0A', borderWidth: 0.5, borderColor: '#C9A84C', borderRadius: 16, padding: 20, alignSelf: 'center' },
+  topBar:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  wordmark:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 4 },
+  topRight:   { fontSize: 9, color: '#7A6E58', letterSpacing: 1 },
+  divider:    { height: 0.5, backgroundColor: '#C9A84C22', marginVertical: 12 },
+  course:     { fontSize: 10, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 8 },
+  heroNumber: { fontSize: 120, fontWeight: '200', color: '#F5EDD8', lineHeight: 130, letterSpacing: -4 },
+  ptsLabel:   { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 4 },
+  bottomRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  statLabel:  { fontSize: 8, color: '#7A6E58', letterSpacing: 1.5, marginBottom: 3 },
+  statValue:  { fontSize: 13, fontWeight: '700', color: '#F5EDD8', letterSpacing: 0.5 },
+  footer:     { marginTop: 16, alignItems: 'center' },
+  footerText: { fontSize: 8, color: '#C9A84C44', letterSpacing: 2 },
+});
 
-  bgImage: { position: 'absolute', width: W, height: H },
-  scrim:   { position: 'absolute', left: 0, right: 0, bottom: 0, height: H * 0.7 },
+// ─── ROUND CARD — dark green, course photo, hole grid ───────────────────────
+export function RoundCard({ score, courseName, players, holes, difficulty, penalties, clockedScore, date, holeScores, roundTime, customPhoto }) {
+  const scoreStr = score != null ? (score >= 0 ? `+${score}` : String(score)) : '--';
+  const diffLabel = difficulty === 'pro' ? 'PRO' : difficulty === 'beginner' ? 'BGNNR' : 'INTER.';
+  const diffColor = difficulty === 'pro' ? '#E85D4A' : difficulty === 'beginner' ? '#7DC87A' : '#C9A84C';
 
-  // Top bar
-  topBar:      { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14 },
-  topLeft:     { fontSize: 9, fontWeight: '700', color: GOLD, letterSpacing: 2, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  topRightRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  topRightText:{ fontSize: 9, fontWeight: '700', color: CREAM + 'CC', letterSpacing: 2, textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-  cameraBtn:   { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(9,15,10,0.5)', alignItems: 'center', justifyContent: 'center' },
+  const holeColor = (pts) => {
+    if (pts >= 2) return '#F0CB5B';
+    if (pts === 1) return '#7DC87A';
+    if (pts === 0) return '#C9A84C44';
+    return '#E85D4A';
+  };
+  const holeBorder = (pts) => {
+    if (pts >= 2) return '#F0CB5B';
+    if (pts === 1) return '#7DC87A';
+    if (pts === 0) return '#C9A84C';
+    return '#E85D4A';
+  };
+  const holeLabel = (pts) => {
+    if (pts > 0) return `+${pts}`;
+    if (pts === 0) return 'P';
+    return String(pts);
+  };
 
-  // Bottom content
-  bottomContent: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center', paddingBottom: 24, paddingHorizontal: 20 },
+  return (
+    <View style={rnd.card}>
+      {/* Photo band */}
+      <View style={rnd.photoWrap}>
+        {customPhoto ? (
+          <Image source={{ uri: customPhoto }} style={rnd.photo} resizeMode="cover" />
+        ) : (
+          <View style={rnd.photoPlaceholder}>
+            <Text style={rnd.photoPlaceholderText}>{(courseName ?? 'QUICK PLAY').toUpperCase()}</Text>
+          </View>
+        )}
+        <LinearGradient colors={['transparent', '#0D1A0F']} style={rnd.scrim} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
+        <View style={rnd.photoBadgeRow}>
+          <View style={rnd.badge}><Text style={rnd.badgeText}>CLOCKED</Text></View>
+          <View style={rnd.badge}><Text style={rnd.badgeText}>{holes} HOLES</Text></View>
+        </View>
+      </View>
 
-  courseLabel:  { fontSize: 11, fontWeight: '700', color: GOLD, letterSpacing: 2, marginBottom: 6 },
-  partnerLine: { fontSize: 13, color: CREAM + 'DD', marginBottom: 10 },
+      {/* Body */}
+      <View style={rnd.body}>
+        <Text style={rnd.courseName} numberOfLines={1}>{(courseName ?? 'Quick Play').toUpperCase()}</Text>
+        <Text style={rnd.subLine}>{players ?? 'Solo'} {'\u00B7'} {date}</Text>
 
-  scoreHero: { fontSize: 52, fontWeight: '700', fontVariant: ['tabular-nums'], lineHeight: 56, letterSpacing: -2 },
-  scoreSub:  { fontSize: 9, fontWeight: '700', color: GOLD, letterSpacing: 4, marginTop: -2, marginBottom: 8 },
+        {/* Score */}
+        <View style={rnd.scoreRow}>
+          <Text style={rnd.heroScore}>{scoreStr}</Text>
+          <View style={{ marginLeft: 12, justifyContent: 'flex-end', paddingBottom: 6 }}>
+            <Text style={rnd.scoreUnit}>PTS</Text>
+            <Text style={[rnd.penaltyLine, { color: penalties === 0 ? '#7DC87A' : '#E85D4A' }]}>
+              {penalties === 0 ? 'no penalties' : `${penalties} penalties`}
+            </Text>
+          </View>
+        </View>
 
-  // Simple mode
-  penaltyLine: { fontSize: 11, fontWeight: '600', letterSpacing: 1, marginBottom: 12 },
+        {/* Hole grid */}
+        {holeScores?.length > 0 && (
+          <View>
+            <Text style={rnd.gridLabel}>HOLE BY HOLE</Text>
+            <View style={rnd.holeGrid}>
+              {holeScores.map((h, i) => {
+                const pts = h.players?.[0]?.points ?? h.holeScore ?? 0;
+                return (
+                  <View key={i} style={[rnd.holeCell, { borderColor: holeBorder(pts), backgroundColor: holeColor(pts) + '22' }]}>
+                    <Text style={[rnd.holeCellTop, { color: '#7A6E58' }]}>H{h.hole}</Text>
+                    <Text style={[rnd.holeCellScore, { color: holeBorder(pts) }]}>{holeLabel(pts)}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
-  // Detailed mode
-  detailRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  detailItem:  { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  detailDot:   { fontSize: 10, color: DIM },
+        {/* Stats */}
+        <View style={rnd.divider} />
+        <View style={rnd.statsRow}>
+          <View>
+            <Text style={rnd.statLabel}>CLK SCORE</Text>
+            <Text style={[rnd.statVal, { color: '#C9A84C' }]}>{clockedScore ?? '\u2014'}</Text>
+          </View>
+          <View style={{ alignItems: 'center' }}>
+            <Text style={rnd.statLabel}>DIFFICULTY</Text>
+            <Text style={[rnd.statVal, { color: diffColor }]}>{diffLabel}</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={rnd.statLabel}>ROUND TIME</Text>
+            <Text style={rnd.statVal}>{roundTime ?? '\u2014'}</Text>
+          </View>
+        </View>
 
-  dateLine: { fontSize: 10, color: MUTED + 'AA', letterSpacing: 1 },
+        {/* Footer */}
+        <View style={rnd.footerRow}>
+          <Text style={rnd.footerWordmark}>CLOCKED GOLF</Text>
+          <Text style={rnd.footerTagline}>golf has a shot clock.</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const rnd = StyleSheet.create({
+  card:              { width: 340, backgroundColor: '#0D1A0F', borderWidth: 0.5, borderColor: '#7DC87A44', borderRadius: 16, overflow: 'hidden', alignSelf: 'center' },
+  photoWrap:         { height: 120, position: 'relative' },
+  photo:             { width: '100%', height: 120 },
+  photoPlaceholder:  { width: '100%', height: 120, backgroundColor: '#1A3A1C', justifyContent: 'center', alignItems: 'center' },
+  photoPlaceholderText: { fontSize: 10, color: '#7A6E58', letterSpacing: 3 },
+  scrim:             { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 },
+  photoBadgeRow:     { position: 'absolute', top: 12, left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' },
+  badge:             { backgroundColor: '#00000066', borderWidth: 0.5, borderColor: '#FFFFFF33', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  badgeText:         { fontSize: 8, fontWeight: '700', color: '#F5EDD8', letterSpacing: 1.5 },
+  body:              { padding: 16 },
+  courseName:        { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 1, marginBottom: 2 },
+  subLine:           { fontSize: 10, color: '#7A6E58', marginBottom: 8 },
+  scoreRow:          { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12 },
+  heroScore:         { fontSize: 64, fontWeight: '200', color: '#7DC87A', lineHeight: 68, letterSpacing: -2 },
+  scoreUnit:         { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 2, marginBottom: 2 },
+  penaltyLine:       { fontSize: 10, fontStyle: 'italic' },
+  gridLabel:         { fontSize: 8, color: '#7A6E58', letterSpacing: 2, marginBottom: 6 },
+  holeGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 12 },
+  holeCell:          { width: 30, height: 30, borderRadius: 6, borderWidth: 0.5, alignItems: 'center', justifyContent: 'center' },
+  holeCellTop:       { fontSize: 7, lineHeight: 10 },
+  holeCellScore:     { fontSize: 10, fontWeight: '700', lineHeight: 12 },
+  divider:           { height: 0.5, backgroundColor: '#7DC87A22', marginBottom: 10 },
+  statsRow:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
+  statLabel:         { fontSize: 7, color: '#7A6E58', letterSpacing: 1.5, marginBottom: 2 },
+  statVal:           { fontSize: 14, fontWeight: '700', color: '#F5EDD8' },
+  footerRow:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 0.5, borderTopColor: '#7DC87A22', paddingTop: 8 },
+  footerWordmark:    { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 3 },
+  footerTagline:     { fontSize: 8, color: '#7A6E58', fontStyle: 'italic', letterSpacing: 0.5 },
 });
