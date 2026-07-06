@@ -77,8 +77,6 @@ export default function EditProfileScreen({ navigation }) {
       const contentType = asset.mimeType ?? `image/${ext === 'png' ? 'png' : 'jpeg'}`;
       const filePath = `${authUser.id}/avatar.${ext}`;
 
-      // 3. Log before upload
-      console.log('AVATAR_UPLOAD', { authUid: authUser.id, filePath, contentType });
 
       // Decode base64 to binary
       const base64Data = asset.base64;
@@ -94,7 +92,6 @@ export default function EditProfileScreen({ navigation }) {
         .upload(filePath, bytes, { contentType, upsert: true });
 
       if (upErr) {
-        console.log('AVATAR_UPLOAD_ERROR', JSON.stringify(upErr));
         Alert.alert('Upload failed', upErr.message);
         return;
       }
@@ -110,9 +107,7 @@ export default function EditProfileScreen({ navigation }) {
       await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', authUser.id);
       setAvatarUrl(publicUrl);
       await refreshProfile();
-      console.log('AVATAR_UPLOAD_SUCCESS', { filePath, publicUrl });
     } catch (e) {
-      console.log('AVATAR_UPLOAD_CATCH', e?.message);
       Alert.alert('Error', 'Could not upload photo.');
     } finally {
       setUploading(false);

@@ -118,7 +118,7 @@ export default function PublicProfileScreen({ navigation, route }) {
       setLoading(true);
 
       const [{ data: profileData }, { data: roundsData }, { data: followData }, { data: caddyRoundsData }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
         supabase.from('rounds')
           .select('id, course_name, created_at, holes, duration_minutes, pop_score, round_format, active_game, hole_scores')
           .eq('user_id', userId)

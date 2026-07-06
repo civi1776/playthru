@@ -497,7 +497,7 @@ function AppNavigator() {
           return;
         }
         setResumeBanner(state);
-      } catch (e) { console.log('Resume check error:', e); }
+      } catch (e) { /* silent */ }
     };
     const t = setTimeout(checkForActiveRound, 800);
     return () => clearTimeout(t);

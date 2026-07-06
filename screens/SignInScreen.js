@@ -11,8 +11,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
@@ -44,33 +42,6 @@ export default function SignInScreen({ navigation }) {
     await refreshProfile();
     setLoading(false);
     navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-
-    // One-time Face ID setup prompt — only shown if user has never decided
-    const existing = await AsyncStorage.getItem('faceIdEnabled');
-    if (existing === null) {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled  = await LocalAuthentication.isEnrolledAsync();
-      if (hasHardware && isEnrolled) {
-        Alert.alert(
-          'Use Face ID?',
-          'Would you like to use Face ID to log in faster next time?',
-          [
-            {
-              text: 'Enable Face ID',
-              onPress: async () => AsyncStorage.setItem('faceIdEnabled', 'true'),
-            },
-            {
-              text: 'Not Now',
-              style: 'cancel',
-              onPress: async () => AsyncStorage.setItem('faceIdEnabled', 'false'),
-            },
-          ]
-        );
-      } else {
-        // No biometric hardware — mark as decided so we never ask again
-        await AsyncStorage.setItem('faceIdEnabled', 'false');
-      }
-    }
   };
 
   const handleForgotPassword = () => {

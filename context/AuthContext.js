@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
 
 const AuthContext = createContext(null);
 
@@ -13,7 +15,7 @@ export function AuthProvider({ children }) {
   const loadProfile = async (userId) => {
     if (!userId) { setProfile(null); return; }
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-    if (error) { console.log('PROFILE_FETCH_ERROR', error.message); setProfile(null); return; }
+    if (error) { setProfile(null); return; }
     if (data) {
       const { date_of_birth: _dob, ...safe } = data;
       setProfile(safe);
@@ -55,6 +57,7 @@ export function AuthProvider({ children }) {
   };
 
   const signOut = async () => {
+    await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
     await supabase.auth.signOut();
   };
 

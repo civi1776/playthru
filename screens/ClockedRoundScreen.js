@@ -330,13 +330,10 @@ export default function ClockedRoundScreen({ navigation, route }) {
         ...(operatingCaddyId ? { caddy_id: operatingCaddyId, caddy_logged: true } : {}),
       };
 
-      // 1. Before rounds insert
-      console.log('CLOCKED_SAVE_START', { userId: user?.id, courseId: course?.id, courseName: course?.name, holesCount: holeScoresJson?.length, roundFormat: 'clocked' });
 
       let savedRoundId = null;
       for (let attempt = 0; attempt < 5; attempt++) {
         const result = await supabase.from('rounds').insert([row]).select('id');
-        console.log('CLOCKED_SAVE_ROUND', { attempt, data: JSON.stringify(result.data), error: JSON.stringify(result.error) });
 
         if (!result.error) {
           savedRoundId = result.data?.[0]?.id ?? null;
@@ -378,12 +375,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
           .filter(Boolean);
 
         if (participantRows.length > 0) {
-          // 3. Before round_participants insert
-          console.log('CLOCKED_SAVE_PARTICIPANTS_START', { roundId: savedRoundId, participantCount: participantRows.length });
-
-          // 4. After round_participants insert
           const partResult = await supabase.from('round_participants').insert(participantRows);
-          console.log('CLOCKED_SAVE_PARTICIPANTS', { data: JSON.stringify(partResult.data), error: JSON.stringify(partResult.error) });
         }
 
         // Notify pending participants
@@ -459,8 +451,6 @@ export default function ClockedRoundScreen({ navigation, route }) {
         holeScores: results.slice(0, holeCount),
       });
     } catch (e) {
-      // 7. Catch block
-      console.log('CLOCKED_SAVE_CATCH', { message: e?.message, stack: e?.stack });
       Alert.alert('Error', 'Could not save your round. Please try again.');
     }
   };
