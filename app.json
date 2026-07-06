@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Clocked Golf",
-    "slug": "clocked-golf",
+    "slug": "playthru",
     "scheme": "playthru",
     "version": "1.5.3",
     "orientation": "portrait",
