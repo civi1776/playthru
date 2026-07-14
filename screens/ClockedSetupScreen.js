@@ -38,6 +38,7 @@ export default function ClockedSetupScreen({ navigation }) {
   const [transport, setTransport]     = useState(null);
   const [difficulty, setDifficulty]   = useState('intermediate');
   const [players, setPlayers]         = useState([]);
+  const [certData, setCertData]       = useState(null); // { timePars, holeInfo }
 
   // Pre-fetch remote config on mount
   useEffect(() => { fetchClockedConfig(); }, []);
@@ -66,6 +67,7 @@ export default function ClockedSetupScreen({ navigation }) {
     setCourseTees(null);
     setSelectedTeeIdx(null);
     setSelectedNine('front');
+    setCertData(null);
     setPhase(PHASE.HOLES);
     if (c.id) {
       try {
@@ -76,6 +78,21 @@ export default function ClockedSetupScreen({ navigation }) {
           setSelectedTeeIdx(Math.floor(maleTees.length / 2));
         }
       } catch { /* silent */ }
+
+      // Fetch certified time pars
+      try {
+        const { data: certRows } = await supabase
+          .from('course_time_pars')
+          .select('hole_number, par, yardage, time_pars')
+          .eq('course_id', c.id)
+          .eq('certified', true);
+        if (certRows?.length > 0) {
+          setCertData({
+            timePars: Object.fromEntries(certRows.map(r => [r.hole_number, r.time_pars])),
+            holeInfo: Object.fromEntries(certRows.map(r => [r.hole_number, { par: r.par, yardage: r.yardage }])),
+          });
+        }
+      } catch { /* silent — round proceeds on tier fallback */ }
     }
   };
 
@@ -150,7 +167,30 @@ export default function ClockedSetupScreen({ navigation }) {
 
   const handleStartRound = async () => {
     const config = await fetchClockedConfig();
-    const holeDataSlice = buildHoleDataSlice();
+    let holeDataSlice = buildHoleDataSlice();
+
+    // Remap certified data: for back 9, DB hole 10 → round hole 1
+    const holeOffset = (holes === '9' && selectedNine === 'back') ? 9 : 0;
+    let officialTimePars = {};
+    if (certData?.timePars) {
+      officialTimePars = Object.fromEntries(
+        Object.entries(certData.timePars).map(([k, v]) => [Number(k) - holeOffset, v])
+      );
+    }
+
+    // Seed holeData with certified par/yardage where available
+    if (certData?.holeInfo && holeDataSlice) {
+      holeDataSlice = holeDataSlice.map((h, i) => {
+        const dbHole = i + 1 + holeOffset;
+        const cert = certData.holeInfo[dbHole];
+        if (!cert) return h;
+        return {
+          ...h,
+          par: cert.par ?? h.par,
+          yardage: cert.yardage ?? h.yardage,
+        };
+      });
+    }
 
     navigation.navigate('ClockedRound', {
       course,
@@ -164,6 +204,7 @@ export default function ClockedSetupScreen({ navigation }) {
       holeData: holeDataSlice,
       configSnapshot: config,
       operatingCaddyId: isCaddy ? user?.id : null,
+      officialTimePars,
     });
   };
 
