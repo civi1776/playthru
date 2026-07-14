@@ -184,14 +184,7 @@ export default function SearchUsersScreen({ navigation }) {
             >
               <InitialsAvatar name={result.full_name} size={42} avatarUrl={result.avatar_url} />
               <View style={s.info}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={s.name} numberOfLines={1}>{result.full_name || '—'}</Text>
-                  {result.account_type === 'caddy' && (
-                    <View style={s.caddyBadge}>
-                      <Text style={s.caddyBadgeText}>CADDY</Text>
-                    </View>
-                  )}
-                </View>
+                <Text style={s.name} numberOfLines={1}>{result.full_name || '—'}</Text>
                 <Text style={s.handle}>
                   @{result.username}{result.home_course ? ` · ${result.home_course}` : ''}
                 </Text>
@@ -240,6 +233,4 @@ const s = StyleSheet.create({
   followingBtnText:{ color: '#C9A84C' },
   emptyState:      { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
   emptyText:       { fontSize: 20, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', lineHeight: 28 },
-  caddyBadge:      { backgroundColor: '#C9A84C', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  caddyBadgeText:  { fontSize: 7, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
 });

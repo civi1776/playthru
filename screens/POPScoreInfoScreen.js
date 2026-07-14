@@ -100,10 +100,6 @@ export default function POPScoreInfoScreen({ navigation }) {
               <Text style={s.verifyDesc}>Self-reported — you logged the round manually.</Text>
             </View>
             <View style={s.verifyRow}>
-              <VerificationBadge level="caddy_corroborated" />
-              <Text style={s.verifyDesc}>Caddy verified — a caddy on Clocked confirmed your round times.</Text>
-            </View>
-            <View style={s.verifyRow}>
               <VerificationBadge level="gps_tracked" />
               <Text style={s.verifyDesc}>GPS tracked — automatic scoring via real-time GPS. Coming soon.</Text>
             </View>

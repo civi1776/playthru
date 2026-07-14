@@ -25,7 +25,6 @@ const STEP_LABELS = ['Course', 'Holes', 'Tee', 'Mode', 'Players', 'Transport', '
 
 export default function ClockedSetupScreen({ navigation }) {
   const { profile, user } = useAuth();
-  const isCaddy = profile?.account_type === 'caddy';
 
   // ── State ──
   const [phase, setPhase]             = useState(PHASE.COURSE);
@@ -203,7 +202,6 @@ export default function ClockedSetupScreen({ navigation }) {
       selectedNine,
       holeData: holeDataSlice,
       configSnapshot: config,
-      operatingCaddyId: isCaddy ? user?.id : null,
       officialTimePars,
     });
   };

@@ -17,8 +17,6 @@ import { CLOCKED_ROUND_STATE_KEY } from './lib/clockedRoundConstants';
 import HomeScreen             from './screens/HomeScreen';
 import FeedScreen             from './screens/FeedScreen';
 import RulesScreen            from './screens/RulesScreen';
-import CaddyDashboardScreen    from './screens/CaddyDashboardScreen';
-import CaddyLeaderboardScreen  from './screens/CaddyLeaderboardScreen';
 import LogScreen          from './screens/LogScreen';
 import CoursesScreen      from './screens/CoursesScreen';
 import ProfileScreen      from './screens/ProfileScreen';
@@ -111,13 +109,6 @@ const PLAYER_TABS = [
   { name: 'Ranks', icon: 'trophy-outline', label: 'RANKS' },
   { name: 'You',   icon: 'person-outline', label: 'YOU' },
 ];
-const CADDY_TABS = [
-  { name: 'Home',        icon: 'shield-outline', label: 'HUB' },
-  { name: 'Play',        icon: 'timer-outline',  label: 'OPERATE', isPlay: true },
-  { name: 'Leaderboard', icon: 'trophy',         label: 'RANKS' },
-  { name: 'Log',         icon: 'add-circle',     label: 'LOG' },
-];
-
 // ─── Play button glow colors ─────────────────────────────────────────────────
 const PLAY_GOLD       = '#F0CB5B'; // brighter, more saturated than #C9A84C
 const PLAY_GOLD_TOP   = '#F7DC82'; // lighter highlight for gradient top
@@ -183,8 +174,8 @@ function PlayButton({ onPress }) {
   );
 }
 
-function BottomNav({ state, navigation, isCaddy }) {
-  const tabs = isCaddy ? CADDY_TABS : PLAYER_TABS;
+function BottomNav({ state, navigation }) {
+  const tabs = PLAYER_TABS;
   return (
     <View style={nav.container}>
       {tabs.map((tab, i) => {
@@ -260,10 +251,8 @@ const nav = StyleSheet.create({
 // ─── Main app (tab navigator) ─────────────────────────────────────────────────
 // Rendered as the 'Main' screen in the root stack.
 function MainApp({ navigation }) {
-  const { profile } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const [hasActiveRound, setHasActiveRound] = useState(false);
-  const isCaddy = profile?.account_type === 'caddy';
 
   useEffect(() => {
     const check = () => AsyncStorage.getItem(CLOCKED_ROUND_STATE_KEY).then(v => setHasActiveRound(!!v)).catch(() => {});
@@ -288,32 +277,18 @@ function MainApp({ navigation }) {
           <Text style={nav.roundBannerAction}>TAP TO RESUME {'\u2192'}</Text>
         </TouchableOpacity>
       )}
-      {isCaddy ? (
-        <Tab.Navigator
-          tabBar={props => <BottomNav {...props} isCaddy />}
-          screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
-        >
-          <Tab.Screen name="Home"        component={CaddyDashboardScreen} />
-          {/* Play/Operate — the BottomNav button pushes ClockedSetup on the root stack */}
-          <Tab.Screen name="Play"        component={CaddyDashboardScreen} />
-          <Tab.Screen name="Leaderboard" component={CaddyLeaderboardScreen} />
-          <Tab.Screen name="Log"         component={LogScreen} />
-          <Tab.Screen name="Courses"     component={CoursesScreen} />
-        </Tab.Navigator>
-      ) : (
-        <Tab.Navigator
-          tabBar={props => <BottomNav {...props} />}
-          screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
-        >
-          <Tab.Screen name="Feed"  component={FeedScreen} />
-          <Tab.Screen name="Rules" component={RulesScreen} />
-          <Tab.Screen name="Play"  component={FeedScreen} />
-          <Tab.Screen name="Ranks" component={LeaderboardScreen} />
-          <Tab.Screen name="You"   component={ProfileScreen} />
-          {/* Hidden: reachable via navigate() from stack, no visible tab */}
-          <Tab.Screen name="Log"         component={LogScreen} />
-        </Tab.Navigator>
-      )}
+      <Tab.Navigator
+        tabBar={props => <BottomNav {...props} />}
+        screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
+      >
+        <Tab.Screen name="Feed"  component={FeedScreen} />
+        <Tab.Screen name="Rules" component={RulesScreen} />
+        <Tab.Screen name="Play"  component={FeedScreen} />
+        <Tab.Screen name="Ranks" component={LeaderboardScreen} />
+        <Tab.Screen name="You"   component={ProfileScreen} />
+        {/* Hidden: reachable via navigate() from stack, no visible tab */}
+        <Tab.Screen name="Log"         component={LogScreen} />
+      </Tab.Navigator>
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
     </>
   );

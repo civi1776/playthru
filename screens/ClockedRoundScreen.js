@@ -83,7 +83,6 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
   const playerDefs       = resumeState?.playerDefs ?? params.players;
   const playerCount      = playerDefs.length;
-  const operatingCaddyId = params.operatingCaddyId ?? null;
   const [officialTimePars, setOfficialTimePars] = useState(
     () => resumeState?.officialTimePars ?? params.officialTimePars ?? {}
   );
@@ -304,8 +303,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
         difficulty, players: String(playerCount), tee_time: new Date(roundStartTs).toISOString(),
         finish_time: new Date().toISOString(), duration_minutes: durationMinutes,
         round_format: 'clocked', hole_scores: holeScoresJson, active_game: activeGameJson,
-        flagged: false, verification_level: operatingCaddyId ? 'caddy_operated' : 'self_reported',
-        ...(operatingCaddyId ? { caddy_id: operatingCaddyId, caddy_logged: true } : {}),
+        flagged: false, verification_level: 'self_reported',
       };
 
 

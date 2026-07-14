@@ -677,12 +677,6 @@ function RoundsTab({ navigation, rounds = [], loading }) {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 10, gap: 8 }}>
               <VerificationBadge level={r.verification_level} />
-              {r.caddy_id ? (
-                <View style={s.caddyLoggedBadge}>
-                  <Ionicons name="person" size={8} color="#090F0A" style={{ marginRight: 3 }} />
-                  <Text style={s.caddyLoggedText}>CADDY LOGGED</Text>
-                </View>
-              ) : null}
               {delayInfo ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: delayInfo.color }} />
@@ -721,144 +715,6 @@ function RoundsTab({ navigation, rounds = [], loading }) {
               <Text style={s.seasonBetLabel}>NET ($)</Text>
             </View>
           </View>
-        </View>
-      )}
-    </ScrollView>
-  );
-}
-
-// ─── Caddy helpers ────────────────────────────────────────────────────────────
-
-function teeWindowLabel(teeTimeStr) {
-  if (!teeTimeStr) return null;
-  const [hm, period] = teeTimeStr.split(' ');
-  const [h] = hm.split(':').map(Number);
-  let hour = h % 12;
-  if (period === 'PM' && h !== 12) hour += 12;
-  if (period === 'AM' && h === 12) hour = 0;
-  if (hour < 10) return 'morning';
-  if (hour < 14) return 'midday';
-  return 'afternoon';
-}
-
-function getBestWindow(rounds) {
-  const windows = { morning: [], midday: [], afternoon: [] };
-  for (const r of rounds) {
-    const w = teeWindowLabel(r.tee_time);
-    if (w && r.caddy_rating != null) windows[w].push(r.caddy_rating);
-  }
-  let best = null, bestAvg = -1;
-  for (const [w, ratings] of Object.entries(windows)) {
-    if (ratings.length === 0) continue;
-    const avg = ratings.reduce((s, v) => s + v, 0) / ratings.length;
-    if (avg > bestAvg) { bestAvg = avg; best = w; }
-  }
-  return best;
-}
-
-// ─── Caddy Dashboard ──────────────────────────────────────────────────────────
-
-function CaddyDashboard({ caddyCourse, navigation }) {
-  const { user } = useAuth();
-  const [caddyRounds, setCaddyRounds] = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [avgRating, setAvgRating]     = useState(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const uid = user?.id;
-        if (!uid) { setLoading(false); return; }
-        const { data } = await supabase
-          .from('rounds')
-          .select('course_name, tee_time, holes, players, caddy_rating, created_at')
-          .eq('caddy_id', uid)
-          .order('created_at', { ascending: false })
-          .limit(20);
-        const rounds = data || [];
-        setCaddyRounds(rounds);
-        const rated = rounds.filter(r => r.caddy_rating != null);
-        if (rated.length > 0) {
-          setAvgRating(parseFloat((rated.reduce((sum, r) => sum + r.caddy_rating, 0) / rated.length).toFixed(1)));
-        }
-      } catch (e) {
-        // silent fail
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const totalRounds = caddyRounds.length;
-  const bestWindow  = getBestWindow(caddyRounds);
-  const bestWindowLabel = bestWindow === 'morning'   ? 'Best at morning rounds'
-    : bestWindow === 'midday'     ? 'Best at midday rounds'
-    : bestWindow === 'afternoon'  ? 'Best at afternoon rounds'
-    : null;
-
-  return (
-    <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 }}>
-      {caddyCourse ? (
-        <TouchableOpacity
-          style={s.caddyCourseCard}
-          onPress={() => navigation.navigate('CourseProfile', { course: { name: caddyCourse } })}
-          activeOpacity={0.8}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={s.caddyCourseLabel}>MY COURSE</Text>
-            <Text style={s.caddyCourseName}>{caddyCourse}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color="#C9A84C" />
-        </TouchableOpacity>
-      ) : null}
-
-      {!loading && avgRating != null && (
-        <View style={s.gaugeCard}>
-          <Gauge score={avgRating} />
-          <View style={s.trendRow}>
-            <Text style={s.trendLabel}>CADDY RATING</Text>
-          </View>
-          {bestWindowLabel && (
-            <Text style={{ fontSize: 11, color: '#7DC87A', fontWeight: '600', marginTop: 6 }}>
-              {bestWindowLabel.toUpperCase()}
-            </Text>
-          )}
-        </View>
-      )}
-
-      <View style={s.statGrid}>
-        <StatBox label="ROUNDS CADDIED" value={loading ? '—' : totalRounds} />
-        <StatBox label="CADDY RATING"   value={loading ? '—' : avgRating != null ? avgRating.toFixed(1) : '—'} />
-      </View>
-
-      {!loading && caddyRounds.length > 0 && (
-        <>
-          <Text style={[s.sectionLabel, { marginTop: 16 }]}>RECENT ROUNDS CADDIED</Text>
-          {caddyRounds.slice(0, 10).map((r, i) => (
-            <View key={i} style={s.roundCard}>
-              <View style={s.roundTop}>
-                <View style={s.roundInfo}>
-                  <Text style={s.roundCourse}>{r.course_name}</Text>
-                  <Text style={s.roundMeta}>{r.holes} holes · {r.players}P · {r.tee_time}</Text>
-                </View>
-                <View style={s.roundScoreCol}>
-                  <Text style={[s.roundPop, { color: popColor(r.caddy_rating || 0) }]}>
-                    {r.caddy_rating != null ? r.caddy_rating.toFixed(1) : '—'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ))}
-        </>
-      )}
-
-      {!loading && caddyRounds.length === 0 && (
-        <View style={[s.emptyState, { paddingVertical: 40 }]}>
-          <Ionicons name="person" size={40} color="rgba(201,168,76,0.3)" style={{ marginBottom: 12 }} />
-          <Text style={[s.emptyText, { fontSize: 16 }]}>No rounds caddied yet.</Text>
-          <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('Log')} activeOpacity={0.8}>
-            <Text style={s.emptyBtnText}>LOG A ROUND</Text>
-          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -1008,8 +864,6 @@ export default function ProfileScreen({ navigation }) {
       return;
     }
 
-    if (profile?.account_type === 'caddy') setTab('caddy');
-
     const loadData = async () => {
       setLoading(true);
 
@@ -1093,11 +947,10 @@ export default function ProfileScreen({ navigation }) {
     loadData();
   }, [profile?.id]));
 
-  const isCaddy  = profile?.account_type === 'caddy';
   const last5    = rounds.slice(0, 5);
   const isCertified = PRO_ENABLED && last5.length === 5 && last5.every(r => (r.pop_score ?? 0) >= 4.0);
-  const tabs     = isCaddy ? ['caddy', 'rounds', 'friends'] : ['stats', 'rounds', 'friends', 'activity'];
-  const tabLabel = (t) => t === 'caddy' ? 'CADDY' : t.toUpperCase();
+  const tabs     = ['stats', 'rounds', 'friends', 'activity'];
+  const tabLabel = (t) => t.toUpperCase();
 
   const handleSettings = () => navigation.navigate('Settings');
 
@@ -1131,11 +984,9 @@ export default function ProfileScreen({ navigation }) {
                 <Text style={s.name}>{profile?.full_name ?? ''}</Text>
                 <Text style={s.username}>{'@' + (profile?.username ?? '')}</Text>
                 <Text style={s.handle}>
-                  {isCaddy && profile?.caddy_course
-                    ? profile.caddy_course
-                    : profile?.created_at
-                      ? 'Member since ' + new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                      : ''}
+                  {profile?.created_at
+                    ? 'Member since ' + new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                    : ''}
                 </Text>
               </View>
             </View>
@@ -1159,7 +1010,7 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         {/* Hero score section */}
-        {!isCaddy && !loading && (
+        {!loading && (
           <View style={s.heroScore}>
             <Text style={s.heroLabel}>CLOCKED SCORE</Text>
             <View style={s.heroRow}>
@@ -1221,7 +1072,7 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         {/* Stat chips row */}
-        {!loading && !isCaddy && (
+        {!loading && (
           <View style={s.statChipsRow}>
             <View style={s.statChip}>
               <Text style={s.statChipLabel}>ROUNDS</Text>
@@ -1258,15 +1109,13 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         {/* National Rankings row */}
-        {!isCaddy && (
-          <TouchableOpacity style={s.rankingsRow} onPress={() => navigation.navigate('Leaderboard')} activeOpacity={0.8}>
+        <TouchableOpacity style={s.rankingsRow} onPress={() => navigation.navigate('Leaderboard')} activeOpacity={0.8}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Ionicons name="trophy-outline" size={18} color="#C9A84C" />
               <Text style={s.rankingsRowText}>National Rankings</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color="#7A6E58" />
           </TouchableOpacity>
-        )}
 
         {/* Recent clocked rounds */}
         {!loading && (() => {
@@ -1427,17 +1276,10 @@ statSection:         { paddingHorizontal: 16, marginBottom: 16 },
   hcpTrendBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   hcpTrendText:     { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
   hcpSub:           { fontSize: 11, color: '#7A6E58', marginTop: 6 },
-  caddyBadge:       { backgroundColor: '#C9A84C', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
-  caddyBadgeText:   { fontSize: 8, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
-  caddyLoggedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#7DC87A', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3 },
-  caddyLoggedText:  { fontSize: 7, fontWeight: '700', color: '#090F0A', letterSpacing: 1 },
   underReviewBadge: { backgroundColor: 'rgba(192,122,106,0.15)', borderWidth: 1, borderColor: 'rgba(192,122,106,0.4)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3 },
   underReviewText:  { fontSize: 9, fontWeight: '700', color: '#C07A6A', letterSpacing: 0.5 },
   reviewBanner:     { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(192,122,106,0.1)', borderBottomWidth: 1, borderBottomColor: 'rgba(192,122,106,0.25)', paddingHorizontal: 16, paddingVertical: 10 },
   reviewBannerText: { fontSize: 11, color: '#C07A6A', flex: 1, fontWeight: '500' },
-  caddyCourseCard:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#C9A84C33', padding: 16, marginBottom: 12 },
-  caddyCourseLabel: { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 4 },
-  caddyCourseName:  { fontSize: 16, fontWeight: '600', color: '#F5EDD8' },
   referralCard:         { marginHorizontal: 16, marginBottom: 24, backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(201,168,76,0.25)', padding: 20, gap: 10 },
   referralCardHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
   referralCardTitle:    { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },

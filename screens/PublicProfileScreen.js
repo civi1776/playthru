@@ -98,12 +98,11 @@ function getInitials(fullName) {
 
 export default function PublicProfileScreen({ navigation, route }) {
   const { userId } = route.params;
-  const { user, profile: myProfile, signOut } = useAuth();
+  const { user, profile: myProfile } = useAuth();
   const myUid = user?.id;
 
   const [profile, setProfile]           = useState(null);
   const [rounds, setRounds]             = useState([]);
-  const [caddyRounds, setCaddyRounds]   = useState([]);
   const [loading, setLoading]           = useState(true);
   const [following, setFollowing]       = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -117,7 +116,7 @@ export default function PublicProfileScreen({ navigation, route }) {
     const load = async () => {
       setLoading(true);
 
-      const [{ data: profileData }, { data: roundsData }, { data: followData }, { data: caddyRoundsData }] = await Promise.all([
+      const [{ data: profileData }, { data: roundsData }, { data: followData }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
         supabase.from('rounds')
           .select('id, course_name, created_at, holes, duration_minutes, pop_score, round_format, active_game, hole_scores')
@@ -127,17 +126,10 @@ export default function PublicProfileScreen({ navigation, route }) {
         myUid
           ? supabase.from('follows').select('id').eq('follower_id', myUid).eq('following_id', userId).maybeSingle()
           : Promise.resolve({ data: null }),
-        // Fetch rounds where this user was the caddy (to derive "Also caddied at")
-        supabase.from('rounds')
-          .select('course_name')
-          .eq('caddy_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(50),
       ]);
 
       setProfile(profileData);
       setRounds(roundsData ?? []);
-      setCaddyRounds(caddyRoundsData ?? []);
       setFollowing(!!followData);
 
       // Compute Clocked Score for this user
@@ -231,16 +223,7 @@ export default function PublicProfileScreen({ navigation, route }) {
 
   const pop      = profile.pop_score ?? null;
   const tier     = paceTier(pop);
-  const isCaddy  = profile.account_type === 'caddy';
   const initials = getInitials(profile.full_name);
-
-  // Caddy-specific computed values
-  const primaryCourse = profile.caddy_course || null;
-  const alsoCaddiedAt = isCaddy
-    ? [...new Set(caddyRounds.map(r => r.course_name).filter(Boolean))]
-        .filter(name => name !== primaryCourse)
-        .slice(0, 5)
-    : [];
 
   // Stat card values from rounds
   const bestPop  = rounds.length > 0 ? Math.max(...rounds.map(r => r.pop_score ?? 0)) : null;
@@ -277,7 +260,7 @@ export default function PublicProfileScreen({ navigation, route }) {
       </View>
 
       {/* Challenge button — visitors only, golfers only */}
-      {!isOwnProfile && myUid && !isCaddy && rounds.length > 0 && (
+      {!isOwnProfile && myUid && rounds.length > 0 && (
         <View style={{ paddingHorizontal: 16, paddingBottom: 10, alignItems: 'flex-end' }}>
           <ChallengeButton
             targetUserId={userId}
@@ -308,56 +291,16 @@ export default function PublicProfileScreen({ navigation, route }) {
         <View style={s.identityRow}>
           <InitialsAvatar name={profile.full_name} size={60} avatarUrl={profile.avatar_url} />
           <View style={s.identityInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <Text style={s.fullName}>{profile.full_name || '—'}</Text>
-              {isCaddy && (
-                <View style={s.caddyBadge}>
-                  <Text style={s.caddyBadgeText}>CADDY</Text>
-                </View>
-              )}
-            </View>
+            <Text style={s.fullName}>{profile.full_name || '—'}</Text>
             <Text style={s.username}>@{profile.username || '—'}</Text>
-            {!isCaddy && profile.home_course ? (
+            {profile.home_course ? (
               <Text style={s.homeCourse}>{profile.home_course}</Text>
             ) : null}
           </View>
         </View>
 
-        {/* Caddy info card */}
-        {isCaddy && (
-          <View style={s.caddyInfoCard}>
-            {primaryCourse ? (
-              <View style={s.caddyInfoRow}>
-                <Ionicons name="home-outline" size={14} color="#7DC87A" />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.caddyInfoLabel}>HOME BASE</Text>
-                  <Text style={s.caddyInfoValue}>{primaryCourse}</Text>
-                </View>
-              </View>
-            ) : null}
-            {profile.caddy_experience ? (
-              <View style={s.caddyInfoRow}>
-                <Ionicons name="time-outline" size={14} color="#7DC87A" />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.caddyInfoLabel}>EXPERIENCE</Text>
-                  <Text style={s.caddyInfoValue}>{profile.caddy_experience}</Text>
-                </View>
-              </View>
-            ) : null}
-            {alsoCaddiedAt.length > 0 && (
-              <View style={s.caddyInfoRow}>
-                <Ionicons name="golf-outline" size={14} color="#7DC87A" />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.caddyInfoLabel}>ALSO CADDIED AT</Text>
-                  <Text style={s.caddyInfoValue}>{alsoCaddiedAt.join(', ')}</Text>
-                </View>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Clocked Score card — golfers only */}
-        {!isCaddy && (
+        {/* Clocked Score card */}
+        {(
           <ClockedScoreCard
             clockedScore={clockedRating.clockedScore}
             scoring={clockedRating.scoring}
@@ -369,7 +312,7 @@ export default function PublicProfileScreen({ navigation, route }) {
         )}
 
         {/* Handicap + pace credential row */}
-        {!isCaddy && (
+        {(
           <View style={s.credentialRow}>
             {profile.handicap_index != null && (
               <View style={s.credentialCard}>
@@ -386,8 +329,8 @@ export default function PublicProfileScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Stat cards — golfers */}
-        {!isCaddy && <View style={s.statRow}>
+        {/* Stat cards */}
+        <View style={s.statRow}>
           <View style={s.statCard}>
             <Text style={s.statLabel}>ROUNDS{'\n'}LOGGED</Text>
             <Text style={s.statValue}>{rounds.length > 0 ? profile.total_rounds ?? rounds.length : 0}</Text>
@@ -404,23 +347,7 @@ export default function PublicProfileScreen({ navigation, route }) {
             <Text style={s.statLabel}>PACE{'\n'}STREAK</Text>
             <Text style={s.statValue}>{paceStreak > 0 ? `${paceStreak}${paceStreak >= 3 ? ' 🔥' : ''}` : '—'}</Text>
           </View>
-        </View>}
-
-        {/* Stat cards — caddies */}
-        {isCaddy && <View style={s.statRow}>
-          <View style={s.statCard}>
-            <Text style={s.statLabel}>ROUNDS{'\n'}CADDIED</Text>
-            <Text style={s.statValue}>{caddyRounds.length}</Text>
-          </View>
-          <View style={s.statCard}>
-            <Text style={s.statLabel}>COURSES{'\n'}WORKED</Text>
-            <Text style={s.statValue}>{[...new Set(caddyRounds.map(r => r.course_name).filter(Boolean))].length}</Text>
-          </View>
-          <View style={s.statCard}>
-            <Text style={s.statLabel}>CADDY{'\n'}RATING</Text>
-            <Text style={s.statValue}>{profile.caddy_rating ? profile.caddy_rating.toFixed(1) : '—'}</Text>
-          </View>
-        </View>}
+        </View>
 
         {/* Recent rounds — format-aware */}
         <RecentRoundsList rounds={rounds} navigation={navigation} limit={10} />
@@ -432,41 +359,6 @@ export default function PublicProfileScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* Sign out — only on own caddy profile */}
-        {isOwnProfile && isCaddy && (
-          <View style={s.accountSection}>
-            <TouchableOpacity
-              style={s.switchModeBtn}
-              onPress={() =>
-                Alert.alert(
-                  'Switch to Golfer Mode',
-                  'Sign in with a golfer account to access the golfer experience.',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Sign Out', style: 'destructive', onPress: signOut },
-                  ]
-                )
-              }
-              activeOpacity={0.8}
-            >
-              <Ionicons name="swap-horizontal-outline" size={15} color="#B8A882" />
-              <Text style={s.switchModeTxt}>Switch to Golfer Mode</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={s.signOutBtn}
-              onPress={() =>
-                Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Sign Out', style: 'destructive', onPress: signOut },
-                ])
-              }
-              activeOpacity={0.8}
-            >
-              <Text style={s.signOutTxt}>Sign Out</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </ScrollView>
       )}
 
@@ -507,13 +399,6 @@ const s = StyleSheet.create({
   fullName:       { fontSize: 20, fontWeight: '600', color: '#F5EDD8' },
   username:       { fontSize: 12, color: '#C9A84C', marginTop: 2 },
   homeCourse:     { fontSize: 11, color: '#7A6E58', marginTop: 2 },
-  caddyBadge:     { backgroundColor: '#C9A84C', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
-  caddyBadgeText: { fontSize: 8, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
-
-  caddyInfoCard:  { backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#7DC87A22', borderLeftWidth: 3, borderLeftColor: '#7DC87A', padding: 14, marginBottom: 14, gap: 12 },
-  caddyInfoRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  caddyInfoLabel: { fontSize: 9, fontWeight: '700', color: '#7DC87A88', letterSpacing: 1.5, marginBottom: 2 },
-  caddyInfoValue: { fontSize: 14, color: '#F5EDD8', fontWeight: '500', lineHeight: 20 },
 
   gaugeCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 20, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, gap: 16, marginBottom: 14 },
   gaugeLeft:      { alignItems: 'center', justifyContent: 'center' },
@@ -557,10 +442,4 @@ const s = StyleSheet.create({
   actPop:         { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
   actTime:        { fontSize: 10, color: 'rgba(184,168,130,0.5)', marginTop: 3 },
 
-  // Own caddy profile account actions
-  accountSection: { marginTop: 32, gap: 10, paddingBottom: 12 },
-  switchModeBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#B8A88244', borderRadius: 8, padding: 12 },
-  switchModeTxt:  { fontSize: 13, fontWeight: '600', color: '#B8A882' },
-  signOutBtn:     { borderWidth: 1, borderColor: '#E24B4A', borderRadius: 8, padding: 12, alignItems: 'center' },
-  signOutTxt:     { color: '#E24B4A', fontSize: 14, fontWeight: '600' },
 });
