@@ -65,6 +65,7 @@ export default function SignUpScreen({ navigation }) {
 
   // Username availability
   const [usernameStatus, setUsernameStatus] = useState('idle'); // idle|checking|ok|taken
+  const [usernameHint, setUsernameHint]     = useState('');
   const usernameDebounce = useRef(null);
 
   // Pre-fill referral code from deep link
@@ -119,13 +120,16 @@ export default function SignUpScreen({ navigation }) {
       const { error: signUpError } = await supabase.auth.signUp({
         email: emailVal, password: passwordVal,
       });
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        if (signUpError.message?.includes('already registered')) throw new Error('An account with this email already exists. Try signing in.');
+        throw new Error('Could not create account. Please try again.');
+      }
 
       // 2. Sign in immediately
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: emailVal, password: passwordVal,
       });
-      if (signInError) throw signInError;
+      if (signInError) throw new Error('Account created but sign-in failed. Try signing in manually.');
 
       const userId = signInData.session.user.id;
 
@@ -144,7 +148,7 @@ export default function SignUpScreen({ navigation }) {
         if (profileError.code === '23505' && profileError.message?.includes('username')) {
           throw new Error('That username is already taken.');
         }
-        throw new Error('Could not save profile: ' + profileError.message);
+        throw new Error('Could not save your profile. Please try again.');
       }
 
       // 4. Generate referral code
@@ -182,7 +186,7 @@ export default function SignUpScreen({ navigation }) {
       }).catch(() => {});
 
       await refreshProfile();
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
     } catch (e) {
       setError(e.message);
     }
@@ -273,7 +277,7 @@ export default function SignUpScreen({ navigation }) {
           <Text style={s.wordmark}>CLOCKED</Text>
 
           <Text style={s.headline}>Create your account.</Text>
-          <Text style={s.subhead}>Takes 30 seconds.</Text>
+          <Text style={s.subhead}>30 seconds. Then you're on the clock.</Text>
 
           {/* Full Name */}
           <View style={s.inputWrap}>
@@ -298,8 +302,13 @@ export default function SignUpScreen({ navigation }) {
               autoCapitalize="none"
               autoCorrect={false}
               value={username}
-              onChangeText={setUsername}
+              onChangeText={(raw) => {
+                const sanitized = raw.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                setUsername(sanitized);
+                setUsernameHint(raw !== sanitized ? 'Letters, numbers, underscores only' : '');
+              }}
             />
+            {usernameHint ? <Text style={s.fieldHint}>{usernameHint}</Text> : null}
             {usernameStatus === 'taken' && (
               <Text style={s.fieldError}>Username is taken</Text>
             )}
@@ -397,6 +406,7 @@ const s = StyleSheet.create({
   input:        { backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, color: '#F5EDD8', fontSize: 15 },
   fieldError:   { fontSize: 11, color: '#E85D4A', marginTop: 4 },
   fieldOk:      { fontSize: 11, color: '#7DC87A', marginTop: 4 },
+  fieldHint:    { fontSize: 11, color: '#C9A84C88', marginTop: 4 },
 
   // Error
   error:        { color: '#E85D4A', fontSize: 13, marginBottom: 16 },
