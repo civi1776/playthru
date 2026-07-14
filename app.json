@@ -23,10 +23,13 @@
         "NSCameraUsageDescription": "Clocked uses your camera to take a profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Clocked saves your Clocked Score share card to your photo library.",
         "NSMicrophoneUsageDescription": "Clocked may use the microphone when recording video content.",
-        "UIBackgroundModes": ["fetch", "remote-notification"],
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ],
         "NSSupportsLiveActivities": true
       },
-      "buildNumber": "4",
+      "buildNumber": "6",
       "version": "1.5.3"
     },
     "android": {
