@@ -65,7 +65,6 @@
           "sounds": []
         }
       ],
-      "expo-sharing",
       [
         "expo-media-library",
         {

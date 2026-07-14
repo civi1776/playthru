@@ -387,7 +387,7 @@ function PlayerHomeScreen({ navigation }) {
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Profile')}
+            onPress={() => navigation.navigate('You')}
             activeOpacity={0.8}
             style={styles.headerAvatar}
             accessibilityLabel="View your profile"
@@ -527,7 +527,7 @@ function PlayerHomeScreen({ navigation }) {
               return (
                 <TouchableOpacity
                   style={styles.lastRoundCard}
-                  onPress={() => navigation.navigate('Profile')}
+                  onPress={() => navigation.navigate('You')}
                   activeOpacity={0.85}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -812,7 +812,6 @@ const styles = StyleSheet.create({
   wordmark:         { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 2 },
   brandTagline:     { fontSize: 9, fontWeight: '600', color: '#C9A84C88', letterSpacing: 3, marginBottom: 6 },
   greeting:         { fontSize: 20, fontFamily: 'Georgia', color: '#F5EDD8' },
-  subGreeting:      { fontSize: 11, fontWeight: '600', color: '#7DC87A', marginTop: 3 },
   scoreCard:        { margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center' },
   scoreInfoBtn:     { position: 'absolute', top: 6, right: 6, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   hcpRow:           { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
@@ -828,10 +827,8 @@ const styles = StyleSheet.create({
   courseName:       { fontSize: 19, fontWeight: '600', color: '#F5EDD8' },
   roundDetail:      { fontSize: 11, color: '#B8A882', marginTop: 3 },
   row:              { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
-  popBadge:         { fontFamily: 'monospace', fontSize: 13, color: '#7DC87A', borderWidth: 1, borderColor: '#7DC87A', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 },
   verified:         { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
   cardLabel:        { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2, marginBottom: 8 },
-  standingText:     { fontSize: 18, fontWeight: '500', color: '#F5EDD8' },
   // Last Round
   lastRoundCard:         { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#0D1A0F', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#7DC87A22' },
   lastRoundLabel:        { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2, marginBottom: 6 },
@@ -839,8 +836,6 @@ const styles = StyleSheet.create({
   lastRoundDetail:       { fontSize: 11, color: '#B8A882' },
   lastRoundScore:        { fontSize: 32, fontFamily: 'Georgia', lineHeight: 36 },
   lastRoundScoreLabel:   { fontSize: 8, fontWeight: '700', color: '#B8A882', letterSpacing: 2, marginTop: 1 },
-  lastRoundVerified:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 5 },
-  lastRoundVerifiedText: { fontSize: 7, fontWeight: '700', color: '#7DC87A', letterSpacing: 1 },
   // Featured Round
   featuredCard:         { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#0D1A0F', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#7DC87A22' },
   featuredLabelRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
@@ -851,8 +846,6 @@ const styles = StyleSheet.create({
   featuredBadgePop:     { fontSize: 7, fontWeight: '700', letterSpacing: 1 },
   featuredCourse:       { fontSize: 15, fontWeight: '600', color: '#F5EDD8', marginBottom: 4 },
   featuredDetail:       { fontSize: 11, color: '#B8A882' },
-  featuredVerified:     { flexDirection: 'column', alignItems: 'center', gap: 2 },
-  featuredVerifiedText: { fontSize: 7, fontWeight: '700', color: '#7DC87A', letterSpacing: 1 },
   // Error
   errorCard:        { margin: 16, backgroundColor: '#0D1A0F', borderRadius: 18, padding: 28, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center' },
   errorText:        { fontSize: 14, color: '#7A6E58', textAlign: 'center', marginBottom: 16, lineHeight: 20 },

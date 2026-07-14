@@ -81,7 +81,7 @@ export default function SearchUsersScreen({ navigation }) {
     try {
       const { data, error: err } = await supabase
         .from('profiles')
-        .select('id, full_name, username, pop_score, home_course, account_type, avatar_url')
+        .select('id, full_name, username, pop_score, home_course, avatar_url')
         .or(`username.ilike.%${text}%,full_name.ilike.%${text}%`)
         .neq('id', myUid ?? '')
         .limit(20);
