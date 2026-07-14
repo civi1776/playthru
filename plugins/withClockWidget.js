@@ -1,11 +1,12 @@
 // Custom config plugin to add the ClockWidget Live Activity extension target.
 // This replaces @bacons/apple-targets which is incompatible with SDK 55.
-const { withXcodeProject, withInfoPlist, withEntitlementsPlist } = require('@expo/config-plugins');
+const { withXcodeProject, withInfoPlist, withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
 const WIDGET_NAME = 'ClockWidget';
 const WIDGET_BUNDLE_ID_SUFFIX = '.clock-widget';
+const APPLE_TEAM_ID = 'CL344GMS7J';
 
 function withClockWidget(config) {
   // 1. Add NSSupportsLiveActivities to main app Info.plist
@@ -71,7 +72,7 @@ function withClockWidget(config) {
         }
       }
 
-      // Set build settings for the widget target
+      // Set build settings for the widget target (Debug + Release)
       const configs = project.pbxXCBuildConfigurationSection();
       for (const key in configs) {
         const config = configs[key];
@@ -83,6 +84,7 @@ function withClockWidget(config) {
           config.buildSettings.TARGETED_DEVICE_FAMILY = '"1,2"';
           config.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = '16.2';
           config.buildSettings.CODE_SIGN_STYLE = 'Automatic';
+          config.buildSettings.DEVELOPMENT_TEAM = APPLE_TEAM_ID;
           config.buildSettings.GENERATE_INFOPLIST_FILE = 'YES';
         }
       }
@@ -90,6 +92,38 @@ function withClockWidget(config) {
 
     return config;
   });
+
+  // 3. Patch Podfile to disable code signing for resource bundle targets
+  config = withDangerousMod(config, ['ios', async (config) => {
+    const podfilePath = path.join(config.modRequest.platformProjectRoot, 'Podfile');
+    if (fs.existsSync(podfilePath)) {
+      let podfile = fs.readFileSync(podfilePath, 'utf8');
+
+      const resourceBundleFix = `
+  # Disable code signing for resource bundle targets (Xcode 15+)
+  installer.pods_project.targets.each do |target|
+    if target.respond_to?(:product_type) && target.product_type == "com.apple.product-type.bundle"
+      target.build_configurations.each do |config|
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      end
+    end
+  end`;
+
+      // Append to existing post_install or add a new one
+      if (podfile.includes('post_install do |installer|')) {
+        // Insert before the last 'end' of the post_install block
+        podfile = podfile.replace(
+          /post_install do \|installer\|/,
+          `post_install do |installer|${resourceBundleFix}`
+        );
+      } else {
+        podfile += `\npost_install do |installer|${resourceBundleFix}\nend\n`;
+      }
+
+      fs.writeFileSync(podfilePath, podfile);
+    }
+    return config;
+  }]);
 
   return config;
 }

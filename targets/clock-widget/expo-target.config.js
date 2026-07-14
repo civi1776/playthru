@@ -4,5 +4,6 @@ module.exports = {
   name: "ClockWidget",
   bundleIdentifier: ".clock-widget",
   deploymentTarget: "16.2",
+  appleTeamId: "CL344GMS7J",
   frameworks: ["SwiftUI", "ActivityKit"],
 };

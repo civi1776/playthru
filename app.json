@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.civiswings.playthru",
+      "appleTeamId": "CL344GMS7J",
       "backgroundColor": "#090F0A",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
