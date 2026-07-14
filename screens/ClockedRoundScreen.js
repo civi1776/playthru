@@ -17,7 +17,7 @@ import {
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
 import { sendPushToUser, sendLocalNotification, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
 import * as Notifications from 'expo-notifications';
-import { startActivity, endActivity } from '../modules/clocked-activity/src';
+import { startActivity, updateActivity, endActivity } from '../modules/clocked-activity/src';
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 const BG       = '#090F0A';
@@ -207,6 +207,15 @@ export default function ClockedRoundScreen({ navigation, route }) {
     });
     // Reset strokes to new par
     setPlayerStrokes(playerDefs.map(() => newPar));
+    // Sync Live Activity endTime if clock is running
+    if (clockRunning && clockStartedAt) {
+      try {
+        const newOfficialSec = officialTimeParFor(officialTimePars?.[currentHole], transport, playerCount);
+        const newTP = computeTimePar(curHoleData.yardage, newPar, playerCount, transport, difficulty, newOfficialSec, clockCoeffs);
+        const elapsedNow = Math.floor((Date.now() - clockStartedAt) / 1000);
+        updateActivity(currentHole, newPar, Date.now() + (newTP - elapsedNow) * 1000).catch(() => {});
+      } catch {}
+    }
   };
 
   // ── Score this hole ──
@@ -693,7 +702,13 @@ export default function ClockedRoundScreen({ navigation, route }) {
               />
               <TouchableOpacity onPress={() => {
                 const secs = parseTimeInput(editTimeStr);
-                if (secs != null && secs > 0) { setHoleFrozenTime(secs); setDisplayElapsed(secs); }
+                if (secs != null && secs > 0) {
+                  setHoleFrozenTime(secs);
+                  setDisplayElapsed(secs);
+                  if (clockRunning) {
+                    try { updateActivity(currentHole, curHoleData.par, Date.now() + (curTimePar - secs) * 1000).catch(() => {}); } catch {}
+                  }
+                }
                 setEditingTime(false);
               }} activeOpacity={0.7}>
                 <Ionicons name="checkmark" size={18} color="#7DC87A" />
