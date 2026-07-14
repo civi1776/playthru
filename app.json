@@ -92,7 +92,19 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "68988e38-af05-49d5-8d8d-c9cc46e31a74"
+        "projectId": "68988e38-af05-49d5-8d8d-c9cc46e31a74",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ClockWidget",
+                  "bundleIdentifier": "com.civiswings.playthru.clock-widget"
+                }
+              ]
+            }
+          }
+        }
       }
     }
   }
