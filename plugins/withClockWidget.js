@@ -15,25 +15,19 @@ function withClockWidget(config) {
     return config;
   });
 
-  // 2. Add the widget extension to the Xcode project
-  config = withXcodeProject(config, async (config) => {
-    const project = config.modResults;
-    const mainBundleId = config.ios?.bundleIdentifier ?? 'com.civiswings.playthru';
-    const widgetBundleId = mainBundleId + WIDGET_BUNDLE_ID_SUFFIX;
-
-    // Copy Swift source files into the ios project
+  // 2. Copy widget Swift sources into ios/ during prebuild + patch Podfile
+  config = withDangerousMod(config, ['ios', async (config) => {
     const projectRoot = config.modRequest.projectRoot;
-    const iosDir = path.join(projectRoot, 'ios');
+    const iosDir = config.modRequest.platformProjectRoot;
     const widgetDir = path.join(iosDir, WIDGET_NAME);
 
     if (!fs.existsSync(widgetDir)) {
       fs.mkdirSync(widgetDir, { recursive: true });
     }
 
-    // Copy widget source files
     const sourceDir = path.join(projectRoot, 'targets', 'clock-widget');
-    const filesToCopy = ['Attributes.swift', 'ClockWidgetLiveActivity.swift', 'index.swift'];
-    for (const file of filesToCopy) {
+    const allFiles = ['Attributes.swift', 'ClockWidgetLiveActivity.swift', 'index.swift', 'Info.plist'];
+    for (const file of allFiles) {
       const src = path.join(sourceDir, file);
       const dest = path.join(widgetDir, file);
       if (fs.existsSync(src)) {
@@ -41,77 +35,13 @@ function withClockWidget(config) {
       }
     }
 
-    // Copy Info.plist for the widget
-    const infoPlistSrc = path.join(sourceDir, 'Info.plist');
-    const infoPlistDest = path.join(widgetDir, 'Info.plist');
-    if (fs.existsSync(infoPlistSrc)) {
-      fs.copyFileSync(infoPlistSrc, infoPlistDest);
-    }
-
-    // Add widget target to Xcode project
-    const targetUuid = project.generateUuid();
-    const widgetTarget = project.addTarget(
-      WIDGET_NAME,
-      'app_extension',
-      WIDGET_NAME,
-      widgetBundleId
-    );
-
-    if (widgetTarget) {
-      // Add Swift files to the target
-      const groupKey = project.pbxCreateGroup(WIDGET_NAME, WIDGET_NAME);
-      const mainGroupKey = project.getFirstProject().firstProject.mainGroup;
-      project.addToPbxGroup(groupKey, mainGroupKey);
-
-      for (const file of [...filesToCopy, 'Info.plist']) {
-        const filePath = path.join(WIDGET_NAME, file);
-        if (file.endsWith('.swift')) {
-          project.addSourceFile(filePath, { target: widgetTarget.uuid }, groupKey);
-        } else {
-          project.addFile(filePath, groupKey);
-        }
-      }
-
-      // Set build settings for the widget target (Debug + Release)
-      const configs = project.pbxXCBuildConfigurationSection();
-      for (const key in configs) {
-        const config = configs[key];
-        if (config.buildSettings && config.name &&
-            JSON.stringify(config).includes(WIDGET_NAME)) {
-          config.buildSettings.INFOPLIST_FILE = `${WIDGET_NAME}/Info.plist`;
-          config.buildSettings.PRODUCT_BUNDLE_IDENTIFIER = `"${widgetBundleId}"`;
-          config.buildSettings.SWIFT_VERSION = '5.0';
-          config.buildSettings.TARGETED_DEVICE_FAMILY = '"1,2"';
-          config.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = '16.2';
-          config.buildSettings.CODE_SIGN_STYLE = 'Automatic';
-          config.buildSettings.DEVELOPMENT_TEAM = APPLE_TEAM_ID;
-          config.buildSettings.GENERATE_INFOPLIST_FILE = 'YES';
-        }
-      }
-    }
-
-    return config;
-  });
-
-  // 3. Patch Podfile to disable code signing for resource bundle targets
-  config = withDangerousMod(config, ['ios', async (config) => {
-    const podfilePath = path.join(config.modRequest.platformProjectRoot, 'Podfile');
+    // Patch Podfile: disable code signing for resource bundle targets (Xcode 15+)
+    const podfilePath = path.join(iosDir, 'Podfile');
     if (fs.existsSync(podfilePath)) {
       let podfile = fs.readFileSync(podfilePath, 'utf8');
+      const resourceBundleFix = `\n    # Disable code signing for resource bundle targets (Xcode 15+)\n    installer.pods_project.targets.each do |target|\n      if target.respond_to?(:product_type) && target.product_type == "com.apple.product-type.bundle"\n        target.build_configurations.each do |config|\n          config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'\n        end\n      end\n    end`;
 
-      const resourceBundleFix = `
-  # Disable code signing for resource bundle targets (Xcode 15+)
-  installer.pods_project.targets.each do |target|
-    if target.respond_to?(:product_type) && target.product_type == "com.apple.product-type.bundle"
-      target.build_configurations.each do |config|
-        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-      end
-    end
-  end`;
-
-      // Append to existing post_install or add a new one
       if (podfile.includes('post_install do |installer|')) {
-        // Insert before the last 'end' of the post_install block
         podfile = podfile.replace(
           /post_install do \|installer\|/,
           `post_install do |installer|${resourceBundleFix}`
@@ -119,11 +49,124 @@ function withClockWidget(config) {
       } else {
         podfile += `\npost_install do |installer|${resourceBundleFix}\nend\n`;
       }
-
       fs.writeFileSync(podfilePath, podfile);
     }
+
     return config;
   }]);
+
+  // 3. Add the widget extension target to the Xcode project
+  config = withXcodeProject(config, async (config) => {
+    const project = config.modResults;
+    const mainBundleId = config.ios?.bundleIdentifier ?? 'com.civiswings.playthru';
+    const widgetBundleId = mainBundleId + WIDGET_BUNDLE_ID_SUFFIX;
+    const objects = project.hash.project.objects;
+
+    // Create the widget native target (creates target with empty buildPhases)
+    const widgetTarget = project.addTarget(
+      WIDGET_NAME,
+      'app_extension',
+      WIDGET_NAME,
+      widgetBundleId
+    );
+
+    if (!widgetTarget) return config;
+
+    // Create a Sources build phase for the widget and wire it up
+    const sourcesPhaseUuid = project.generateUuid();
+    if (!objects.PBXSourcesBuildPhase) objects.PBXSourcesBuildPhase = {};
+    objects.PBXSourcesBuildPhase[sourcesPhaseUuid] = {
+      isa: 'PBXSourcesBuildPhase',
+      buildActionMask: 2147483647,
+      files: [],
+      runOnlyForDeploymentPostprocessing: 0,
+    };
+    objects.PBXSourcesBuildPhase[sourcesPhaseUuid + '_comment'] = 'Sources';
+
+    // Add the Sources phase to the widget native target's buildPhases
+    const ntObj = objects.PBXNativeTarget[widgetTarget.uuid];
+    if (ntObj) {
+      ntObj.buildPhases.push({ value: sourcesPhaseUuid, comment: 'Sources' });
+    }
+
+    // Create the ClockWidget group
+    const groupKey = project.pbxCreateGroup(WIDGET_NAME, WIDGET_NAME);
+    const mainGroupKey = project.getFirstProject().firstProject.mainGroup;
+    project.addToPbxGroup(groupKey, mainGroupKey);
+
+    // Add Swift files — file references in the group, build files in widget Sources only
+    const swiftFiles = ['Attributes.swift', 'ClockWidgetLiveActivity.swift', 'index.swift'];
+
+    for (const fileName of swiftFiles) {
+      // PBXFileReference (path relative to group, which has path = ClockWidget)
+      const fileRefUuid = project.generateUuid();
+      objects.PBXFileReference[fileRefUuid] = {
+        isa: 'PBXFileReference',
+        fileEncoding: 4,
+        lastKnownFileType: 'sourcecode.swift',
+        name: fileName,
+        path: fileName,
+        sourceTree: '"<group>"',
+      };
+      objects.PBXFileReference[fileRefUuid + '_comment'] = fileName;
+
+      // Add to ClockWidget group
+      const grp = objects.PBXGroup[groupKey];
+      if (grp) {
+        grp.children.push({ value: fileRefUuid, comment: fileName });
+      }
+
+      // PBXBuildFile → widget Sources phase only
+      const buildFileUuid = project.generateUuid();
+      objects.PBXBuildFile[buildFileUuid] = {
+        isa: 'PBXBuildFile',
+        fileRef: fileRefUuid,
+        fileRef_comment: fileName,
+      };
+      objects.PBXBuildFile[buildFileUuid + '_comment'] = `${fileName} in Sources`;
+
+      // Add to widget Sources phase
+      objects.PBXSourcesBuildPhase[sourcesPhaseUuid].files.push({
+        value: buildFileUuid,
+        comment: `${fileName} in Sources`,
+      });
+    }
+
+    // Add Info.plist file reference (not in any build phase)
+    const plistRefUuid = project.generateUuid();
+    objects.PBXFileReference[plistRefUuid] = {
+      isa: 'PBXFileReference',
+      fileEncoding: 4,
+      lastKnownFileType: 'text.plist.xml',
+      name: 'Info.plist',
+      path: 'Info.plist',
+      sourceTree: '"<group>"',
+    };
+    objects.PBXFileReference[plistRefUuid + '_comment'] = 'Info.plist';
+    const grp = objects.PBXGroup[groupKey];
+    if (grp) {
+      grp.children.push({ value: plistRefUuid, comment: 'Info.plist' });
+    }
+
+    // Set build settings for the widget target (Debug + Release)
+    const configs = project.pbxXCBuildConfigurationSection();
+    for (const key in configs) {
+      const cfg = configs[key];
+      if (cfg.buildSettings && cfg.name &&
+          JSON.stringify(cfg).includes(WIDGET_NAME)) {
+        cfg.buildSettings.INFOPLIST_FILE = `${WIDGET_NAME}/Info.plist`;
+        cfg.buildSettings.PRODUCT_BUNDLE_IDENTIFIER = `"${widgetBundleId}"`;
+        cfg.buildSettings.SWIFT_VERSION = '5.0';
+        cfg.buildSettings.TARGETED_DEVICE_FAMILY = '"1,2"';
+        cfg.buildSettings.IPHONEOS_DEPLOYMENT_TARGET = '16.2';
+        cfg.buildSettings.CODE_SIGN_STYLE = 'Automatic';
+        cfg.buildSettings.DEVELOPMENT_TEAM = APPLE_TEAM_ID;
+        cfg.buildSettings.GENERATE_INFOPLIST_FILE = 'YES';
+      }
+    }
+
+    return config;
+  });
 
   return config;
 }
