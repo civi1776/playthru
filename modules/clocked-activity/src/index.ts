@@ -1,18 +1,29 @@
-import { requireNativeModule, Platform } from "expo-modules-core";
+import { Platform } from "expo-modules-core";
 
-const isIOS = Platform.OS === "ios";
+let Native: any = null;
 
-const ClockedActivity = isIOS
-  ? requireNativeModule("ClockedActivityModule")
-  : null;
+if (Platform.OS === "ios") {
+  try {
+    // requireOptionalNativeModule returns null instead of throwing
+    const { requireOptionalNativeModule } = require("expo-modules-core");
+    Native = requireOptionalNativeModule("ClockedActivityModule");
+  } catch {
+    Native = null;
+  }
+}
+
+export function areActivitiesSupported(): boolean {
+  return Native != null;
+}
 
 export async function startActivity(
   hole: number,
   par: number,
   endTimeMs: number
 ): Promise<string | null> {
-  if (!isIOS || !ClockedActivity) return null;
-  return ClockedActivity.startActivity(hole, par, endTimeMs);
+  if (!Native) return null;
+  try { return await Native.startActivity(hole, par, endTimeMs); }
+  catch { return null; }
 }
 
 export async function updateActivity(
@@ -20,16 +31,19 @@ export async function updateActivity(
   par: number,
   endTimeMs: number
 ): Promise<void> {
-  if (!isIOS || !ClockedActivity) return;
-  return ClockedActivity.updateActivity(hole, par, endTimeMs);
+  if (!Native) return;
+  try { await Native.updateActivity(hole, par, endTimeMs); }
+  catch {}
 }
 
 export async function endActivity(): Promise<void> {
-  if (!isIOS || !ClockedActivity) return;
-  return ClockedActivity.endActivity();
+  if (!Native) return;
+  try { await Native.endActivity(); }
+  catch {}
 }
 
 export async function areActivitiesEnabled(): Promise<boolean> {
-  if (!isIOS || !ClockedActivity) return false;
-  return ClockedActivity.areActivitiesEnabled();
+  if (!Native) return false;
+  try { return await Native.areActivitiesEnabled(); }
+  catch { return false; }
 }

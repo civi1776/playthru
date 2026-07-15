@@ -35,6 +35,11 @@
     "react-native-view-shot": "4.0.3"
   },
   "private": true,
+  "expo": {
+    "autolinking": {
+      "nativeModulesDir": "modules"
+    }
+  },
   "devDependencies": {
     "@types/react": "~19.2.10",
     "typescript": "~5.9.2"
