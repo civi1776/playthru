@@ -3,19 +3,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import VerificationBadge from '../components/VerificationBadge';
 
-const TIERS = [
-  { range: '4.5 – 5.0', label: 'Elite Pacer',       color: '#C9A84C', bg: 'rgba(201,168,76,0.12)',  border: 'rgba(201,168,76,0.35)' },
-  { range: '4.0 – 4.4', label: 'Fast Golfer',        color: '#7DC87A', bg: 'rgba(125,200,122,0.1)',  border: 'rgba(125,200,122,0.3)' },
-  { range: '3.0 – 3.9', label: 'Average Pace',       color: '#D4B86A', bg: 'rgba(212,184,106,0.1)',  border: 'rgba(212,184,106,0.3)' },
-  { range: 'Below 3.0', label: 'Needs Improvement',  color: '#C07A6A', bg: 'rgba(192,122,106,0.1)',  border: 'rgba(192,122,106,0.3)' },
+// Mirrors lib/clockedRating.js — keep these in sync with the real formula.
+const COMPONENTS = [
+  {
+    n: '1',
+    title: 'SCORING — 65%',
+    desc: 'Your average points per hole against par (birdies and pars pull it up, bogeys and worse pull it down), mapped onto a 0–100 scale.',
+  },
+  {
+    n: '2',
+    title: 'CLOCK — 35%',
+    desc: 'The share of your holes finished under time par. Weighted by difficulty — beating the clock at Pro tier counts full, Beginner tier counts less.',
+  },
 ];
 
-const INPUTS = [
-  { n: '1', title: 'Holes played',      desc: '9 or 18 holes sets the expected baseline time for your round.' },
-  { n: '2', title: 'Transport',         desc: 'Cart rounds have a shorter baseline than walking rounds.' },
-  { n: '3', title: 'Group size',        desc: 'Larger groups get more expected time built into the calculation.' },
-  { n: '4', title: 'Pace delay',        desc: 'If you were held up by another group, that time is forgiven.' },
-  { n: '5', title: 'Score vs handicap', desc: 'Playing well rewards a small bonus to your score.' },
+const STAGES = [
+  { label: 'Provisional', desc: 'Fewer than 5 clocked rounds logged. You still get a full score — new players start at a neutral baseline around 65 so the rankings are never empty — but it moves fast as real rounds come in.' },
+  { label: 'Established', desc: '5 or more clocked rounds. Your score now reflects a rolling window of your last 20 rounds, weighted toward how you actually play and beat the clock.' },
 ];
 
 export default function POPScoreInfoScreen({ navigation }) {
@@ -32,41 +36,25 @@ export default function POPScoreInfoScreen({ navigation }) {
         {/* Hero header */}
         <View style={s.hero}>
           <Text style={s.heroTitle}>Clocked Score</Text>
-          <Text style={s.heroSub}>On The Clock Score</Text>
+          <Text style={s.heroSub}>0 – 100</Text>
         </View>
 
         {/* Section 1 — What is it */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>What is an Clocked Score?</Text>
+          <Text style={s.sectionTitle}>What is a Clocked Score?</Text>
           <Text style={s.body}>
-            Your Clocked Score is a number from 0.0 to 5.0 powered by an AI algorithm that measures how efficiently you play golf. The higher your score, the faster you play relative to the expected time for your specific round conditions. Clocked's AI calculates your score automatically every time you log a round, factoring in multiple inputs to give you the most accurate pace rating in golf.
+            Your Clocked Score is a single number from 0 to 100 that combines how well you score against par with how well you beat the clock. It's calculated fresh every time you finish a round on the clock, and it's the number every ranking on Clocked is built on.
           </Text>
         </View>
 
-        {/* Section 2 — The scale */}
+        {/* Section 2 — How it's calculated */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>The scale</Text>
-          <View style={s.tierList}>
-            {TIERS.map(t => (
-              <View key={t.label} style={[s.tierCard, { backgroundColor: t.bg, borderColor: t.border }]}>
-                <View style={s.tierLeft}>
-                  <Text style={[s.tierRange, { color: t.color }]}>{t.range}</Text>
-                  <Text style={[s.tierLabel, { color: t.color }]}>{t.label}</Text>
-                </View>
-                <View style={[s.tierDot, { backgroundColor: t.color }]} />
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Section 3 — How it's calculated */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>How our AI calculates your score</Text>
+          <Text style={[s.sectionTitle]}>How it's calculated</Text>
           <Text style={[s.body, { marginBottom: 16 }]}>
-            Clocked's AI weighs five key inputs from every round you log and combines them into a single precise score. No two rounds are scored the same way — the algorithm adapts to your specific conditions every time:
+            Two components, weighted together:
           </Text>
           <View style={s.inputList}>
-            {INPUTS.map(item => (
+            {COMPONENTS.map(item => (
               <View key={item.n} style={s.inputRow}>
                 <View style={s.inputNum}>
                   <Text style={s.inputNumText}>{item.n}</Text>
@@ -80,15 +68,20 @@ export default function POPScoreInfoScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Section 4 — Initial score */}
+        {/* Section 3 — Provisional vs established */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Your initial score</Text>
-          <Text style={s.body}>
-            When you first joined Clocked, our AI set your initial Clocked Score based on your typical round time. As you log more rounds, the AI continuously learns from your real on-course performance and refines your score to be more accurate over time. The more you log, the smarter it gets.
-          </Text>
+          <Text style={s.sectionTitle}>Provisional vs. established</Text>
+          <View style={s.tierList}>
+            {STAGES.map(stage => (
+              <View key={stage.label} style={s.stageCard}>
+                <Text style={s.stageLabel}>{stage.label.toUpperCase()}</Text>
+                <Text style={s.stageDesc}>{stage.desc}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        {/* Section 5 — Verification levels */}
+        {/* Section 4 — Verification levels */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>Round verification</Text>
           <Text style={[s.body, { marginBottom: 16 }]}>
@@ -108,7 +101,7 @@ export default function POPScoreInfoScreen({ navigation }) {
 
         {/* Footer */}
         <Text style={s.footer}>
-          Clocked uses leading-edge AI to deliver the most accurate pace of play score in golf.
+          One score, calculated the same way for every player on every certified course.
         </Text>
 
       </ScrollView>
@@ -131,11 +124,9 @@ const s = StyleSheet.create({
   body:         { fontSize: 15, color: '#C8BFA8', lineHeight: 24 },
 
   tierList:     { gap: 8 },
-  tierCard:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 16 },
-  tierLeft:     { gap: 3 },
-  tierRange:    { fontSize: 12, fontWeight: '700', letterSpacing: 1 },
-  tierLabel:    { fontSize: 16, fontWeight: '300' },
-  tierDot:      { width: 10, height: 10, borderRadius: 5 },
+  stageCard:    { borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', backgroundColor: 'rgba(125,200,122,0.06)', paddingVertical: 14, paddingHorizontal: 16, gap: 6 },
+  stageLabel:   { fontSize: 12, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+  stageDesc:    { fontSize: 13, color: '#C8BFA8', lineHeight: 20 },
 
   inputList:    { gap: 14 },
   inputRow:     { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },

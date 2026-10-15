@@ -1,6 +1,6 @@
 // Custom config plugin to add the ClockWidget Live Activity extension target.
 // This replaces @bacons/apple-targets which is incompatible with SDK 55.
-const { withXcodeProject, withInfoPlist, withDangerousMod } = require('@expo/config-plugins');
+const { withXcodeProject, withInfoPlist, withDangerousMod, withEntitlementsPlist } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -8,10 +8,28 @@ const WIDGET_NAME = 'ClockWidget';
 const WIDGET_BUNDLE_ID_SUFFIX = '.clock-widget';
 const APPLE_TEAM_ID = 'CL344GMS7J';
 
+// Shared App Group used for the lock-screen "Holed Out" hand-off — the
+// widget extension writes {holeNumber, timestamp} into this suite when the
+// interactive Live Activity button is tapped, and the main app reads it back
+// on next foreground (ClockedActivityModule.swift's getPendingHoleCompletion
+// / clearPendingHoleCompletion, called from ClockedRoundScreen.js). Must
+// match ClockWidget.entitlements and the appGroupId constants in
+// HoledOutIntent.swift and ClockedActivityModule.swift exactly.
+const APP_GROUP_ID = 'group.com.civiswings.playthru';
+
 function withClockWidget(config) {
   // 1. Add NSSupportsLiveActivities to main app Info.plist
   config = withInfoPlist(config, (config) => {
     config.modResults.NSSupportsLiveActivities = true;
+    return config;
+  });
+
+  // 1b. Add the shared App Group entitlement to the main app target
+  config = withEntitlementsPlist(config, (config) => {
+    const existing = config.modResults['com.apple.security.application-groups'];
+    const groups = new Set(Array.isArray(existing) ? existing : []);
+    groups.add(APP_GROUP_ID);
+    config.modResults['com.apple.security.application-groups'] = Array.from(groups);
     return config;
   });
 
@@ -26,7 +44,10 @@ function withClockWidget(config) {
     }
 
     const sourceDir = path.join(projectRoot, 'targets', 'clock-widget');
-    const allFiles = ['Attributes.swift', 'ClockWidgetLiveActivity.swift', 'index.swift', 'Info.plist'];
+    const allFiles = [
+      'Attributes.swift', 'ClockWidgetLiveActivity.swift', 'index.swift', 'HoledOutIntent.swift',
+      'Info.plist', 'ClockWidget.entitlements',
+    ];
     for (const file of allFiles) {
       const src = path.join(sourceDir, file);
       const dest = path.join(widgetDir, file);
@@ -95,7 +116,7 @@ function withClockWidget(config) {
     project.addToPbxGroup(groupKey, mainGroupKey);
 
     // Add Swift files — file references in the group, build files in widget Sources only
-    const swiftFiles = ['Attributes.swift', 'ClockWidgetLiveActivity.swift', 'index.swift'];
+    const swiftFiles = ['Attributes.swift', 'ClockWidgetLiveActivity.swift', 'index.swift', 'HoledOutIntent.swift'];
 
     for (const fileName of swiftFiles) {
       // PBXFileReference (path relative to group, which has path = ClockWidget)
@@ -148,6 +169,21 @@ function withClockWidget(config) {
       grp.children.push({ value: plistRefUuid, comment: 'Info.plist' });
     }
 
+    // Add ClockWidget.entitlements file reference (not in any build phase —
+    // it's wired up via CODE_SIGN_ENTITLEMENTS below)
+    const entitlementsRefUuid = project.generateUuid();
+    objects.PBXFileReference[entitlementsRefUuid] = {
+      isa: 'PBXFileReference',
+      lastKnownFileType: 'text.plist.entitlements',
+      name: 'ClockWidget.entitlements',
+      path: 'ClockWidget.entitlements',
+      sourceTree: '"<group>"',
+    };
+    objects.PBXFileReference[entitlementsRefUuid + '_comment'] = 'ClockWidget.entitlements';
+    if (grp) {
+      grp.children.push({ value: entitlementsRefUuid, comment: 'ClockWidget.entitlements' });
+    }
+
     // Set build settings for the widget target (Debug + Release)
     const configs = project.pbxXCBuildConfigurationSection();
     for (const key in configs) {
@@ -162,6 +198,7 @@ function withClockWidget(config) {
         cfg.buildSettings.CODE_SIGN_STYLE = 'Automatic';
         cfg.buildSettings.DEVELOPMENT_TEAM = APPLE_TEAM_ID;
         cfg.buildSettings.GENERATE_INFOPLIST_FILE = 'YES';
+        cfg.buildSettings.CODE_SIGN_ENTITLEMENTS = `${WIDGET_NAME}/ClockWidget.entitlements`;
       }
     }
 

@@ -10,13 +10,14 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { getReferralStats } from '../lib/referrals';
 import { PRO_ENABLED } from '../lib/featureFlags';
-import Gauge from '../components/guage';
 import SkeletonLoader from '../components/SkeletonLoader';
 import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
 import VerificationBadge from '../components/VerificationBadge';
 import RecentRoundsList from '../components/RecentRoundsList';
-import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import { computeFullRating, extractPlayerRoundStats, fetchClockedRatingForUser, computeNationalRank, DEFAULT_SCORING_BAND } from '../lib/clockedRating';
+import { totalPointsFromHoleScores } from '../lib/clockedSport';
+import { scoreTier, COLOR, SCORE_TIERS } from '../lib/theme';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -60,19 +61,19 @@ function timeAgo(isoStr) {
   return `${mo[d.getMonth()]} ${d.getDate()}`;
 }
 
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
-  return '#C07A6A';
+// Same thresholds as LeaderboardScreen's clockedColor() — 0–100 scale.
+function clockedColor(score) {
+  if (score == null) return '#7A6E58';
+  if (score >= 70) return '#7DC87A';
+  if (score >= 40) return '#C9A84C';
+  return '#B8A882';
 }
 
-function paceTier(score) {
-  if (score == null) return null;
-  if (score >= 5.0) return 'Elite Pacer';
-  if (score >= 4.0) return 'Fast Golfer';
-  if (score >= 3.0) return 'Average Pace';
-  if (score >= 2.0) return 'Slow Player';
-  return 'Pace Improvement Needed';
+function ptsColor(pts) {
+  if (pts == null) return '#7A6E58';
+  if (pts >= 8) return '#7DC87A';
+  if (pts >= 0) return '#C9A84C';
+  return '#C07A6A';
 }
 
 const DELAY_DOT = {
@@ -82,130 +83,12 @@ const DELAY_DOT = {
   constant: { color: '#C07A6A', label: 'Constant delay' },
 };
 
-// ─── Skeletons ────────────────────────────────────────────────────────────────
-
-function StatTabSkeleton() {
-  return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-      <View style={{ margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center', gap: 12 }}>
-        <SkeletonLoader width={220} height={220} style={{ borderRadius: 110 }} />
-        <SkeletonLoader width={80} height={14} />
-      </View>
-      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <SkeletonLoader width={80} height={10} style={{ marginBottom: 10 }} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {[...Array(4)].map((_, i) => (
-            <View key={i} style={{ width: '47%', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, alignItems: 'center', gap: 8 }}>
-              <SkeletonLoader width="60%" height={10} />
-              <SkeletonLoader width="40%" height={26} />
-            </View>
-          ))}
-        </View>
-      </View>
-    </ScrollView>
-  );
-}
-
-// ─── Handicap helpers ─────────────────────────────────────────────────────────
-
-const HCP_COUNT_MAP = {
-  3:1, 4:1, 5:1, 6:2, 7:2, 8:2, 9:3, 10:3,
-  11:4, 12:4, 13:5, 14:5, 15:6, 16:6, 17:7, 18:8, 19:9, 20:10,
-};
-
-function computeHandicapHistory(rounds) {
-  const withDiff = [...rounds]
-    .filter(r => r.differential != null)
-    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  const history = [];
-  for (let i = 2; i < withDiff.length; i++) {
-    const window = withDiff.slice(Math.max(0, i - 19), i + 1);
-    const n = Math.min(window.length, 20);
-    const count = HCP_COUNT_MAP[n] || 10;
-    const sorted = [...window].sort((a, b) => a.differential - b.differential);
-    const best = sorted.slice(0, count);
-    const avg = best.reduce((sum, r) => sum + r.differential, 0) / best.length;
-    history.push(Math.max(0, Math.min(54, Math.round(avg * 0.96 * 10) / 10)));
-  }
-  return history.slice(-10);
-}
-
-function formatHandicap(hcp) {
-  if (hcp == null) return '—';
-  if (hcp < 0) return `+${Math.abs(hcp).toFixed(1)}`;
-  return hcp.toFixed(1);
-}
-
-// ─── Handicap Line Chart ──────────────────────────────────────────────────────
-
-function HandicapLineChart({ data }) {
-  const [chartWidth, setChartWidth] = useState(0);
-  if (!data || data.length < 2) return null;
-  const H = 52;
-  const max = Math.max(...data);
-  const min = Math.min(...data);
-  const range = max - min || 0.5;
-  const n = data.length;
-
-  return (
-    <View
-      style={{ height: H + 16, marginTop: 12 }}
-      onLayout={e => setChartWidth(e.nativeEvent.layout.width)}
-    >
-      {chartWidth > 0 && data.map((val, i) => {
-        if (i === 0) return null;
-        const prev = data[i - 1];
-        const x1 = ((i - 1) / (n - 1)) * chartWidth;
-        const y1 = 8 + ((val  - min) / range) * (H - 8); // higher value = lower on chart (worse)
-        const x2 = (i / (n - 1)) * chartWidth;
-        const y2 = 8 + ((val  - min) / range) * (H - 8);
-        const py1 = 8 + ((prev - min) / range) * (H - 8);
-        const dx = x2 - x1;
-        const dy = y2 - py1;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        const improving = val <= prev;
-        return (
-          <View
-            key={i}
-            style={{
-              position: 'absolute',
-              left: (x1 + x2) / 2 - len / 2,
-              top: (py1 + y2) / 2 - 1,
-              width: len,
-              height: 2,
-              borderRadius: 1,
-              backgroundColor: improving ? '#7DC87A' : '#C07A6A',
-              transform: [{ rotate: `${angle}deg` }],
-            }}
-          />
-        );
-      })}
-      {chartWidth > 0 && data.map((val, i) => {
-        const x = (i / (n - 1)) * chartWidth;
-        const y = 8 + ((val - min) / range) * (H - 8);
-        return (
-          <View
-            key={`dot-${i}`}
-            style={{
-              position: 'absolute',
-              left: x - 4,
-              top: y - 4,
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: '#7DC87A',
-              borderWidth: 1.5,
-              borderColor: '#090F0A',
-            }}
-          />
-        );
-      })}
-    </View>
-  );
-}
-
 // ─── Stat Tab ─────────────────────────────────────────────────────────────────
+// NOTE: StatTab/StatTabSkeleton/StatBox/calcPaceStreak (a whole earlier
+// version of this tab, built around the retired 0–5 pop_score scale) were
+// removed here — confirmed dead code, never rendered anywhere in this file.
+// The real, currently-rendered hero/stats live further down this component,
+// driven by `clockedRating` (the real 0–100 Clocked Score).
 
 // ─── Profile Activity Tab ─────────────────────────────────────────────────────
 
@@ -221,7 +104,7 @@ function ActivityRow({ item }) {
   };
   const info    = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: '#7A6E58', label: () => 'Activity' };
   const content = item.content ?? {};
-  const pop     = content.pop_score;
+  const pts     = content.team_score;
   return (
     <View style={s.activityRow}>
       <View style={[s.activityIconWrap, { backgroundColor: info.color + '22' }]}>
@@ -229,8 +112,8 @@ function ActivityRow({ item }) {
       </View>
       <View style={s.activityContent}>
         <Text style={s.activityLabel}>{info.label(content)}</Text>
-        {item.type === 'round_logged' && pop != null && (
-          <Text style={[s.activityPop, { color: popColor(pop) }]}>{pop.toFixed(1)} CLK</Text>
+        {item.type === 'round_logged' && pts != null && (
+          <Text style={[s.activityPop, { color: ptsColor(pts) }]}>{pts > 0 ? `+${pts}` : pts} PTS</Text>
         )}
         <Text style={s.activityTime}>{timeAgo(item.created_at)}</Text>
       </View>
@@ -255,7 +138,14 @@ function ActivityTab({ userId }) {
   }, [userId]);
 
   useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   if (loading) return <ActivityIndicator color="#C9A84C" style={{ marginTop: 40 }} />;
   if (!items.length) return (
@@ -277,14 +167,18 @@ function ActivityTab({ userId }) {
 
 // ─── Score Trend Chart ────────────────────────────────────────────────────────
 
+// Plots average points-per-hole for each of the last 20 clocked rounds —
+// the same "SCORING" component the real Clocked Score is built from
+// (DEFAULT_SCORING_BAND), rather than the retired 0–5 pop_score scale.
 function ScoreTrendChart({ rounds }) {
   const [w, setW]               = useState(0);
   const [tooltipIdx, setTipIdx] = useState(null);
 
   const data = [...(rounds ?? [])]
-    .filter(r => r.pop_score != null)
+    .filter(r => r.round_format === 'clocked' && r.hole_scores?.length)
     .slice(0, 20)
-    .reverse();
+    .reverse()
+    .map(r => ({ ...r, avgPts: totalPointsFromHoleScores(r.hole_scores) / r.hole_scores.length }));
 
   if (data.length < 3 || w === 0) {
     return (
@@ -297,18 +191,20 @@ function ScoreTrendChart({ rounds }) {
     );
   }
 
+  const { low, high } = DEFAULT_SCORING_BAND;
+  const PAR = 1; // DEFAULT_SCORING_SCALE.par — one point per hole at par
   const H = 110;
   const PX = 24;
   const PY = 12;
   const n  = data.length;
   const toX = i => PX + (i / (n - 1)) * (w - PX * 2);
-  const toY = v => PY + (1 - (v - 1.0) / 4.0) * (H - PY * 2);
-  const threshY = toY(3.5);
-  const pts = data.map((r, i) => `${toX(i).toFixed(1)},${toY(r.pop_score).toFixed(1)}`).join(' ');
+  const toY = v => PY + (1 - (v - low) / (high - low)) * (H - PY * 2);
+  const threshY = toY(PAR);
+  const pts = data.map((r, i) => `${toX(i).toFixed(1)},${toY(r.avgPts).toFixed(1)}`).join(' ');
 
   const half     = Math.max(1, Math.floor(n / 2));
-  const avgFirst = data.slice(0, half).reduce((s, r) => s + r.pop_score, 0) / half;
-  const avgLast  = data.slice(n - half).reduce((s, r) => s + r.pop_score, 0) / half;
+  const avgFirst = data.slice(0, half).reduce((s, r) => s + r.avgPts, 0) / half;
+  const avgLast  = data.slice(n - half).reduce((s, r) => s + r.avgPts, 0) / half;
   const lineColor = avgLast > avgFirst + 0.1 ? '#7DC87A' : avgLast < avgFirst - 0.1 ? '#C07A6A' : '#C9A84C';
 
   const tip = tooltipIdx != null ? data[tooltipIdx] : null;
@@ -333,7 +229,7 @@ function ScoreTrendChart({ rounds }) {
           {data.map((r, i) => (
             <Circle
               key={i}
-              cx={toX(i)} cy={toY(r.pop_score)}
+              cx={toX(i)} cy={toY(r.avgPts)}
               r={tooltipIdx === i ? 6 : 4}
               fill={tooltipIdx === i ? lineColor : '#0D1A0F'}
               stroke={lineColor} strokeWidth={2}
@@ -341,245 +237,18 @@ function ScoreTrendChart({ rounds }) {
             />
           ))}
         </Svg>
-        <Text style={[s.chartAxisLabel, { position: 'absolute', left: 0, top: threshY - 8 }]}>3.5</Text>
+        <Text style={[s.chartAxisLabel, { position: 'absolute', left: 0, top: threshY - 8 }]}>PAR</Text>
         {tip != null && (
           <View style={[s.chartTooltip, {
             left: Math.min(Math.max(toX(tooltipIdx) - 55, 0), w - 120),
-            top:  Math.max(toY(tip.pop_score) - 60, 0),
+            top:  Math.max(toY(tip.avgPts) - 60, 0),
           }]}>
-            <Text style={s.chartTooltipScore}>{tip.pop_score.toFixed(1)}</Text>
+            <Text style={s.chartTooltipScore}>{tip.avgPts.toFixed(1)} pts/hole</Text>
             <Text style={s.chartTooltipCourse} numberOfLines={1}>{tip.course_name ?? '—'}</Text>
             <Text style={s.chartTooltipDate}>{formatShortDate(tip.created_at)}</Text>
           </View>
         )}
       </View>
-    </View>
-  );
-}
-
-function StatTab({ stats, roundCount, rounds, navigation }) {
-  const { profile, user } = useAuth();
-  const pop  = profile?.pop_score ?? null;
-  const tier = paceTier(pop);
-  const hcpIndex = profile?.handicap_index ?? null;
-  const hcpTrend = profile?.handicap_trend ?? null;
-  const hcpHistory = computeHandicapHistory(rounds ?? []);
-  const roundsWithDiff = (rounds ?? []).filter(r => r.differential != null).length;
-
-  const trendIcon = hcpTrend === 'improving' ? 'arrow-down'
-    : hcpTrend === 'rising' ? 'arrow-up'
-    : 'remove';
-  const trendColor = hcpTrend === 'improving' ? '#7DC87A'
-    : hcpTrend === 'rising' ? '#C07A6A'
-    : '#B8A882';
-
-  const [referralCode, setReferralCode]   = useState(null);
-  const [referralCount, setReferralCount] = useState(0);
-  const [challenges, setChallenges]       = useState([]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    getReferralStats(user.id).then(({ code, count }) => {
-      setReferralCode(code);
-      setReferralCount(count);
-    }).catch(() => {});
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    (async () => {
-      const { data: rows } = await supabase
-        .from('challenges')
-        .select('id, challenger_id, challenged_id, course_name, challenger_score, challenged_score, status, winner_id, expires_at, created_at')
-        .or(`challenger_id.eq.${user.id},challenged_id.eq.${user.id}`)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (!rows?.length) return;
-      const oppIds = [...new Set(rows.map(r => r.challenger_id === user.id ? r.challenged_id : r.challenger_id))];
-      const { data: oppProfiles } = await supabase.from('profiles').select('id, username').in('id', oppIds);
-      const pMap = Object.fromEntries((oppProfiles ?? []).map(p => [p.id, p]));
-      setChallenges(rows.map(r => ({
-        ...r,
-        opponentUsername: pMap[r.challenger_id === user.id ? r.challenged_id : r.challenger_id]?.username ?? '—',
-      })));
-    })();
-  }, [user?.id]);
-
-  return (
-    <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-      {/* Compact gauge header row */}
-      <View style={s.gaugeRow}>
-        <View style={s.gaugeCompact}>
-          {pop != null
-            ? <Gauge score={pop} size={132} />
-            : <View style={{ width: 132, height: 132, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 36, fontWeight: '100', color: '#C9A84C44' }}>—</Text>
-              </View>
-          }
-        </View>
-        <View style={s.gaugeInfo}>
-          {tier
-            ? <Text style={s.tierLabel}>{tier.toUpperCase()}</Text>
-            : <Text style={s.tierLabelMuted}>LOG A ROUND TO{'\n'}EARN YOUR SCORE</Text>
-          }
-          <TouchableOpacity onPress={() => navigation.navigate('POPScoreInfo')} activeOpacity={0.7} style={{ marginTop: 6 }}>
-            <Text style={s.popInfoLink}>What is my Clocked Score?</Text>
-          </TouchableOpacity>
-          <View style={{ marginTop: 10, gap: 8 }}>
-            <View>
-              <Text style={s.scoreStatLabel}>YOUR SCORE</Text>
-              <Text style={s.scoreStatValueLg}>{pop != null ? pop.toFixed(1) : '—'}</Text>
-            </View>
-            <View>
-              <Text style={s.scoreStatLabel}>NAT'L AVG</Text>
-              <Text style={s.scoreStatValue}>3.9</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Handicap Index card */}
-      <View style={s.hcpCard}>
-        <View style={s.hcpTopRow}>
-          <View>
-            <Text style={s.hcpLabel}>HANDICAP INDEX</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
-              <Text style={s.hcpValue}>{formatHandicap(hcpIndex)}</Text>
-              {hcpIndex != null && (
-                <View style={[s.hcpTrendBadge, { backgroundColor: trendColor + '22', borderColor: trendColor + '44' }]}>
-                  <Ionicons name={trendIcon} size={12} color={trendColor} />
-                  <Text style={[s.hcpTrendText, { color: trendColor }]}>
-                    {hcpTrend === 'improving' ? 'IMPROVING' : hcpTrend === 'rising' ? 'RISING' : 'STABLE'}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-        <Text style={s.hcpSub}>
-          {hcpIndex != null
-            ? `Based on last ${roundsWithDiff} round${roundsWithDiff !== 1 ? 's' : ''}`
-            : 'Log 3 rounds to calculate your handicap'}
-        </Text>
-        {hcpHistory.length >= 2 && (
-          <>
-            <Text style={[s.hcpLabel, { marginTop: 16, marginBottom: 4 }]}>TREND</Text>
-            <HandicapLineChart data={hcpHistory} />
-          </>
-        )}
-      </View>
-
-      {/* Dominant stats grid */}
-      <View style={s.statSection}>
-        <Text style={s.sectionLabel}>STATS</Text>
-        <View style={s.statGrid}>
-          <StatBox label="CLOCKED SCORE"      value={pop != null ? pop.toFixed(1) : '—'} />
-          <StatBox label="ROUNDS LOGGED"  value={roundCount ?? 0} />
-          <StatBox label="AVG ROUND TIME" value={stats?.avgTime ? formatDuration(Math.round(stats.avgTime)) : '—'} />
-          <StatBox label="BEST CLOCKED SCORE" value={stats?.bestScore > 0 ? stats.bestScore.toFixed(1) : '—'} />
-          <StatBox label="FASTEST ROUND"  value={stats?.fastestRound && stats.fastestRound < 999 ? formatDuration(stats.fastestRound) : '—'} />
-          <StatBox label="AVG GROUP SIZE" value={stats?.avgGroupSize != null ? stats.avgGroupSize.toFixed(1) : '—'} />
-          <StatBox label="CART VS WALK"   value={roundCount > 0 ? `${stats?.cartRounds ?? 0}C · ${stats?.walkRounds ?? 0}W` : '—'} />
-          <StatBox label="COURSES PLAYED" value={stats?.uniqueCourses ?? 0} />
-          <StatBox label="MEMBER SINCE"   value={profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'} />
-          <StatBox label="PACE STREAK"    value={`${calcPaceStreak(rounds)}${calcPaceStreak(rounds) >= 3 ? ' 🔥' : ''}`} sub="rounds ≥ 3.5" />
-        </View>
-      </View>
-
-      {rounds.length >= 3 && <ScoreTrendChart rounds={rounds} />}
-
-      {/* Challenges section */}
-      {challenges.length > 0 && (
-        <View style={s.statSection}>
-          <Text style={s.sectionLabel}>CHALLENGES</Text>
-          {challenges.map(ch => {
-            const isChallenger  = ch.challenger_id === user.id;
-            const myScore       = isChallenger ? ch.challenger_score : ch.challenged_score;
-            const theirScore    = isChallenger ? ch.challenged_score : ch.challenger_score;
-            const expired       = new Date(ch.expires_at) < new Date() && (ch.status === 'pending' || ch.status === 'accepted');
-            const displayStatus = expired ? 'expired' : ch.status;
-            const won           = ch.status === 'completed' && ch.winner_id === user.id;
-            const statusColor   = displayStatus === 'completed' ? (won ? '#7DC87A' : '#C07A6A')
-              : displayStatus === 'accepted'  ? '#C9A84C'
-              : displayStatus === 'expired' || displayStatus === 'declined' ? '#7A6E58'
-              : '#B8A882';
-            const statusLabel   = displayStatus === 'completed' ? (won ? 'WON' : 'LOST')
-              : displayStatus === 'accepted'  ? 'ACTIVE'
-              : displayStatus === 'expired'   ? 'EXPIRED'
-              : displayStatus === 'declined'  ? 'DECLINED'
-              : isChallenger ? 'SENT' : 'RECEIVED';
-            const daysLeft = Math.max(0, Math.ceil((new Date(ch.expires_at) - new Date()) / 86400000));
-            return (
-              <View key={ch.id} style={s.challengeRow}>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                    <Text style={s.challengeOpponent}>@{ch.opponentUsername}</Text>
-                    <View style={[s.challengeBadge, { backgroundColor: statusColor + '22', borderColor: statusColor + '44' }]}>
-                      <Text style={[s.challengeBadgeText, { color: statusColor }]}>{statusLabel}</Text>
-                    </View>
-                  </View>
-                  <Text style={s.challengeCourse}>{ch.course_name}</Text>
-                  <Text style={s.challengeScores}>You {myScore != null ? myScore.toFixed(1) : '—'}  ·  Them {theirScore != null ? theirScore.toFixed(1) : '—'}</Text>
-                  {displayStatus !== 'completed' && displayStatus !== 'expired' && displayStatus !== 'declined' && (
-                    <Text style={s.challengeExpiry}>{daysLeft}d remaining</Text>
-                  )}
-                </View>
-                <Ionicons name="flash" size={14} color={statusColor} style={{ marginTop: 2 }} />
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Referral card */}
-      <View style={s.referralCard}>
-        <View style={s.referralCardHeader}>
-          <Ionicons name="gift-outline" size={18} color="#C9A84C" />
-          <Text style={s.referralCardTitle}>REFER A FRIEND</Text>
-        </View>
-        <Text style={s.referralCardSub}>
-          Share your code and help grow the Clocked community.
-        </Text>
-        <View style={s.referralCodeRow}>
-          <Text style={s.referralCodeText}>{referralCode ?? '——————'}</Text>
-          {referralCode && (
-            <TouchableOpacity
-              style={s.referralShareBtn}
-              activeOpacity={0.8}
-              onPress={() => Share.share({
-                message: `Join me on Clocked — the app that tracks pace of play. Use my referral code ${referralCode} when you sign up! https://clocked.golf/join?ref=${referralCode}`,
-              })}
-            >
-              <Ionicons name="share-outline" size={16} color="#090F0A" />
-              <Text style={s.referralShareBtnText}>SHARE</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        {referralCount > 0 && (
-          <Text style={s.referralCountText}>
-            {referralCount} {referralCount === 1 ? 'person' : 'people'} joined with your code
-          </Text>
-        )}
-      </View>
-    </ScrollView>
-  );
-}
-
-function calcPaceStreak(rounds) {
-  let streak = 0;
-  for (const r of (rounds ?? [])) {
-    if ((r.pop_score ?? 0) >= 3.5) streak++;
-    else break;
-  }
-  return streak;
-}
-
-function StatBox({ label, value, sub }) {
-  return (
-    <View style={s.statBox}>
-      <Text style={s.statBoxLabel}>{label}</Text>
-      <Text style={s.statBoxValue}>{value}</Text>
-      {sub && <Text style={s.statBoxSub}>{sub}</Text>}
     </View>
   );
 }
@@ -639,8 +308,8 @@ function RoundsTab({ navigation, rounds = [], loading }) {
       <View style={s.emptyState}>
         <Ionicons name="golf" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
         <Text style={s.emptyText}>No rounds logged yet.</Text>
-        <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('Log')} activeOpacity={0.8}>
-          <Text style={s.emptyBtnText}>LOG YOUR FIRST ROUND</Text>
+        <TouchableOpacity style={s.emptyBtn} onPress={() => navigation.navigate('ClockedSetup')} activeOpacity={0.8}>
+          <Text style={s.emptyBtnText}>PLAY YOUR FIRST ROUND</Text>
         </TouchableOpacity>
       </View>
     );
@@ -652,6 +321,7 @@ function RoundsTab({ navigation, rounds = [], loading }) {
       {displayRounds.map((r, i) => {
         if (!r) return null;
         const delayInfo = r.pace_delay ? DELAY_DOT[r.pace_delay] : null;
+        const pts = r.hole_scores?.length ? totalPointsFromHoleScores(r.hole_scores) : null;
         return (
           <View key={i} style={s.roundCard}>
             <View style={s.roundTop}>
@@ -668,8 +338,8 @@ function RoundsTab({ navigation, rounds = [], loading }) {
                     <Text style={s.underReviewText}>Under Review</Text>
                   </View>
                 ) : (
-                  <Text style={[s.roundPop, { color: popColor(r.pop_score || 0) }]}>
-                    {r.pop_score != null ? r.pop_score.toFixed(1) : '—'}
+                  <Text style={[s.roundPop, { color: ptsColor(pts) }]}>
+                    {pts != null ? (pts > 0 ? `+${pts}` : pts) : '—'}
                   </Text>
                 )}
                 <Text style={s.roundTime}>{formatDuration(r.duration_minutes)}</Text>
@@ -737,10 +407,48 @@ function FriendsTab({ navigation }) {
       if (!uid) { setLoading(false); return; }
       const { data, error: err } = await supabase
         .from('follows')
-        .select('following_id, profiles!follows_following_id_fkey(id, full_name, username, home_course, pop_score)')
+        .select('following_id, profiles!follows_following_id_fkey(id, full_name, username, home_course, handicap_index, avatar_url)')
         .eq('follower_id', uid);
       if (err) throw err;
-      setFriends((data || []).map(r => r.profiles).filter(Boolean));
+      const followedProfiles = (data || []).map(r => r.profiles).filter(Boolean);
+      setFriends(followedProfiles);
+
+      // Batch-compute each followed player's real Clocked Score, matching how
+      // the Leaderboard does it — one query for their rounds, one for their
+      // confirmed participations, instead of the retired pop_score column.
+      const friendIds = followedProfiles.map(p => p.id);
+      if (friendIds.length) {
+        const { data: ownRounds } = await supabase
+          .from('rounds').select('id, user_id, hole_scores')
+          .eq('round_format', 'clocked').not('hole_scores', 'is', null)
+          .in('user_id', friendIds);
+        const byUser = {};
+        (ownRounds ?? []).forEach(r => { (byUser[r.user_id] ??= []).push(r); });
+        const roundIds = (ownRounds ?? []).map(r => r.id);
+        let parts = [];
+        if (roundIds.length) {
+          const { data: partRows } = await supabase
+            .from('round_participants').select('round_id, user_id, player_key')
+            .eq('status', 'confirmed').in('round_id', roundIds).in('user_id', friendIds);
+          parts = partRows ?? [];
+        }
+        const roundMap = {};
+        (ownRounds ?? []).forEach(r => { roundMap[r.id] = r; });
+        parts.forEach(p => {
+          if (!byUser[p.user_id]) byUser[p.user_id] = [];
+          const already = byUser[p.user_id].some(r => r.id === p.round_id);
+          if (!already && roundMap[p.round_id]) byUser[p.user_id].push({ ...roundMap[p.round_id], _playerKey: p.player_key });
+        });
+        const withScores = followedProfiles.map(p => {
+          const playerName = p.full_name || p.username || 'Player';
+          const roundStats = (byUser[p.id] ?? [])
+            .map(r => extractPlayerRoundStats(r.hole_scores, r._playerKey ?? playerName))
+            .filter(Boolean);
+          const rating = computeFullRating({ roundStats, handicapIndex: p.handicap_index });
+          return { ...p, clockedScore: rating.clockedScore };
+        });
+        setFriends(withScores);
+      }
     } catch (e) {
       setError(true);
     } finally {
@@ -814,15 +522,22 @@ function FriendsTab({ navigation }) {
           onPress={() => navigation.navigate('PublicProfile', { userId: f.id })}
           activeOpacity={0.8}
         >
-          <InitialsAvatar name={f.full_name} size={40} />
+          <InitialsAvatar name={f.full_name} size={40} avatarUrl={f.avatar_url} username={f.username} />
           <View style={s.friendInfo}>
             <Text style={s.friendName}>{f.full_name || '—'}</Text>
             <Text style={s.friendHandle}>@{f.username}{f.home_course ? ` · ${f.home_course}` : ''}</Text>
           </View>
           <View style={s.friendRight}>
-            <Text style={[s.friendPop, { color: popColor(f.pop_score) }]}>
-              {f.pop_score != null ? f.pop_score.toFixed(1) : '—'}
+            <Text style={[s.friendPop, { color: clockedColor(f.clockedScore) }]}>
+              {f.clockedScore ?? '—'}
             </Text>
+            <TouchableOpacity
+              style={s.vsFriendBtn}
+              onPress={(e) => { e.stopPropagation?.(); navigation.navigate('Rivalry', { userId: f.id, username: f.username }); }}
+              activeOpacity={0.7}
+            >
+              <Text style={s.vsFriendText}>VS</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={s.unfollowBtn} onPress={(e) => { e.stopPropagation?.(); unfollow(f.id); }} activeOpacity={0.7}>
               <Text style={s.unfollowText}>UNFOLLOW</Text>
             </TouchableOpacity>
@@ -853,6 +568,7 @@ export default function ProfileScreen({ navigation }) {
   const [stats, setStats]       = useState({});
   const [clockedRating, setClockedRating] = useState({ clockedScore: null, scoring: null, clock: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
   const [followingCount, setFollowingCount] = useState(0);
+  const [nationalRank, setNationalRank] = useState(null);
 
   useEffect(() => {
     if (!user) navigation.replace('Welcome');
@@ -884,7 +600,10 @@ export default function ProfileScreen({ navigation }) {
 
       if (roundsData && roundsData.length > 0) {
         const avgTime      = roundsData.reduce((sum, r) => sum + (r.duration_minutes || 0), 0) / roundsData.length;
-        const bestScore    = Math.max(...roundsData.map(r => r.pop_score || 0));
+        const clockedPointTotals = roundsData
+          .filter(r => r.round_format === 'clocked' && r.hole_scores?.length)
+          .map(r => totalPointsFromHoleScores(r.hole_scores));
+        const bestScore    = clockedPointTotals.length ? Math.max(...clockedPointTotals) : 0;
         const fastestRound = Math.min(...roundsData.map(r => r.duration_minutes || 999));
         const avgGroupSize = roundsData.reduce((sum, r) => sum + (r.players || 0), 0) / roundsData.length;
         const cartRounds   = roundsData.filter(r => r.transport === 'Cart').length;
@@ -898,48 +617,14 @@ export default function ProfileScreen({ navigation }) {
         setStats(newStats);
       }
 
-      // Compute Clocked Score from clocked rounds (own + confirmed participations)
-      const myOwnClocked = (roundsData ?? []).filter(r => r.round_format === 'clocked' && r.hole_scores);
-      const playerName = profile?.full_name || profile?.username || 'You';
-
-      // Fetch rounds where I'm a confirmed participant (but not the logger)
-      let participatedRounds = [];
-      try {
-        const { data: myParts } = await supabase
-          .from('round_participants')
-          .select('round_id, player_key, hole_scores, total_points')
-          .eq('user_id', profile.id)
-          .eq('status', 'confirmed');
-        if (myParts?.length) {
-          const partRoundIds = myParts
-            .map(p => p.round_id)
-            .filter(rid => !myOwnClocked.some(r => r.id === rid));
-          if (partRoundIds.length) {
-            const { data: partRounds } = await supabase
-              .from('rounds')
-              .select('id, hole_scores, round_format')
-              .in('id', partRoundIds)
-              .eq('round_format', 'clocked');
-            participatedRounds = (partRounds ?? []).map(r => {
-              const part = myParts.find(p => p.round_id === r.id);
-              return { ...r, _playerKey: part?.player_key };
-            });
-          }
-        }
-      } catch { /* silent */ }
-
-      const allClockedRounds = [...myOwnClocked, ...participatedRounds];
-      const roundStats = allClockedRounds
-        .map(r => {
-          const key = r._playerKey ?? playerName;
-          return extractPlayerRoundStats(r.hole_scores, key);
-        })
-        .filter(Boolean);
-      const rating = computeFullRating({
-        roundStats,
-        handicapIndex: profile?.handicap_index,
-      });
+      // Real Clocked Score (0–100) — canonical computation shared with
+      // HomeScreen/LeaderboardScreen so every screen agrees on this number.
+      const rating = await fetchClockedRatingForUser(supabase, profile.id, profile);
       setClockedRating(rating);
+
+      // National rank — profiles.national_rank is a retired column (only
+      // ever written by the orphaned LiveRoundScreen), so compute it fresh.
+      computeNationalRank(supabase, profile.id).then(setNationalRank).catch(() => {});
 
       setLoading(false);
     };
@@ -947,15 +632,17 @@ export default function ProfileScreen({ navigation }) {
     loadData();
   }, [profile?.id]));
 
-  const last5    = rounds.slice(0, 5);
-  const isCertified = PRO_ENABLED && last5.length === 5 && last5.every(r => (r.pop_score ?? 0) >= 4.0);
+  const last5Clocked = rounds.filter(r => r.round_format === 'clocked' && r.hole_scores?.length).slice(0, 5);
+  const isCertified = PRO_ENABLED && last5Clocked.length === 5
+    && last5Clocked.every(r => (totalPointsFromHoleScores(r.hole_scores) ?? -Infinity) >= 8);
   const tabs     = ['stats', 'rounds', 'friends', 'activity'];
   const tabLabel = (t) => t.toUpperCase();
 
   const handleSettings = () => navigation.navigate('Settings');
 
   const bestRound = rounds
-    .filter(r => r.round_format === 'clocked' && r.team_score != null)
+    .filter(r => r.round_format === 'clocked' && r.hole_scores?.length)
+    .map(r => ({ ...r, team_score: totalPointsFromHoleScores(r.hole_scores) }))
     .sort((a, b) => (b.team_score ?? 0) - (a.team_score ?? 0))[0];
 
   return (
@@ -1010,29 +697,34 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         {/* Hero score section */}
-        {!loading && (
+        {!loading && (() => {
+          // A fresh account has no earned score \u2014 computeFullRating returns a
+          // cold-start baseline for zero rounds, but we never show it as if it
+          // were real. Zero rounds: "\u2014", no pill, no tier, just the first-round
+          // prompt. Provisional (1..threshold-1 rounds): real number in its tier
+          // color with the PROVISIONAL pill as the single label.
+          const hasRounds = (clockedRating.roundsUsed ?? 0) > 0;
+          const hasScore = hasRounds && clockedRating.clockedScore != null;
+          const tier = scoreTier(clockedRating.clockedScore, clockedRating.isProvisional);
+          return (
           <View style={s.heroScore}>
             <Text style={s.heroLabel}>CLOCKED SCORE</Text>
             <View style={s.heroRow}>
-              <Text style={[s.heroNum, { color: (() => {
-                const sc = clockedRating.clockedScore;
-                if (sc == null) return '#7A6E58';
-                if (sc >= 80) return '#F0CB5B';
-                if (sc >= 60) return '#C9A84C';
-                if (sc >= 40) return '#E8A838';
-                return '#E85D4A';
-              })() }]}>
-                {clockedRating.clockedScore ?? '\u2014'}
+              <Text style={[s.heroNum, { color: hasScore ? tier.color : '#7A6E58' }]}>
+                {hasScore ? clockedRating.clockedScore : '\u2014'}
               </Text>
-              {clockedRating.clockedScore != null && (
+              {hasScore && (
                 <Text style={s.heroMax}>/100</Text>
               )}
-              {clockedRating.isProvisional && (
+              {hasScore && clockedRating.isProvisional && (
                 <View style={s.heroProv}>
                   <Text style={s.heroProvText}>PROVISIONAL</Text>
                 </View>
               )}
             </View>
+            {hasScore && !clockedRating.isProvisional && (
+              <Text style={[s.heroTierName, { color: tier.color }]}>{tier.name}</Text>
+            )}
 
             {/* Gradient progress bar */}
             <View style={s.heroBarTrack}>
@@ -1040,7 +732,7 @@ export default function ProfileScreen({ navigation }) {
                 colors={['#7DC87A', '#C9A84C', '#F0CB5B']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={[s.heroBarFill, { width: `${clockedRating.clockedScore ?? 0}%` }]}
+                style={[s.heroBarFill, { width: `${hasScore ? clockedRating.clockedScore : 0}%` }]}
               />
             </View>
 
@@ -1069,24 +761,91 @@ export default function ProfileScreen({ navigation }) {
               </Text>
             )}
           </View>
-        )}
+          );
+        })()}
 
-        {/* Stat chips row */}
+        {/* Score trend sparkline */}
+        {!loading && (() => {
+          const clockedRounds = rounds.filter(r => r.round_format === 'clocked' && r.hole_scores?.length);
+          if (clockedRounds.length < 3) return null;
+          const sparkData = clockedRounds.slice(0, 10).reverse().map(r => {
+            const playerName = profile?.full_name || profile?.username || 'Player';
+            const rs = extractPlayerRoundStats(r.hole_scores, playerName);
+            if (!rs) return null;
+            const rating = computeFullRating({ roundStats: [rs], handicapIndex: profile?.handicap_index });
+            return rating.clockedScore;
+          }).filter(v => v != null);
+          if (sparkData.length < 3) return null;
+          const W = 280, H = 60, PX = 12, PY = 8;
+          const minV = Math.min(...sparkData) - 2, maxV = Math.max(...sparkData) + 2;
+          const range = maxV - minV || 1;
+          const toX = (i) => PX + (i / (sparkData.length - 1)) * (W - PX * 2);
+          const toY = (v) => PY + (1 - (v - minV) / range) * (H - PY * 2);
+          const pts = sparkData.map((v, i) => `${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+          const last = sparkData[sparkData.length - 1];
+          const first = sparkData[0];
+          const lineColor = last > first + 1 ? COLOR.green : last < first - 1 ? COLOR.red : COLOR.gold;
+          return (
+            <View style={s.sparkCard}>
+              <Text style={s.sparkLabel}>SCORE TREND</Text>
+              <Svg width={W} height={H}>
+                <Polyline points={pts} fill="none" stroke={lineColor} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                <Circle cx={toX(sparkData.length - 1)} cy={toY(last)} r={4} fill={lineColor} />
+              </Svg>
+            </View>
+          );
+        })()}
+
+        {/* Stat strip */}
         {!loading && (
           <View style={s.statChipsRow}>
             <View style={s.statChip}>
               <Text style={s.statChipLabel}>ROUNDS</Text>
               <Text style={s.statChipNum}>{rounds.filter(r => r.round_format === 'clocked').length}</Text>
             </View>
-            <View style={[s.statChip, profile?.national_rank && s.statChipGold]}>
+            <View style={s.statChip}>
+              <Text style={s.statChipLabel}>COURSES</Text>
+              <Text style={s.statChipNum}>{stats.uniqueCourses ?? 0}</Text>
+            </View>
+            <View style={[s.statChip, nationalRank && s.statChipGold]}>
               <Text style={s.statChipLabel}>RANK</Text>
-              <Text style={s.statChipNum}>{profile?.national_rank ? `#${profile.national_rank}` : '\u2014'}</Text>
+              <Text style={s.statChipNum}>{nationalRank ? `#${nationalRank}` : '\u2014'}</Text>
             </View>
             <View style={s.statChip}>
               <Text style={s.statChipLabel}>FOLLOWING</Text>
               <Text style={s.statChipNum}>{followingCount}</Text>
             </View>
           </View>
+        )}
+
+        {/* Tier progress */}
+        {!loading && clockedRating.clockedScore != null && !clockedRating.isProvisional && (() => {
+          const score = clockedRating.clockedScore;
+          const nextTier = [...SCORE_TIERS].reverse().find(t => t.min > score);
+          if (!nextTier) return null;
+          const gap = nextTier.min - score;
+          return (
+            <View style={s.tierProgressRow}>
+              <Text style={s.tierProgressText}>
+                {gap} point{gap !== 1 ? 's' : ''} to <Text style={{ color: nextTier.color, fontWeight: '700' }}>{nextTier.name}</Text>
+              </Text>
+            </View>
+          );
+        })()}
+
+        {/* Tournament promo card */}
+        {!loading && (
+          <TouchableOpacity
+            style={s.promoCard}
+            onPress={() => navigation.navigate('Tournament')}
+            activeOpacity={0.8}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={s.promoTitle}>Ready to compete?</Text>
+              <Text style={s.promoSub}>Apply for the Clocked Golf tournament series.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={COLOR.gold} />
+          </TouchableOpacity>
         )}
 
         {/* Best round callout */}
@@ -1149,6 +908,7 @@ const s = StyleSheet.create({
   heroMax:          { fontSize: 22, fontWeight: '300', color: '#7A6E58', marginLeft: 4, marginBottom: 4 },
   heroProv:         { marginLeft: 12, backgroundColor: '#C9A84C18', borderRadius: 6, borderWidth: 1, borderColor: '#C9A84C33', paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
   heroProvText:     { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+  heroTierName:     { fontSize: 11, fontWeight: '800', letterSpacing: 3, marginTop: -6, marginBottom: 12 },
   heroBarTrack:     { height: 6, backgroundColor: '#1A2E1C', borderRadius: 3, marginTop: 12, marginBottom: 16, overflow: 'hidden' },
   heroBarFill:      { height: 6, borderRadius: 3 },
   heroSubRow:       { flexDirection: 'row', gap: 20 },
@@ -1163,6 +923,19 @@ const s = StyleSheet.create({
   statChipGold:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 10, paddingVertical: 6 },
   statChipLabel:    { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
   statChipNum:      { fontSize: 20, fontWeight: '300', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
+
+  // Sparkline
+  sparkCard:        { marginHorizontal: 16, marginTop: 8, marginBottom: 4, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, alignItems: 'center' },
+  sparkLabel:       { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 6, alignSelf: 'flex-start' },
+
+  // Tier progress
+  tierProgressRow:  { paddingHorizontal: 22, marginBottom: 6 },
+  tierProgressText: { fontSize: 12, color: '#B8A882', fontStyle: 'italic' },
+
+  // Promo card
+  promoCard:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 14, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#C9A84C33', paddingVertical: 14, paddingHorizontal: 16 },
+  promoTitle:       { fontSize: 13, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
+  promoSub:         { fontSize: 11, color: '#B8A882' },
 
   // Best round
   bestRound:        { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#C9A84C22', paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -1262,6 +1035,8 @@ statSection:         { paddingHorizontal: 16, marginBottom: 16 },
   friendPop:        { fontSize: 24, fontWeight: '300' },
   unfollowBtn:      { borderWidth: 1, borderColor: '#C9A84C33', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
   unfollowText:     { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 1.5 },
+  vsFriendBtn:      { borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, marginBottom: 6 },
+  vsFriendText:     { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
   addFriendBtn:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 14, borderStyle: 'dashed', paddingVertical: 18, alignItems: 'center', marginTop: 4 },
   addFriendText:    { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
   emptyState:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingVertical: 60 },
@@ -1269,13 +1044,6 @@ statSection:         { paddingHorizontal: 16, marginBottom: 16 },
   emptyBtn:         { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24 },
   emptyBtnText:     { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
   // Handicap card
-  hcpCard:          { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#7DC87A22', padding: 20 },
-  hcpTopRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  hcpLabel:         { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
-  hcpValue:         { fontSize: 44, fontWeight: '200', color: '#F5EDD8' },
-  hcpTrendBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  hcpTrendText:     { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
-  hcpSub:           { fontSize: 11, color: '#7A6E58', marginTop: 6 },
   underReviewBadge: { backgroundColor: 'rgba(192,122,106,0.15)', borderWidth: 1, borderColor: 'rgba(192,122,106,0.4)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3 },
   underReviewText:  { fontSize: 9, fontWeight: '700', color: '#C07A6A', letterSpacing: 0.5 },
   reviewBanner:     { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(192,122,106,0.1)', borderBottomWidth: 1, borderBottomColor: 'rgba(192,122,106,0.25)', paddingHorizontal: 16, paddingVertical: 10 },

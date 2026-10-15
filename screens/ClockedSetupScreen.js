@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView, Platform,
   KeyboardAvoidingView, StyleSheet, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import { CLOCKED_LAST_TRANSPORT_KEY, CLOCKED_DEFAULT_TRANSPORT } from '../lib/clockedRoundConstants';
 import { searchCourses } from '../lib/courses';
 import { useAuth } from '../context/AuthContext';
 import CourseAvatar from '../components/CourseAvatar';
@@ -34,8 +36,22 @@ export default function ClockedSetupScreen({ navigation }) {
   const [selectedTeeIdx, setSelectedTeeIdx] = useState(null);
   const [selectedNine, setSelectedNine]     = useState('front');
   const [mode, setMode]               = useState(1); // 1=solo, 2/3/4
-  const [transport, setTransport]     = useState(null);
-  const [difficulty, setDifficulty]   = useState('intermediate');
+  // Pre-selected so CONTINUE is live the moment the step appears: last-used
+  // transport if we have one, otherwise Cart. The user can still change it.
+  const [transport, setTransport]     = useState(CLOCKED_DEFAULT_TRANSPORT);
+  const transportTouched = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(CLOCKED_LAST_TRANSPORT_KEY).then(saved => {
+      if (cancelled || transportTouched.current) return;
+      if (saved === 'Walking' || saved === 'Cart') setTransport(saved);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const chooseTransport = (t) => { transportTouched.current = true; setTransport(t); };
+  // Defaults to the league picked during onboarding, if set — still fully
+  // changeable per round.
+  const [difficulty, setDifficulty]   = useState(() => profile?.preferred_difficulty ?? 'intermediate');
   const [players, setPlayers]         = useState([]);
   const [certData, setCertData]       = useState(null); // { timePars, holeInfo }
 
@@ -59,6 +75,12 @@ export default function ClockedSetupScreen({ navigation }) {
   const selectedTee = (courseTees && selectedTeeIdx != null) ? courseTees[selectedTeeIdx] : null;
   const teeHoles = selectedTee?.holes ?? course?.hole_data ?? null;
   const holeCount = parseInt(holes, 10);
+  // Last-resort par when a hole has no measured data. Par-3/executive
+  // courses (flagged via is_par3 or name pattern) default to 3, everything
+  // else to 4 — mirrors LiveRoundScreen's logic so Clocked never claims a
+  // par-3 short course plays to par 4 just because granular hole data is
+  // missing.
+  const defaultPar = isPar3Course(course) ? 3 : 4;
 
   // ── Handlers ──
   const handleCourseSelected = async (c) => {
@@ -191,6 +213,9 @@ export default function ClockedSetupScreen({ navigation }) {
       });
     }
 
+    // Remember for next time — pre-selects this transport on the next setup.
+    AsyncStorage.setItem(CLOCKED_LAST_TRANSPORT_KEY, transport).catch(() => {});
+
     navigation.navigate('ClockedRound', {
       course,
       holes,
@@ -203,13 +228,20 @@ export default function ClockedSetupScreen({ navigation }) {
       holeData: holeDataSlice,
       configSnapshot: config,
       officialTimePars,
+      defaultPar,
     });
   };
 
   const buildHoleDataSlice = () => {
-    if (!teeHoles || teeHoles.length === 0) return null;
+    // Require a full slice's worth of holes before trusting this data —
+    // a short/partial array (e.g. 9 holes returned when 18 were requested)
+    // would otherwise silently mix real holes with undefined ones. All-or-
+    // nothing: if we don't have enough real holes, fall back to defaultPar
+    // for every hole in ClockedRoundScreen instead of a mismatched slice.
+    if (!teeHoles || teeHoles.length < holeCount) return null;
     const sliceFrom = (holeCount === 9 && teeHoles.length >= 18 && selectedNine === 'back') ? 9 : 0;
-    return teeHoles.slice(sliceFrom, sliceFrom + holeCount);
+    return teeHoles.slice(sliceFrom, sliceFrom + holeCount)
+      .map(h => ({ ...h, par: h?.par ?? defaultPar }));
   };
 
   const handleBack = () => {
@@ -532,7 +564,7 @@ export default function ClockedSetupScreen({ navigation }) {
                 <TouchableOpacity
                   key={t}
                   style={[s.groupBtn, s.groupBtnWide, transport === t && s.groupBtnOn]}
-                  onPress={() => setTransport(t)}
+                  onPress={() => chooseTransport(t)}
                   activeOpacity={0.8}
                 >
                   <Ionicons
@@ -550,7 +582,7 @@ export default function ClockedSetupScreen({ navigation }) {
             <View style={s.difficultyRow}>
               {[
                 { key: 'beginner',     label: 'BEGINNER', sub: '~4:30 round', color: '#7DC87A' },
-                { key: 'intermediate', label: 'INTER.',   sub: '~3:30 round', color: '#C9A84C' },
+                { key: 'intermediate', label: 'INTER.',   sub: '~3:30 round', color: '#D9954C' },
                 { key: 'pro',          label: 'PRO',      sub: '~3:00 round', color: '#E85D4A' },
               ].map(d => (
                 <TouchableOpacity

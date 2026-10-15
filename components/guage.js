@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
-export default function Gauge({ score = 4.2, size = 220 }) {
+export default function Gauge({ score = 65, max = 100, size = 220 }) {
   const scale = size / 220;
   const cx = size / 2;
   const cy = size / 2;
@@ -12,7 +12,9 @@ export default function Gauge({ score = 4.2, size = 220 }) {
   const strokeW    = Math.round(10 * scale);
   const scoreFontSize = Math.round(52 * scale);
 
-  const color = score >= 4.0 ? '#7DC87A' : score >= 3.0 ? '#D4B86A' : '#C07A6A';
+  // Same thresholds as LeaderboardScreen's clockedColor() — 70/40 on the 0–100 scale.
+  const pct = max > 0 ? score / max : 0;
+  const color = score >= 0.7 * max ? '#7DC87A' : score >= 0.4 * max ? '#C9A84C' : '#B8A882';
 
   // Count-up animation for the score number (setInterval — works in Expo Go)
   const [displayScore, setDisplayScore] = useState(0);
@@ -30,7 +32,7 @@ export default function Gauge({ score = 4.2, size = 220 }) {
         setDisplayScore(target);
         clearInterval(interval);
       } else {
-        setDisplayScore(parseFloat(current.toFixed(1)));
+        setDisplayScore(current);
       }
     }, duration / steps);
     return () => clearInterval(interval);
@@ -61,7 +63,7 @@ export default function Gauge({ score = 4.2, size = 220 }) {
   }
 
   const trackPath = arcPath(startAngle, startAngle + totalDeg);
-  const fillDeg   = (score / 5.0) * totalDeg;   // static arc — always full score
+  const fillDeg   = pct * totalDeg;   // static arc — always full score
   const fillPath  = arcPath(startAngle, startAngle + fillDeg);
   const tip       = xy(startAngle + fillDeg);
   const tipOuter  = 8 * scale;
@@ -84,7 +86,7 @@ export default function Gauge({ score = 4.2, size = 220 }) {
 
       {/* Score number — counts up from 0 */}
       <View style={styles.center}>
-        <Text style={[styles.score, { fontSize: scoreFontSize }]}>{displayScore.toFixed(1)}</Text>
+        <Text style={[styles.score, { fontSize: scoreFontSize }]}>{Math.round(displayScore)}</Text>
         <Text style={[styles.label, { fontSize: Math.max(6, Math.round(8 * scale)) }]}>CLOCKED SCORE</Text>
       </View>
     </View>

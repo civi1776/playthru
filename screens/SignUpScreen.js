@@ -15,22 +15,38 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const DAYS   = Array.from({ length: 31 }, (_, i) => String(i + 1));
 const YEARS  = Array.from({ length: 110 }, (_, i) => String(new Date().getFullYear() - i));
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NETWORK_TIMEOUT_MS = 15000;
+
+// Client-side timeout guard for Supabase calls — flaky course wifi can hang
+// a request indefinitely otherwise, leaving the button stuck on "CREATING
+// ACCOUNT...". Mirrors the AbortController timeout pattern used in
+// lib/courses.js (8s there, 15s here since this covers auth + DB writes).
+function withTimeout(promise, ms = NETWORK_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timed out. Please check your connection and try again.')), ms);
+    }),
+  ]);
+}
+
 // ─── Welcome email builder ────────────────────────────────────────────────────
 function buildWelcomeEmail({ firstName, username, referralCode }) {
   const name = firstName || username || 'Golfer';
   return `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#090F0A;font-family:Georgia,serif;">
-  <div style="max-width:520px;margin:40px auto;background:#0D1A0F;border-radius:16px;border:1px solid rgba(201,168,76,0.25);padding:40px 36px;">
+  <div style="max-width:520px;margin:40px auto;background:#0D1A0F;border-radius:16px;border:1px solid rgba(125,200,122,0.25);padding:40px 36px;">
     <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:#C9A84C;letter-spacing:5px;font-family:Arial,sans-serif;">CLOCKED GOLF</p>
-    <p style="margin:0 0 28px;font-size:9px;color:rgba(201,168,76,0.5);letter-spacing:3px;font-family:Arial,sans-serif;">GOLF ON THE CLOCK</p>
+    <p style="margin:0 0 28px;font-size:9px;color:rgba(125,200,122,0.5);letter-spacing:3px;font-family:Arial,sans-serif;">GOLF ON THE CLOCK</p>
     <h1 style="margin:0 0 8px;font-size:26px;font-weight:400;color:#F5EDD8;">Welcome, ${name}.</h1>
     <p style="margin:0 0 24px;font-size:13px;color:rgba(245,237,216,0.6);letter-spacing:1px;font-family:Arial,sans-serif;">YOUR ACCOUNT IS READY</p>
-    <hr style="border:none;border-top:1px solid rgba(201,168,76,0.15);margin:0 0 24px;" />
+    <hr style="border:none;border-top:1px solid rgba(125,200,122,0.15);margin:0 0 24px;" />
     <p style="margin:0 0 20px;font-size:15px;color:#F5EDD8;line-height:1.6;">Log your first round to get your official Clocked Score and see where you rank nationally.</p>
     ${referralCode ? `
-    <div style="background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:10px;padding:16px 20px;margin-bottom:24px;">
-      <p style="margin:0 0 4px;font-size:9px;font-weight:700;color:rgba(201,168,76,0.6);letter-spacing:3px;font-family:Arial,sans-serif;">YOUR REFERRAL CODE</p>
+    <div style="background:rgba(125,200,122,0.08);border:1px solid rgba(125,200,122,0.2);border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+      <p style="margin:0 0 4px;font-size:9px;font-weight:700;color:rgba(125,200,122,0.6);letter-spacing:3px;font-family:Arial,sans-serif;">YOUR REFERRAL CODE</p>
       <p style="margin:0;font-size:22px;font-weight:700;color:#C9A84C;letter-spacing:4px;font-family:Arial,sans-serif;">${referralCode}</p>
       <p style="margin:6px 0 0;font-size:12px;color:rgba(245,237,216,0.5);font-family:Arial,sans-serif;">Share with friends.</p>
     </div>` : ''}
@@ -58,6 +74,7 @@ export default function SignUpScreen({ navigation }) {
   const [email, setEmail]         = useState('');
   const [password, setPassword]   = useState('');
   const [referralCodeInput, setReferralCodeInput] = useState('');
+  const [petitionOptIn, setPetitionOptIn] = useState(false);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -113,28 +130,29 @@ export default function SignUpScreen({ navigation }) {
       if (!fullNameVal) throw new Error('Please enter your name.');
       if (!usernameVal || usernameVal.length < 3) throw new Error('Username must be at least 3 characters.');
       if (!emailVal) throw new Error('Please enter your email.');
+      if (!EMAIL_RE.test(emailVal)) throw new Error('Enter a valid email.');
       if (passwordVal.length < 8) throw new Error('Password must be at least 8 characters.');
       if (usernameStatus === 'taken') throw new Error('That username is already taken.');
 
       // 1. Create auth account
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { error: signUpError } = await withTimeout(supabase.auth.signUp({
         email: emailVal, password: passwordVal,
-      });
+      }));
       if (signUpError) {
         if (signUpError.message?.includes('already registered')) throw new Error('An account with this email already exists. Try signing in.');
         throw new Error('Could not create account. Please try again.');
       }
 
       // 2. Sign in immediately
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await withTimeout(supabase.auth.signInWithPassword({
         email: emailVal, password: passwordVal,
-      });
+      }));
       if (signInError) throw new Error('Account created but sign-in failed. Try signing in manually.');
 
       const userId = signInData.session.user.id;
 
       // 3. Create profile
-      const { error: profileError } = await supabase.from('profiles').upsert({
+      const { error: profileError } = await withTimeout(supabase.from('profiles').upsert({
         id: userId,
         email: emailVal,
         full_name: fullNameVal,
@@ -142,7 +160,9 @@ export default function SignUpScreen({ navigation }) {
         age_verified: true,
         account_type: 'golfer',
         tos_agreed_at: new Date().toISOString(),
-      }, { onConflict: 'id' });
+        petition_opt_in: petitionOptIn,
+        petition_opt_in_at: petitionOptIn ? new Date().toISOString() : null,
+      }, { onConflict: 'id' }));
 
       if (profileError) {
         if (profileError.code === '23505' && profileError.message?.includes('username')) {
@@ -359,6 +379,25 @@ export default function SignUpScreen({ navigation }) {
             />
           </View>
 
+          {/* Petition opt-in */}
+          <TouchableOpacity
+            style={s.checkboxRow}
+            onPress={() => setPetitionOptIn(!petitionOptIn)}
+            activeOpacity={0.7}
+          >
+            <View style={[s.checkbox, petitionOptIn && s.checkboxChecked]}>
+              {petitionOptIn && <Ionicons name="checkmark" size={14} color="#090F0A" />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.checkboxLabel}>
+                Add my voice to the Clocked Golf petition — help bring official certification to the courses I play.
+              </Text>
+              <Text style={s.checkboxSub}>
+                We use this to prioritize which courses we approach for Clocked Certification.
+              </Text>
+            </View>
+          </TouchableOpacity>
+
           {/* Error */}
           {error ? <Text style={s.error}>{error}</Text> : null}
 
@@ -420,6 +459,13 @@ const s = StyleSheet.create({
   signInLink:   { marginTop: 24, alignItems: 'center' },
   signInText:   { fontSize: 13, color: '#7A6E58' },
   terms:        { fontSize: 10, color: '#7A6E5888', textAlign: 'center', marginTop: 24, lineHeight: 16 },
+
+  // Petition checkbox
+  checkboxRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 20, marginTop: 8 },
+  checkbox:       { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#7DC87A22', backgroundColor: '#0D1A0F', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  checkboxChecked:{ backgroundColor: '#7DC87A', borderColor: '#7DC87A' },
+  checkboxLabel:  { fontSize: 13, color: '#F5EDD8', lineHeight: 19 },
+  checkboxSub:    { fontSize: 11, color: '#7A6E58', marginTop: 4, lineHeight: 16 },
 
   // Age gate
   ageGateContent: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },

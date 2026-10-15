@@ -278,9 +278,9 @@ const s = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 20,
-    backgroundColor: 'rgba(201,168,76,0.12)',
+    backgroundColor: 'rgba(125,200,122,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.3)',
+    borderColor: 'rgba(125,200,122,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -313,9 +313,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 16,
     marginBottom: 20,
-    backgroundColor: 'rgba(201,168,76,0.1)',
+    backgroundColor: 'rgba(125,200,122,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(201,168,76,0.3)',
+    borderColor: 'rgba(125,200,122,0.3)',
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -350,8 +350,8 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   featureRowHero: {
-    borderColor: 'rgba(201,168,76,0.3)',
-    backgroundColor: 'rgba(201,168,76,0.06)',
+    borderColor: 'rgba(125,200,122,0.3)',
+    backgroundColor: 'rgba(125,200,122,0.06)',
   },
   featureIconWrap: {
     width: 36,
@@ -364,7 +364,7 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   featureIconWrapHero: {
-    backgroundColor: 'rgba(201,168,76,0.12)',
+    backgroundColor: 'rgba(125,200,122,0.12)',
   },
   featureLabel: {
     fontSize: 14,
@@ -381,7 +381,7 @@ const s = StyleSheet.create({
     lineHeight: 17,
   },
   heroPill: {
-    backgroundColor: 'rgba(201,168,76,0.15)',
+    backgroundColor: 'rgba(125,200,122,0.15)',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,

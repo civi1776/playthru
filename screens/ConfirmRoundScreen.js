@@ -1,6 +1,6 @@
 // ─── ConfirmRoundScreen — confirm/decline a round you played in ──────────────
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
@@ -36,55 +36,86 @@ export default function ConfirmRoundScreen({ navigation, route }) {
   const [round, setRound]           = useState(null);
   const [participation, setParticipation] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError]   = useState(false);
 
   useEffect(() => {
     if (!roundId || !user?.id) return;
     (async () => {
-      const [roundRes, partRes] = await Promise.all([
-        supabase.from('rounds').select('*').eq('id', roundId).maybeSingle(),
-        supabase.from('round_participants').select('*')
-          .eq('round_id', roundId).eq('user_id', user.id).maybeSingle(),
-      ]);
-      setRound(roundRes.data);
-      setParticipation(partRes.data);
-      setLoading(false);
+      try {
+        const [roundRes, partRes] = await Promise.all([
+          supabase.from('rounds').select('*').eq('id', roundId).maybeSingle(),
+          supabase.from('round_participants').select('*')
+            .eq('round_id', roundId).eq('user_id', user.id).maybeSingle(),
+        ]);
+        setRound(roundRes.data);
+        setParticipation(partRes.data);
+      } catch (e) {
+        setLoadError(true);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [roundId, user?.id]);
 
   const handleConfirm = async () => {
     setSubmitting(true);
-    await supabase.from('round_participants')
-      .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
-      .eq('round_id', roundId).eq('user_id', user.id);
+    try {
+      await supabase.from('round_participants')
+        .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
+        .eq('round_id', roundId).eq('user_id', user.id);
 
-    // Notify the round logger that their partner confirmed
-    if (round?.user_id && round.user_id !== user.id) {
-      const { data: me } = await supabase.from('profiles').select('full_name, username').eq('id', user.id).maybeSingle();
-      const partnerName = me?.username ? `@${me.username}` : (me?.full_name?.split(' ')[0] ?? 'Your partner');
-      sendPushToUser(
-        round.user_id,
-        'Partner confirmed',
-        `${partnerName} confirmed their scores for your round.`,
-        'round_confirm',
-        { round_id: roundId },
-      ).catch(() => {});
+      // Notify the round logger that their partner confirmed
+      if (round?.user_id && round.user_id !== user.id) {
+        const { data: me } = await supabase.from('profiles').select('full_name, username').eq('id', user.id).maybeSingle();
+        const partnerName = me?.username ? `@${me.username}` : (me?.full_name?.split(' ')[0] ?? 'Your partner');
+        sendPushToUser(
+          round.user_id,
+          'Partner confirmed',
+          `${partnerName} confirmed their scores for your round.`,
+          'round_confirm',
+          { round_id: roundId },
+        ).catch(() => {});
+      }
+
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('Error', 'Could not confirm this round. Check your connection and try again.');
+    } finally {
+      setSubmitting(false);
     }
-
-    navigation.goBack();
   };
 
   const handleDecline = async () => {
     setSubmitting(true);
-    await supabase.from('round_participants')
-      .update({ status: 'declined' })
-      .eq('round_id', roundId).eq('user_id', user.id);
-    navigation.goBack();
+    try {
+      await supabase.from('round_participants')
+        .update({ status: 'declined' })
+        .eq('round_id', roundId).eq('user_id', user.id);
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('Error', 'Could not decline this round. Check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
     return (
       <SafeAreaView style={s.container}>
         <View style={s.center}><ActivityIndicator color={GOLD} size="large" /></View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={s.container}>
+        <View style={s.center}>
+          <Text style={s.errorText}>Couldn't load this round. Check your connection and try again.</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+            <Text style={s.backBtnText}>GO BACK</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }

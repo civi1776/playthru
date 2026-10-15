@@ -3,7 +3,7 @@
     "name": "Clocked Golf",
     "slug": "playthru",
     "scheme": "playthru",
-    "version": "1.5.3",
+    "version": "1.5.5",
     "orientation": "portrait",
     "icon": "./assets/PlayThru_AppIcon.png",
     "userInterfaceStyle": "light",
@@ -30,8 +30,11 @@
         ],
         "NSSupportsLiveActivities": true
       },
-      "buildNumber": "7",
-      "version": "1.5.3"
+      "buildNumber": "9",
+      "version": "1.5.5",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.civiswings.playthru"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -88,7 +91,9 @@
         {
           "locationWhenInUsePermission": "Clocked uses your location to show nearby courses first."
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-asset"
     ],
     "extra": {
       "eas": {
@@ -99,7 +104,10 @@
               "appExtensions": [
                 {
                   "targetName": "ClockWidget",
-                  "bundleIdentifier": "com.civiswings.playthru.clock-widget"
+                  "bundleIdentifier": "com.civiswings.playthru.clock-widget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": ["group.com.civiswings.playthru"]
+                  }
                 }
               ]
             }

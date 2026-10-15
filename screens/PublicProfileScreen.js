@@ -6,29 +6,31 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { sendLocalNotification } from '../lib/notifications';
+import { sendLocalNotification, sendPushToUser } from '../lib/notifications';
 import ChallengeButton from '../components/ChallengeButton';
 import Gauge from '../components/guage';
 import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
 import ClockedScoreCard from '../components/ClockedScoreCard';
 import RecentRoundsList from '../components/RecentRoundsList';
-import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import { fetchClockedRatingForUser } from '../lib/clockedRating';
+import { totalPointsFromHoleScores } from '../lib/clockedSport';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function paceTier(score) {
-  if (score == null) return null;
-  if (score >= 5.0) return 'Elite Pacer';
-  if (score >= 4.0) return 'Fast Golfer';
-  if (score >= 3.0) return 'Average Pace';
-  if (score >= 2.0) return 'Slow Player';
-  return 'Pace Improvement Needed';
+// Aggregate 0–100 Clocked Score color — matches LeaderboardScreen's clockedColor().
+function clockedColor(score) {
+  if (score == null) return '#7A6E58';
+  if (score >= 70) return '#7DC87A';
+  if (score >= 40) return '#C9A84C';
+  return '#B8A882';
 }
 
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
+// Per-round points color (raw PTS, not the 0–100 aggregate score).
+function ptsColor(pts) {
+  if (pts == null) return '#B8A882';
+  if (pts >= 8) return '#7DC87A';
+  if (pts >= 0) return '#C9A84C';
   return '#C07A6A';
 }
 
@@ -70,7 +72,7 @@ function PubActRow({ item }) {
   };
   const info    = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: '#7A6E58', label: () => 'Activity' };
   const content = item.content ?? {};
-  const pop     = content.pop_score;
+  const pts     = content.team_score; // raw round points, set at save time (not the 0–100 aggregate)
   return (
     <View style={s.actRow}>
       <View style={[s.actIconWrap, { backgroundColor: info.color + '22' }]}>
@@ -78,8 +80,8 @@ function PubActRow({ item }) {
       </View>
       <View style={s.actContent}>
         <Text style={s.actLabel}>{info.label(content)}</Text>
-        {item.type === 'round_logged' && pop != null && (
-          <Text style={[s.actPop, { color: popColor(pop) }]}>{pop.toFixed(1)} CLK</Text>
+        {item.type === 'round_logged' && pts != null && (
+          <Text style={[s.actPop, { color: ptsColor(pts) }]}>{pts > 0 ? `+${pts}` : pts} PTS</Text>
         )}
         <Text style={s.actTime}>{timeAgo(item.created_at)}</Text>
       </View>
@@ -111,61 +113,69 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [activityLoading, setActivityLoading] = useState(false);
   const [challengerBestScore, setChallengerBestScore] = useState(null);
   const [clockedRating, setClockedRating] = useState({ clockedScore: null, scoring: null, clock: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      setLoadError(false);
 
-      const [{ data: profileData }, { data: roundsData }, { data: followData }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-        supabase.from('rounds')
-          .select('id, course_name, created_at, holes, duration_minutes, pop_score, round_format, active_game, hole_scores')
+      try {
+        const [{ data: profileData }, { data: roundsData }, { data: followData }] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+          supabase.from('rounds')
+            .select('id, course_name, created_at, holes, duration_minutes, round_format, active_game, hole_scores')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(20),
+          myUid
+            ? supabase.from('follows').select('id').eq('follower_id', myUid).eq('following_id', userId).maybeSingle()
+            : Promise.resolve({ data: null }),
+        ]);
+
+        setProfile(profileData);
+        setRounds(roundsData ?? []);
+        setFollowing(!!followData);
+
+        // Real Clocked Score (0–100) — canonical computation shared with
+        // HomeScreen/LeaderboardScreen/ProfileScreen so every screen agrees.
+        // Covers rounds this user logged themselves plus confirmed
+        // participations, not just what's in `roundsData` (their own logs).
+        const rating = await fetchClockedRatingForUser(supabase, userId, profileData);
+        setClockedRating(rating);
+
+        // Fetch challenger's (viewer's) best round POINTS at this user's most
+        // recent course — points, not the 0–100 aggregate score, since this
+        // is a single-round comparison (ChallengeButton shows it as a target
+        // to beat, not the aggregate rating).
+        if (myUid && roundsData?.length > 0) {
+          const defaultCourse = roundsData[0].course_name;
+          if (defaultCourse) {
+            supabase.from('rounds').select('hole_scores')
+              .eq('user_id', myUid).eq('course_name', defaultCourse)
+              .eq('round_format', 'clocked').not('hole_scores', 'is', null)
+              .then(({ data }) => {
+                const totals = (data ?? [])
+                  .map(r => totalPointsFromHoleScores(r.hole_scores))
+                  .filter(v => v != null);
+                setChallengerBestScore(totals.length ? Math.max(...totals) : null);
+              });
+          }
+        }
+
+        // Load activity feed (non-blocking)
+        setActivityLoading(true);
+        supabase.from('activity_feed')
+          .select('id, type, content, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
-          .limit(20),
-        myUid
-          ? supabase.from('follows').select('id').eq('follower_id', myUid).eq('following_id', userId).maybeSingle()
-          : Promise.resolve({ data: null }),
-      ]);
-
-      setProfile(profileData);
-      setRounds(roundsData ?? []);
-      setFollowing(!!followData);
-
-      // Compute Clocked Score for this user
-      const clockedRounds = (roundsData ?? []).filter(r => r.round_format === 'clocked' && r.hole_scores);
-      const playerName = profileData?.full_name || profileData?.username || 'Player';
-      const roundStats = clockedRounds
-        .map(r => extractPlayerRoundStats(r.hole_scores, playerName))
-        .filter(Boolean);
-      const rating = computeFullRating({
-        roundStats,
-        handicapIndex: profileData?.handicap_index,
-      });
-      setClockedRating(rating);
-
-      setLoading(false);
-
-      // Fetch challenger's best score at this user's most recent course
-      if (myUid && roundsData?.length > 0) {
-        const defaultCourse = roundsData[0].course_name;
-        if (defaultCourse) {
-          supabase.from('rounds').select('pop_score')
-            .eq('user_id', myUid).eq('course_name', defaultCourse)
-            .not('pop_score', 'is', null)
-            .order('pop_score', { ascending: false }).limit(1).maybeSingle()
-            .then(({ data }) => setChallengerBestScore(data?.pop_score ?? null));
-        }
+          .limit(30)
+          .then(({ data }) => { setActivityItems(data ?? []); setActivityLoading(false); });
+      } catch (e) {
+        setLoadError(true);
+      } finally {
+        setLoading(false);
       }
-
-      // Load activity feed (non-blocking)
-      setActivityLoading(true);
-      supabase.from('activity_feed')
-        .select('id, type, content, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(30)
-        .then(({ data }) => { setActivityItems(data ?? []); setActivityLoading(false); });
     };
     load();
   }, [userId, myUid]);
@@ -208,6 +218,19 @@ export default function PublicProfileScreen({ navigation, route }) {
     );
   }
 
+  if (loadError) {
+    return (
+      <SafeAreaView style={s.container}>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={20} color="#C9A84C" />
+        </TouchableOpacity>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#7A6E58', fontSize: 16 }}>Couldn't load this profile. Check your connection and try again.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!profile) {
     return (
       <SafeAreaView style={s.container}>
@@ -221,15 +244,23 @@ export default function PublicProfileScreen({ navigation, route }) {
     );
   }
 
-  const pop      = profile.pop_score ?? null;
-  const tier     = paceTier(pop);
   const initials = getInitials(profile.full_name);
 
-  // Stat card values from rounds
-  const bestPop  = rounds.length > 0 ? Math.max(...rounds.map(r => r.pop_score ?? 0)) : null;
+  // Stat card values from rounds — best round is raw points (a single
+  // round's total), the aggregate Clocked Score (0–100) lives in
+  // clockedRating.clockedScore / the ClockedScoreCard above.
+  const clockedRoundsWithScores = rounds.filter(r => r.round_format === 'clocked' && r.hole_scores?.length);
+  const bestRoundPts = clockedRoundsWithScores.length
+    ? Math.max(...clockedRoundsWithScores.map(r => totalPointsFromHoleScores(r.hole_scores)))
+    : null;
   const avgTime  = rounds.length > 0 ? Math.round(rounds.reduce((s, r) => s + (r.duration_minutes || 0), 0) / rounds.length) : null;
+
+  // Pace streak — consecutive most-recent clocked rounds with non-negative points.
   let paceStreak = 0;
-  for (const r of rounds) { if ((r.pop_score ?? 0) >= 3.5) paceStreak++; else break; }
+  for (const r of clockedRoundsWithScores) {
+    const pts = totalPointsFromHoleScores(r.hole_scores);
+    if (pts != null && pts >= 0) paceStreak++; else break;
+  }
 
   const isOwnProfile = myUid === userId;
 
@@ -259,9 +290,18 @@ export default function PublicProfileScreen({ navigation, route }) {
         )}
       </View>
 
-      {/* Challenge button — visitors only, golfers only */}
+      {/* Challenge + Rivalry — visitors only, golfers only */}
       {!isOwnProfile && myUid && rounds.length > 0 && (
-        <View style={{ paddingHorizontal: 16, paddingBottom: 10, alignItems: 'flex-end' }}>
+        <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 10, justifyContent: 'flex-end' }}>
+          <TouchableOpacity
+            style={s.vsBtn}
+            onPress={() => navigation.navigate('Rivalry', { userId, username: profile.username ?? profile.full_name })}
+            activeOpacity={0.8}
+            accessibilityLabel={`Head to head vs ${profile.username ?? 'this player'}`}
+          >
+            <Ionicons name="stats-chart" size={11} color="#B8A882" />
+            <Text style={s.vsBtnText}>VS</Text>
+          </TouchableOpacity>
           <ChallengeButton
             targetUserId={userId}
             targetUsername={profile.username ?? profile.full_name?.split(' ')[0] ?? 'player'}
@@ -311,21 +351,13 @@ export default function PublicProfileScreen({ navigation, route }) {
           />
         )}
 
-        {/* Handicap + pace credential row */}
-        {(
+        {/* Clocked Score credential row */}
+        {clockedRating.clockedScore != null && (clockedRating.roundsUsed ?? 0) > 0 && (
           <View style={s.credentialRow}>
-            {profile.handicap_index != null && (
-              <View style={s.credentialCard}>
-                <Text style={s.credentialLabel}>HANDICAP</Text>
-                <Text style={s.credentialValue}>{Math.round(profile.handicap_index * 10) / 10}</Text>
-              </View>
-            )}
-            {pop != null && (
-              <View style={s.credentialCard}>
-                <Text style={s.credentialLabel}>PACE RATING</Text>
-                <Text style={[s.credentialValue, { color: popColor(pop) }]}>{pop.toFixed(1)}</Text>
-              </View>
-            )}
+            <View style={s.credentialCard}>
+              <Text style={s.credentialLabel}>CLOCKED SCORE</Text>
+              <Text style={[s.credentialValue, { color: clockedColor(clockedRating.clockedScore) }]}>{clockedRating.clockedScore}</Text>
+            </View>
           </View>
         )}
 
@@ -336,8 +368,10 @@ export default function PublicProfileScreen({ navigation, route }) {
             <Text style={s.statValue}>{rounds.length > 0 ? profile.total_rounds ?? rounds.length : 0}</Text>
           </View>
           <View style={s.statCard}>
-            <Text style={s.statLabel}>BEST{'\n'}CLOCKED SCORE</Text>
-            <Text style={s.statValue}>{bestPop != null && bestPop > 0 ? bestPop.toFixed(1) : '—'}</Text>
+            <Text style={s.statLabel}>BEST{'\n'}ROUND</Text>
+            <Text style={[s.statValue, bestRoundPts != null && { color: ptsColor(bestRoundPts) }]}>
+              {bestRoundPts != null ? `${bestRoundPts > 0 ? '+' : ''}${bestRoundPts} PTS` : '—'}
+            </Text>
           </View>
           <View style={s.statCard}>
             <Text style={s.statLabel}>AVG ROUND{'\n'}TIME</Text>
@@ -383,6 +417,8 @@ export default function PublicProfileScreen({ navigation, route }) {
 
 const s = StyleSheet.create({
   container:      { flex: 1, backgroundColor: '#090F0A' },
+  vsBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#7DC87A22', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
+  vsBtnText:      { fontSize: 11, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
   topBar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
   backBtn:        { flexDirection: 'row', alignItems: 'center', gap: 4 },
   backText:       { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },

@@ -26,6 +26,7 @@ import { useAuth } from '../context/AuthContext';
 import { sendLocalNotification, sendPushToUser } from '../lib/notifications';
 import SkeletonLoader from '../components/SkeletonLoader';
 import InitialsAvatar from '../components/InitialsAvatar';
+import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
 
 function SearchSkeletons() {
   return (
@@ -47,10 +48,12 @@ function SearchSkeletons() {
   );
 }
 
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
-  return '#C07A6A';
+// Aggregate 0–100 Clocked Score color — matches LeaderboardScreen's clockedColor().
+function clockedColor(score) {
+  if (score == null) return '#7A6E58';
+  if (score >= 70) return '#7DC87A';
+  if (score >= 40) return '#C9A84C';
+  return '#B8A882';
 }
 
 export default function SearchUsersScreen({ navigation }) {
@@ -81,12 +84,51 @@ export default function SearchUsersScreen({ navigation }) {
     try {
       const { data, error: err } = await supabase
         .from('profiles')
-        .select('id, full_name, username, pop_score, home_course, avatar_url')
+        .select('id, full_name, username, handicap_index, home_course, avatar_url')
         .or(`username.ilike.%${text}%,full_name.ilike.%${text}%`)
         .neq('id', myUid ?? '')
         .limit(20);
       if (err) throw err;
-      setResults(data || []);
+      const found = data || [];
+      setResults(found);
+
+      // Batch-compute each result's real Clocked Score, matching the pattern
+      // used by ProfileScreen's FriendsTab — one query for their rounds, one
+      // for their confirmed participations, instead of the retired pop_score
+      // column. Avoids N individual per-result queries.
+      const resultIds = found.map(p => p.id);
+      if (resultIds.length) {
+        const { data: ownRounds } = await supabase
+          .from('rounds').select('id, user_id, hole_scores')
+          .eq('round_format', 'clocked').not('hole_scores', 'is', null)
+          .in('user_id', resultIds);
+        const byUser = {};
+        (ownRounds ?? []).forEach(r => { (byUser[r.user_id] ??= []).push(r); });
+        const roundIds = (ownRounds ?? []).map(r => r.id);
+        let parts = [];
+        if (roundIds.length) {
+          const { data: partRows } = await supabase
+            .from('round_participants').select('round_id, user_id, player_key')
+            .eq('status', 'confirmed').in('round_id', roundIds).in('user_id', resultIds);
+          parts = partRows ?? [];
+        }
+        const roundMap = {};
+        (ownRounds ?? []).forEach(r => { roundMap[r.id] = r; });
+        parts.forEach(p => {
+          if (!byUser[p.user_id]) byUser[p.user_id] = [];
+          const already = byUser[p.user_id].some(r => r.id === p.round_id);
+          if (!already && roundMap[p.round_id]) byUser[p.user_id].push({ ...roundMap[p.round_id], _playerKey: p.player_key });
+        });
+        const withScores = found.map(p => {
+          const playerName = p.full_name || p.username || 'Player';
+          const roundStats = (byUser[p.id] ?? [])
+            .map(r => extractPlayerRoundStats(r.hole_scores, r._playerKey ?? playerName))
+            .filter(Boolean);
+          const rating = computeFullRating({ roundStats, handicapIndex: p.handicap_index });
+          return { ...p, clockedScore: rating.clockedScore };
+        });
+        setResults(withScores);
+      }
     } catch (e) {
       setSearchError(true);
       setResults([]);
@@ -190,8 +232,8 @@ export default function SearchUsersScreen({ navigation }) {
                 </Text>
               </View>
               <View style={s.right}>
-                <Text style={[s.pop, { color: popColor(result.pop_score) }]}>
-                  {result.pop_score != null ? result.pop_score.toFixed(1) : '—'}
+                <Text style={[s.pop, { color: clockedColor(result.clockedScore) }]}>
+                  {result.clockedScore ?? '—'}
                 </Text>
                 <TouchableOpacity
                   style={[s.followBtn, isFollowing && s.followingBtn]}

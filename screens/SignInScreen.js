@@ -29,19 +29,23 @@ export default function SignInScreen({ navigation }) {
       return;
     }
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (signInError) {
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+      // Wait for profile to load into AuthContext, then navigate to Main
+      await refreshProfile();
+      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+    } catch (e) {
+      setError(e.message || 'Something went wrong. Please check your connection and try again.');
+    } finally {
       setLoading(false);
-      setError(signInError.message);
-      return;
     }
-    // Wait for profile to load into AuthContext, then navigate to Main
-    await refreshProfile();
-    setLoading(false);
-    navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
   };
 
   const handleForgotPassword = () => {

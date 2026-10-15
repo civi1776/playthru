@@ -36,6 +36,14 @@ export default function WelcomeScreen({ navigation }) {
           <Text style={s.btnSecondaryText}>SIGN IN</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={s.btnTertiary}
+          onPress={() => navigation.navigate('PreviewMode')}
+          activeOpacity={0.7}
+        >
+          <Text style={s.btnTertiaryText}>Browse without an account</Text>
+        </TouchableOpacity>
+
         <Text style={s.legal}>
           By continuing you agree to our Terms & Privacy Policy.
         </Text>
@@ -77,7 +85,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 28,
   },
   btnPrimary: {
-    backgroundColor: '#C9A84C', borderRadius: 14,
+    backgroundColor: '#7DC87A', borderRadius: 14,
     paddingVertical: 17, alignItems: 'center', width: '100%',
   },
   btnPrimaryText: {
@@ -91,8 +99,14 @@ const s = StyleSheet.create({
   btnSecondaryText: {
     fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5,
   },
+  btnTertiary: {
+    alignItems: 'center', paddingVertical: 12, marginTop: 6,
+  },
+  btnTertiaryText: {
+    fontSize: 12, fontWeight: '600', color: '#B8A882', letterSpacing: 0.5,
+  },
   legal: {
     fontSize: 10, color: '#7A6E5888', textAlign: 'center',
-    marginTop: 20, lineHeight: 16,
+    marginTop: 14, lineHeight: 16,
   },
 });

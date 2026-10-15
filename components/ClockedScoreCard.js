@@ -33,15 +33,21 @@ function Bar({ value, color }) {
 // ─── Full Card (You tab headline) ────────────────────────────────────────────
 
 export default function ClockedScoreCard({ clockedScore, scoring, clock, isProvisional, roundsUsed, roundsNeeded }) {
-  const hasScore = clockedScore != null;
+  // Zero rounds: computeFullRating still returns a cold-start baseline, but a
+  // player who has never clocked a round has no earned score to show. Render
+  // "\u2014" with no PROVISIONAL badge and blank sub-stats; the hint below carries
+  // the only copy.
+  const hasRounds = (roundsUsed ?? 0) > 0;
+  const hasScore = hasRounds && clockedScore != null;
   const displayScore = hasScore ? String(clockedScore) : '\u2014';
+  if (!hasRounds) { scoring = null; clock = null; }
 
   return (
     <View style={s.card}>
       {/* Header */}
       <View style={s.headerRow}>
         <Text style={s.headerLabel}>CLOCKED SCORE</Text>
-        {isProvisional && (
+        {hasScore && isProvisional && (
           <View style={s.provBadge}>
             <Text style={s.provText}>PROVISIONAL</Text>
           </View>

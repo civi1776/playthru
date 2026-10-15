@@ -1,11 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView, Modal, StyleSheet,
   Alert, AppState, AccessibilityInfo, KeyboardAvoidingView, Platform, Vibration,
+  Animated, Easing, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Circle } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
+import { useAudioPlayer } from 'expo-audio';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -15,26 +19,32 @@ import {
   DEFAULT_SCORING_SCALE, DEFAULT_CLOCK_COEFFICIENTS, DEFAULT_PENALTY_PARAMS,
 } from '../lib/clockedSport';
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
+import { fetchClockedRatingForUser } from '../lib/clockedRating';
 import { sendPushToUser, sendLocalNotification, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
 import * as Notifications from 'expo-notifications';
-import { startActivity, updateActivity, endActivity } from '../modules/clocked-activity/src';
+import {
+  startActivity, updateActivity, endActivity,
+  getPendingHoleCompletion, clearPendingHoleCompletion,
+} from '../modules/clocked-activity/src';
+import { COLOR, TYPE, MOTION, ringZone, ringColorForZone } from '../lib/theme';
 
-// ─── Colors ──────────────────────────────────────────────────────────────────
-const BG       = '#090F0A';
-const CARD     = '#0D1A0F';
-const GOLD     = '#C9A84C';
-const CREAM    = '#F5EDD8';
-const MUTED    = '#B8A882';
-const DIM      = '#7A6E58';
-const GREEN    = '#7DC87A';
-const RED_WARN = '#E85D4A';
-const BORDER   = '#7DC87A22';
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// ─── Colors — Midnight Fairway, from the shared design system ────────────────
+const BG         = COLOR.bg;
+const CARD       = COLOR.surface;
+const GOLD       = COLOR.gold;
+const GOLD_ELITE = COLOR.goldBright;
+const CREAM      = COLOR.cream;
+const MUTED      = COLOR.muted;
+const DIM        = COLOR.dim;
+const GREEN      = COLOR.green;
+const RED_WARN   = COLOR.red;
+const BORDER     = COLOR.border;
 
 // ─── Clock color — uses remaining time (countdown perspective) ───────────────
 function clockColor(remaining, timePar) {
-  if (remaining > 30) return CREAM;
-  if (remaining > 0) return GOLD;
-  return RED_WARN;
+  return ringColorForZone(ringZone(remaining, timePar));
 }
 
 function pointsColor(points) {
@@ -65,6 +75,114 @@ function parseTimeInput(str) {
   return m * 60 + s;
 }
 
+// ─── Countdown Ring — the signature element ──────────────────────────────────
+// A thin ring drains around the timer as the hole plays. Green -> gold
+// (final 25%) -> pulsing red (final 60s or over). A ghost tick shows where
+// your personal-best round at this course holed out on this same hole.
+const RING_SIZE = 260;
+const RING_STROKE = 5;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+function GhostTick({ progress, size, radius }) {
+  if (progress == null) return null;
+  const angle = -90 + (1 - progress) * 360; // starts at top, drains clockwise
+  const rad = (angle * Math.PI) / 180;
+  const cx = size / 2 + radius * Math.cos(rad);
+  const cy = size / 2 + radius * Math.sin(rad);
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', left: cx - 4, top: cy - 4,
+        width: 8, height: 8, borderRadius: 4,
+        backgroundColor: DIM, borderWidth: 1.5, borderColor: CREAM,
+      }}
+    />
+  );
+}
+
+// `colorOverride` pins the stroke to a fixed color (the settled verdict color
+// once a hole is holed out). `flash` = { color, key } fires a one-shot double
+// pulse of a full ring in that color — the verdict beat — whenever `key`
+// changes.
+function CountdownRing({ progress, zone, ghostProgress, colorOverride, flash, children }) {
+  const animatedProgress = useRef(new Animated.Value(progress)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
+  const flashOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(animatedProgress, {
+      toValue: progress,
+      duration: 950,
+      easing: Easing.linear,
+      useNativeDriver: false, // SVG stroke props aren't native-driver compatible
+    }).start();
+  }, [progress]);
+
+  useEffect(() => {
+    if (!flash?.key) return;
+    flashOpacity.setValue(0);
+    // Two sharp pulses inside the verdict hold — timing-board, not fireworks.
+    Animated.sequence([
+      Animated.timing(flashOpacity, { toValue: 1,    duration: 120, easing: Easing.out(Easing.quad), useNativeDriver: false }),
+      Animated.timing(flashOpacity, { toValue: 0.25, duration: 220, useNativeDriver: false }),
+      Animated.timing(flashOpacity, { toValue: 1,    duration: 160, useNativeDriver: false }),
+      Animated.timing(flashOpacity, { toValue: 0,    duration: Math.max(100, MOTION.verdictHold - 500), useNativeDriver: false }),
+    ]).start();
+  }, [flash?.key]);
+
+  useEffect(() => {
+    let loop;
+    if (zone === 'red' && !colorOverride) {
+      loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse, { toValue: 0.45, duration: 500, useNativeDriver: false }),
+          Animated.timing(pulse, { toValue: 1, duration: 500, useNativeDriver: false }),
+        ])
+      );
+      loop.start();
+    } else {
+      pulse.setValue(1);
+    }
+    return () => loop?.stop();
+  }, [zone, colorOverride]);
+
+  const strokeDashoffset = animatedProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [RING_CIRCUMFERENCE, 0],
+  });
+  const color = colorOverride ?? ringColorForZone(zone);
+
+  return (
+    <View style={{ width: RING_SIZE, height: RING_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={RING_SIZE} height={RING_SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+        <Circle
+          cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS}
+          stroke={CARD} strokeWidth={RING_STROKE} fill="none"
+        />
+        <AnimatedCircle
+          cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS}
+          stroke={color} strokeWidth={RING_STROKE} fill="none"
+          strokeDasharray={RING_CIRCUMFERENCE}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          opacity={pulse}
+        />
+        {flash?.color && (
+          <AnimatedCircle
+            cx={RING_SIZE / 2} cy={RING_SIZE / 2} r={RING_RADIUS}
+            stroke={flash.color} strokeWidth={RING_STROKE + 2} fill="none"
+            opacity={flashOpacity}
+          />
+        )}
+      </Svg>
+      <GhostTick progress={ghostProgress} size={RING_SIZE} radius={RING_RADIUS} />
+      {children}
+    </View>
+  );
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function ClockedRoundScreen({ navigation, route }) {
   const { user } = useAuth();
@@ -86,12 +204,17 @@ export default function ClockedRoundScreen({ navigation, route }) {
   const [officialTimePars, setOfficialTimePars] = useState(
     () => resumeState?.officialTimePars ?? params.officialTimePars ?? {}
   );
+  // Last-resort par for any hole with no measured data — 3 for par-3/
+  // executive courses, 4 otherwise. Computed once in ClockedSetupScreen
+  // (via isPar3Course) and carried through so a short course never shows
+  // par 4 just because its hole_data/tee data is incomplete.
+  const defaultPar = resumeState?.defaultPar ?? params.defaultPar ?? 4;
 
   // Build initial per-hole data (par/yardage) — mutable for par edits
   const buildInitialHoleData = () => {
     const src = params.holeData;
     return Array.from({ length: holeCount }, (_, i) => ({
-      par:     src?.[i]?.par     ?? 4,
+      par:     src?.[i]?.par     ?? defaultPar,
       yardage: src?.[i]?.yardage ?? null,
     }));
   };
@@ -102,8 +225,10 @@ export default function ClockedRoundScreen({ navigation, route }) {
   const [currentHole, setCurrentHole]       = useState(1);
   const [holeResults, setHoleResults]       = useState([]);
   const [playerStrokes, setPlayerStrokes]   = useState(
-    () => playerDefs.map(() => holeDataState[0]?.par ?? 4)
+    () => playerDefs.map(() => holeDataState[0]?.par ?? defaultPar)
   );
+  const [showHolePicker, setShowHolePicker] = useState(false);
+  const [isFinishing, setIsFinishing]       = useState(false); // guards against a double-tap double-inserting the round
 
   // Clock
   const [clockRunning, setClockRunning]     = useState(false);
@@ -113,6 +238,102 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
   const [roundStartTs] = useState(() => Date.now());
   const [showScorecard, setShowScorecard]   = useState(false);
+
+  // ── Ghost Race — personal best round at this course, per-hole ──
+  // Maps hole number -> fraction of that hole's time par remaining when the
+  // ghost holed out (0 = used all their time, 1 = instant). Normalized so it
+  // still means something even if this round's time par differs slightly.
+  const [ghostByHole, setGhostByHole] = useState({});
+  useEffect(() => {
+    if (!course?.name) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const uid = authUser?.id ?? user?.id;
+        if (!uid) return;
+        const { data } = await supabase
+          .from('rounds')
+          .select('id, hole_scores, active_game')
+          .eq('user_id', uid)
+          .eq('course_name', course.name)
+          .eq('round_format', 'clocked')
+          .not('hole_scores', 'is', null)
+          .limit(25);
+        if (cancelled || !data?.length) return;
+        let best = null, bestPts = -Infinity;
+        for (const r of data) {
+          const pts = r.active_game?.summary?.totalScore;
+          if (typeof pts === 'number' && pts > bestPts) { bestPts = pts; best = r; }
+        }
+        if (!best) return;
+        const map = {};
+        for (const h of best.hole_scores ?? []) {
+          if (h?.timePar > 0 && h?.elapsed != null) {
+            map[h.hole] = Math.max(0, Math.min(1, (h.timePar - h.elapsed) / h.timePar));
+          }
+        }
+        if (!cancelled) setGhostByHole(map);
+      } catch { /* ghost is a bonus, never block the round */ }
+    })();
+    return () => { cancelled = true; };
+  }, [course?.name]);
+
+  // ── Sound identity — buzzer on expiry, chime when you beat the clock ──
+  const buzzerPlayer = useAudioPlayer(require('../assets/sounds/buzzer.wav'));
+  const chimePlayer  = useAudioPlayer(require('../assets/sounds/chime.wav'));
+  const playBuzzer = useCallback(() => {
+    try { buzzerPlayer.seekTo(0); buzzerPlayer.play(); } catch {}
+  }, [buzzerPlayer]);
+  const playChime = useCallback(() => {
+    try { chimePlayer.seekTo(0); chimePlayer.play(); } catch {}
+  }, [chimePlayer]);
+
+  // ── Holed-out verdict beat — the single most filmable moment in the app ──
+  // Fires exactly once per hole-out (button tap, lock-screen "Holed Out", or
+  // a cold-start hand-off of that tap). NOT on plain resume/restore of an
+  // already-completed hole — the settled delta block below is derived from
+  // holeFrozenTime at render time, so restore shows the result without
+  // replaying the moment. `verdictBeat` is non-null only during the hold.
+  const [verdictBeat, setVerdictBeat] = useState(null); // { beat, delta, color, key }
+  const verdictScale   = useRef(new Animated.Value(0.6)).current;
+  const verdictOpacity = useRef(new Animated.Value(0)).current;
+  const verdictTimer   = useRef(null);
+  useEffect(() => () => clearTimeout(verdictTimer.current), []);
+
+  const showVerdict = useCallback((holeTime, timePar) => {
+    const delta = timePar - holeTime; // positive = beat the clock
+    const beat  = delta >= 0;
+    const color = beat ? GREEN : RED_WARN;
+
+    if (beat) {
+      playChime();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } else {
+      // Buzzer already fired at the moment of expiry if the clock ran that
+      // long — no need to double up, just the warning tap + red verdict.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    }
+
+    clearTimeout(verdictTimer.current);
+    setVerdictBeat({ beat, delta: Math.abs(delta), color, key: Date.now() });
+    verdictScale.setValue(0.6);
+    verdictOpacity.setValue(0);
+    Animated.parallel([
+      Animated.timing(verdictOpacity, { toValue: 1, duration: MOTION.fast, useNativeDriver: true }),
+      Animated.timing(verdictScale,   { toValue: 1, duration: MOTION.standard, easing: Easing.out(Easing.back(1.4)), useNativeDriver: true }),
+    ]).start();
+    verdictTimer.current = setTimeout(() => {
+      Animated.timing(verdictOpacity, { toValue: 0, duration: MOTION.fast, useNativeDriver: true })
+        .start(() => setVerdictBeat(null));
+    }, MOTION.verdictHold);
+  }, [playChime, verdictScale, verdictOpacity]);
+
+  // Drop an in-flight hold when the hole changes underneath it.
+  const cancelVerdict = useCallback(() => {
+    clearTimeout(verdictTimer.current);
+    setVerdictBeat(null);
+  }, []);
 
   // Edit modal
   const [editHoleIdx, setEditHoleIdx]       = useState(null); // null = closed
@@ -137,14 +358,9 @@ export default function ClockedRoundScreen({ navigation, route }) {
     return () => clearInterval(clockRef.current);
   }, [clockRunning, clockStartedAt, reconcileClock]);
 
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') reconcileClock(); });
-    return () => sub.remove();
-  }, [reconcileClock]);
-
   // ── Current hole data ──
   const holeIdx     = currentHole - 1;
-  const curHoleData = holeDataState[holeIdx] ?? { par: 4, yardage: null, handicap: 18 };
+  const curHoleData = holeDataState[holeIdx] ?? { par: defaultPar, yardage: null, handicap: 18 };
   const curOfficialSeconds = officialTimeParFor(officialTimePars?.[currentHole], transport, playerCount);
   const curTimePar  = computeTimePar(curHoleData.yardage, curHoleData.par, playerCount, transport, difficulty, curOfficialSeconds, clockCoeffs);
 
@@ -154,7 +370,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
     AsyncStorage.setItem(CLOCKED_ROUND_STATE_KEY, JSON.stringify({
       roundStartTs, course, holeCount, transport, difficulty, mode,
       holeDataState, playerDefs, configSnap, currentHole, holeResults,
-      playerStrokes, clockRunning, clockStartedAt, holeFrozenTime, officialTimePars, savedAt: Date.now(),
+      playerStrokes, clockRunning, clockStartedAt, holeFrozenTime, officialTimePars,
+      defaultPar, savedAt: Date.now(),
     })).catch(() => {});
   }, [currentHole, holeResults, playerStrokes, clockRunning, holeFrozenTime, holeDataState]);
 
@@ -163,7 +380,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     if (!resumeState) return;
     setCurrentHole(resumeState.currentHole ?? 1);
     setHoleResults(resumeState.holeResults ?? []);
-    setPlayerStrokes(resumeState.playerStrokes ?? playerDefs.map(() => 4));
+    setPlayerStrokes(resumeState.playerStrokes ?? playerDefs.map(() => defaultPar));
     setClockRunning(resumeState.clockRunning ?? false);
     setHoleFrozenTime(resumeState.holeFrozenTime ?? null);
     if (resumeState.holeDataState) setHoleDataState(resumeState.holeDataState);
@@ -172,6 +389,37 @@ export default function ClockedRoundScreen({ navigation, route }) {
       setClockStartedAt(resumeState.clockStartedAt);
     }
     sendLocalNotification('Round Resumed', `Back on hole ${resumeState.currentHole}.`);
+
+    // ── Lock-screen "Holed Out" hand-off (cold start) ──
+    // If the app was killed (not just backgrounded), the AppState 'active'
+    // listener near the clock controls never fires before this screen
+    // remounts, so check for a pending lock-screen completion here too —
+    // using the resumed values directly, since the setState calls above
+    // haven't committed yet within this same effect pass. This IS a real
+    // hole-out (the golfer tapped the lock screen), so it gets the same
+    // verdict beat as an in-app tap — computed against the resumed hole's
+    // time par, since curTimePar still reflects hole 1 here.
+    if (resumeState.clockRunning && resumeState.clockStartedAt) {
+      (async () => {
+        try {
+          const pending = await getPendingHoleCompletion();
+          if (!pending) return;
+          await clearPendingHoleCompletion();
+          const resumedHole = resumeState.currentHole ?? 1;
+          if (pending.holeNumber === resumedHole) {
+            const finalElapsed = Math.max(0, Math.floor((pending.timestamp - resumeState.clockStartedAt) / 1000));
+            const hd = (resumeState.holeDataState ?? [])[resumedHole - 1] ?? { par: defaultPar, yardage: null };
+            const offSec = officialTimeParFor((resumeState.officialTimePars ?? officialTimePars)?.[resumedHole], transport, playerCount);
+            const resumedTimePar = computeTimePar(hd.yardage, hd.par, playerCount, transport, difficulty, offSec, clockCoeffs);
+            setDisplayElapsed(finalElapsed);
+            setHoleFrozenTime(finalElapsed);
+            setClockRunning(false);
+            endActivity().catch(() => {});
+            showVerdict(finalElapsed, resumedTimePar);
+          }
+        } catch {}
+      })();
+    }
   }, []);
 
   // ── Cleanup Live Activity on unmount ──
@@ -181,6 +429,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
   // ── Clock controls ──
   const startClock = () => {
+    cancelVerdict();
     setClockStartedAt(Date.now());
     setDisplayElapsed(0);
     setHoleFrozenTime(null);
@@ -189,16 +438,51 @@ export default function ClockedRoundScreen({ navigation, route }) {
     startActivity(currentHole, curHoleData.par, Date.now() + curTimePar * 1000).catch(() => {});
   };
 
-  const stopClock = () => {
-    const elapsed = clockStartedAt ? Math.floor((Date.now() - clockStartedAt) / 1000) : 0;
-    setDisplayElapsed(elapsed);
-    setHoleFrozenTime(elapsed);
+  // atMs lets a lock-screen "Holed Out" tap freeze the clock at the moment
+  // the golfer actually tapped it rather than whenever the app happens to
+  // reopen — see the pending-hole-completion handling just below.
+  const stopClockAt = (atMs, { verdict = true } = {}) => {
+    const finalElapsed = clockStartedAt ? Math.max(0, Math.floor((atMs - clockStartedAt) / 1000)) : 0;
+    setDisplayElapsed(finalElapsed);
+    setHoleFrozenTime(finalElapsed);
     setClockRunning(false);
     endActivity().catch(() => {});
+
+    // The verdict — instant, emotional, shareable. Skipped when the clock is
+    // stopped for a non-golf reason (pausing/minimizing the round).
+    if (verdict) showVerdict(finalElapsed, curTimePar);
   };
 
+  const stopClock = (opts) => stopClockAt(Date.now(), opts);
+
+  // ── Lock-screen "Holed Out" hand-off ──
+  // The Live Activity's button runs an AppIntent inside the widget extension
+  // process and has no Supabase/app-state access there, so it just drops
+  // {holeNumber, timestamp} into the shared App Group UserDefaults (see
+  // targets/clock-widget/HoledOutIntent.swift). Every time the app comes
+  // back to the foreground we check for that signal and, if it matches the
+  // hole currently on the clock, freeze the timer at the moment the golfer
+  // actually tapped it — not "now" — so a golfer who beat the clock and
+  // tapped from the lock screen never sees a false "OVER" verdict just
+  // because unlocking the phone took a few extra seconds.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (s) => {
+      if (s !== 'active') return;
+      reconcileClock();
+      try {
+        const pending = await getPendingHoleCompletion();
+        if (!pending) return;
+        await clearPendingHoleCompletion();
+        if (pending.holeNumber === currentHole && clockRunning) {
+          stopClockAt(pending.timestamp);
+        }
+      } catch {}
+    });
+    return () => sub.remove();
+  }, [reconcileClock, currentHole, clockRunning, stopClockAt]);
+
   // ── Change par for current hole ──
-  const setCurrentPar = (newPar) => {
+  const applyParChange = (newPar) => {
     setHoleDataState(prev => {
       const updated = [...prev];
       updated[holeIdx] = { ...updated[holeIdx], par: newPar };
@@ -217,6 +501,20 @@ export default function ClockedRoundScreen({ navigation, route }) {
     }
   };
 
+  const setCurrentPar = (newPar) => {
+    // Only prompt when someone actually entered strokes that differ from the
+    // current par — untouched/default players lose nothing, so no friction.
+    const hasEnteredStrokes = playerStrokes.some(s => s !== curHoleData.par);
+    if (hasEnteredStrokes) {
+      Alert.alert('Change Par?', 'Strokes already entered for this hole will be reset to the new par.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Change Anyway', style: 'destructive', onPress: () => applyParChange(newPar) },
+      ]);
+      return;
+    }
+    applyParChange(newPar);
+  };
+
   // ── Score this hole ──
   const completeHole = () => {
     const elapsed = holeFrozenTime ?? displayElapsed;
@@ -226,13 +524,20 @@ export default function ClockedRoundScreen({ navigation, route }) {
     }));
     const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount, difficulty, officialTimePars, holeNumber: currentHole };
     const result = scoreHole(playersForScoring, elapsed, curHoleData, config);
-    const newResults = [...holeResults, result];
+    // Store by hole number (index = hole - 1), never by completion order —
+    // the hole picker lets players jump around (shotgun starts, joining a
+    // round late), so array position must always match the physical hole.
+    // Unplayed holes stay undefined/null and summarizeRound() already
+    // filters those out, so skipped holes never get a phantom score.
+    const newResults = [...holeResults];
+    newResults[currentHole - 1] = result;
     setHoleResults(newResults);
 
     if (currentHole >= holeCount) {
       finishRound(newResults);
     } else {
-      const nextPar = holeDataState[currentHole]?.par ?? 4;
+      cancelVerdict();
+      const nextPar = holeDataState[currentHole]?.par ?? defaultPar;
       setCurrentHole(currentHole + 1);
       setPlayerStrokes(playerDefs.map(() => nextPar));
       setClockRunning(false);
@@ -240,6 +545,38 @@ export default function ClockedRoundScreen({ navigation, route }) {
       setDisplayElapsed(0);
       setHoleFrozenTime(null);
     }
+  };
+
+  // ── Jump to any hole (shotgun starts, joining a round late, replaying a
+  // hole out of order) ── Cleanly resets clock/stroke state for the new
+  // hole; par/time-par/timer all re-derive from currentHole + holeDataState
+  // on the next render, so nothing carries over stale from the hole we're
+  // leaving. Does NOT touch holeResults — an in-progress, unfinished hole
+  // never gets scored just because the player navigated away from it.
+  const jumpToHole = (n) => {
+    if (n === currentHole) { setShowHolePicker(false); return; }
+    const doJump = () => {
+      cancelVerdict();
+      endActivity().catch(() => {});
+      setCurrentHole(n);
+      setClockRunning(false);
+      setClockStartedAt(null);
+      setDisplayElapsed(0);
+      setHoleFrozenTime(null);
+      const parForHole = holeDataState[n - 1]?.par ?? defaultPar;
+      setPlayerStrokes(playerDefs.map(() => parForHole));
+      setShowHolePicker(false);
+    };
+    // Only prompt when the clock is actually running — nothing to lose
+    // otherwise, so don't add friction to a plain hole jump.
+    if (clockRunning) {
+      Alert.alert('Jump Hole?', 'The clock is still running on this hole. Jumping away will reset it.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Jump Anyway', style: 'destructive', onPress: doJump },
+      ]);
+      return;
+    }
+    doJump();
   };
 
   // ── Edit a past hole ──
@@ -262,18 +599,25 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
   // ── Finish round ──
   const finishRound = async (results) => {
+    setIsFinishing(true);
     endActivity().catch(() => {});
     const summary = summarizeRound(results);
-    const holeScoresJson = results.map((r, i) => ({
-      hole: i + 1, par: r.par, yardage: r.yardage, yardsUsed: r.yardsUsed,
-      yardageSource: r.yardageSource, elapsed: r.elapsed, timePar: r.timePar,
-      penalty: r.penalty, holeScore: r.holeScore, difficulty,
-      timeParSource: r.timeParSource ?? 'tier',
-      players: r.playerResults.map(pr => ({
-        name: pr.name, grossStrokes: pr.grossStrokes,
-        points: pr.points, label: pr.label,
-      })),
-    }));
+    // `results` is indexed by hole number and may have gaps (holes skipped
+    // via the hole picker never got scored) — map with the real index for
+    // the hole number, then drop the gaps so we never persist a phantom
+    // score for a hole that was never played.
+    const holeScoresJson = results
+      .map((r, i) => (r == null ? null : {
+        hole: i + 1, par: r.par, yardage: r.yardage, yardsUsed: r.yardsUsed,
+        yardageSource: r.yardageSource, elapsed: r.elapsed, timePar: r.timePar,
+        penalty: r.penalty, holeScore: r.holeScore, difficulty,
+        timeParSource: r.timeParSource ?? 'tier',
+        players: r.playerResults.map(pr => ({
+          name: pr.name, grossStrokes: pr.grossStrokes,
+          points: pr.points, label: pr.label,
+        })),
+      }))
+      .filter(Boolean);
     const activeGameJson = {
       format: 'clocked', mode: mode === 1 ? 'solo' : String(mode), transport,
       tee: params.selectedTee ? { tee_name: params.selectedTee.tee_name, total_yards: params.selectedTee.total_yards } : null,
@@ -288,13 +632,13 @@ export default function ClockedRoundScreen({ navigation, route }) {
       const uid = authUser?.id ?? user?.id;
       if (!uid) { Alert.alert('Error', 'Not signed in. Please restart the app.'); return; }
 
-      // Daily rate limit (3 rounds per 24h)
+      // Daily rate limit (20 rounds per 24h)
       const { count: todayCount } = await supabase
         .from('rounds').select('id', { count: 'exact', head: true })
         .eq('user_id', uid)
-        .gte('created_at', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString());
-      if ((todayCount ?? 0) >= 3) {
-        Alert.alert('Slow down', "You've logged 3 rounds in the last 12 hours. Take a breather and come back soon!");
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      if ((todayCount ?? 0) >= 20) {
+        Alert.alert('Slow down', "You've logged 20 rounds in the last 24 hours. Take a breather and come back soon!");
         return;
       }
 
@@ -332,11 +676,15 @@ export default function ClockedRoundScreen({ navigation, route }) {
         const participantRows = playerDefs
           .map((p, i) => {
             if (!p.userId) return null; // guest — no account
-            // Build this player's hole_scores from the results
-            const playerHoleScores = results.map((r, hi) => {
-              const pr = r.playerResults?.[i];
-              return { hole: hi + 1, par: r.par, grossStrokes: pr?.grossStrokes, points: pr?.points, label: pr?.label };
-            });
+            // Build this player's hole_scores from the results — skip holes
+            // that were never played (jumped past via the hole picker).
+            const playerHoleScores = results
+              .map((r, hi) => {
+                if (r == null) return null;
+                const pr = r.playerResults?.[i];
+                return { hole: hi + 1, par: r.par, grossStrokes: pr?.grossStrokes, points: pr?.points, label: pr?.label };
+              })
+              .filter(Boolean);
             const totalPoints = playerHoleScores.reduce((s, h) => s + (h.points ?? 0), 0);
             return {
               round_id:     savedRoundId,
@@ -399,22 +747,39 @@ export default function ClockedRoundScreen({ navigation, route }) {
       // Cancel interaction ladder + schedule post-round notifications
       cancelInteractionLadder().catch(() => {});
 
-      // Milestone + rank move + inactivity (fire-and-forget, never block save)
+      // Milestone + inactivity (fire-and-forget, never block save).
+      // Exactly one re-engagement notification per round, delayed at least an
+      // hour so it's a reason to come back rather than an instant confirmation
+      // — milestone-flavored when this round hit one (1/5/10/25 rounds),
+      // otherwise the generic score nudge. Never both, so a round never
+      // double-buzzes the player.
       (async () => {
+        let milestoneHit = null;
         try {
           const { count: totalRoundsCount } = await supabase
             .from('rounds').select('id', { count: 'exact', head: true })
             .eq('user_id', uid).not('flagged', 'is', true);
-          await checkAndSendMilestone(totalRoundsCount ?? 1, summary.totalScore, 0, uid);
+          // Feed milestone copy must show the same 0–100 Clocked Score as the
+          // Profile screen, not the raw per-round points total — compute it
+          // the same canonical way (see lib/clockedRating.js).
+          let clockedScoreForMilestone = summary.totalScore;
+          try {
+            const { data: profileRow } = await supabase
+              .from('profiles').select('full_name, username, handicap_index').eq('id', uid).maybeSingle();
+            const rating = await fetchClockedRatingForUser(supabase, uid, profileRow);
+            if (rating?.clockedScore != null) clockedScoreForMilestone = rating.clockedScore;
+          } catch {}
+          milestoneHit = await checkAndSendMilestone(totalRoundsCount ?? 1, clockedScoreForMilestone, 0, uid, 3600);
         } catch {}
         scheduleInactivityReminder().catch(() => {});
-      })();
 
-      // Re-engagement nudge 1 hour after save
-      Notifications.scheduleNotificationAsync({
-        content: { title: 'Check your Clocked Score', body: 'Your round is logged. See how it moved your score →' },
-        trigger: { seconds: 3600, repeats: false },
-      }).catch(() => {});
+        if (!milestoneHit) {
+          Notifications.scheduleNotificationAsync({
+            content: { title: 'Check your Clocked Score', body: 'Your round is logged. See how it moved your score →' },
+            trigger: { seconds: 3600, repeats: false },
+          }).catch(() => {});
+        }
+      })();
 
       AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
       const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -424,16 +789,18 @@ export default function ClockedRoundScreen({ navigation, route }) {
         teamScore: summary.totalScore, totalTimePar: summary.totalTimePar,
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty,
         playerTotals: summary.playerTotals, formatBadge: formatBadge(playerCount),
-        holeScores: results.slice(0, holeCount),
+        holeScores: results.filter(Boolean).slice(0, holeCount),
       });
     } catch (e) {
       Alert.alert('Error', 'Could not save your round. Please try again.');
+    } finally {
+      setIsFinishing(false);
     }
   };
 
   // Pause round — navigate away without losing state
   const handlePause = () => {
-    if (clockRunning) stopClock();
+    if (clockRunning) stopClock({ verdict: false });
     navigation.navigate('Main');
   };
 
@@ -461,29 +828,71 @@ export default function ClockedRoundScreen({ navigation, route }) {
     });
   };
 
-  // ── 10-second buzzer ──
-  const buzzedRef = useRef(false);
-  // Reset buzzer flag when hole changes
-  useEffect(() => { buzzedRef.current = false; }, [currentHole]);
+  // ── Expiry alarm — fires once per hole, the instant time par runs out ──
+  const expiredRef = useRef(false);
+  useEffect(() => { expiredRef.current = false; }, [currentHole]);
 
   // ── Derived ──
   const runningSummary = summarizeRound(holeResults);
   const elapsed       = clockRunning ? displayElapsed : (holeFrozenTime ?? 0);
   const remaining     = curTimePar - elapsed;
+  const ringZoneNow    = ringZone(remaining, curTimePar);
 
-  // Vibration alert at 10 seconds remaining
+  // Sharp buzzer + strong haptic the instant time par expires (broadcast-grade,
+  // unmistakable — also a sponsorable asset: "the [Sponsor] buzzer").
   useEffect(() => {
-    if (clockRunning && remaining <= 10 && remaining > 0 && !buzzedRef.current) {
-      buzzedRef.current = true;
-      Vibration.vibrate([0, 200, 100, 200]);
+    if (clockRunning && remaining <= 0 && !expiredRef.current) {
+      expiredRef.current = true;
+      playBuzzer();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      Vibration.vibrate([0, 250, 100, 250]);
     }
   }, [remaining, clockRunning]);
-  const clkColor      = clockColor(remaining, curTimePar);
+
+  // Subtle haptic heartbeat in the final minute — the phone itself gets tense.
+  useEffect(() => {
+    if (!clockRunning || remaining > 60 || remaining <= 0) return;
+    const beat = setInterval(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }, 1000);
+    return () => clearInterval(beat);
+  }, [clockRunning, remaining > 60, remaining <= 0]);
+
   const holeStopped   = holeFrozenTime != null;
+  const ghostProgress = ghostByHole[currentHole];
+
+  // Settled verdict — derived, not stored, so it's correct on restore and
+  // tracks a hand-edited hole time. positive delta = beat the clock.
+  const settledDelta  = holeStopped ? curTimePar - holeFrozenTime : 0;
+  const settledBeat   = settledDelta >= 0;
+  const settledColor  = settledBeat ? GREEN : RED_WARN;
+
+  // Once holed out the ring stops being a countdown and becomes the record:
+  // the arc is the share of time par actually used, in the verdict color,
+  // and the digits are the hole time. (Showing leftover time there read as
+  // "the hole took 4:38" on screen — it didn't.)
+  const clkColor      = holeStopped ? settledColor : clockColor(remaining, curTimePar);
+  const ringProgress  = holeStopped
+    ? Math.max(0, Math.min(1, holeFrozenTime / Math.max(1, curTimePar)))
+    : Math.max(0, Math.min(1, remaining / Math.max(1, curTimePar)));
+
+  // Live ghost race pill — "ahead of" / "behind" ghost while the clock runs
+  const ghostDeltaLabel = useMemo(() => {
+    if (ghostProgress == null || !clockRunning) return null;
+    const ghostElapsedEquiv = (1 - ghostProgress) * curTimePar;
+    const diff = Math.round(ghostElapsedEquiv - elapsed);
+    if (Math.abs(diff) < 1) return { text: 'DEAD EVEN WITH GHOST', color: GOLD };
+    return diff > 0
+      ? { text: `AHEAD OF GHOST BY ${formatSeconds(diff)}`, color: GREEN }
+      : { text: `BEHIND GHOST BY ${formatSeconds(Math.abs(diff))}`, color: RED_WARN };
+  }, [ghostProgress, elapsed, clockRunning, curTimePar]);
 
   // ── Countdown display ──
   let clockDisplay, clockSuffix;
-  if (remaining >= 0) {
+  if (holeStopped) {
+    clockDisplay = formatSeconds(holeFrozenTime);
+    clockSuffix  = 'HOLE TIME';
+  } else if (remaining >= 0) {
     clockDisplay = formatSeconds(remaining);
     clockSuffix  = null;
   } else {
@@ -501,12 +910,21 @@ export default function ClockedRoundScreen({ navigation, route }) {
         <TouchableOpacity onPress={handlePause} style={st.headerBtn} accessibilityLabel="Pause round">
           <Ionicons name="chevron-down-outline" size={22} color={GOLD} />
         </TouchableOpacity>
-        <View style={st.headerCenter}>
-          <Text style={st.headerTitle}>HOLE {currentHole}</Text>
+        <TouchableOpacity
+          style={st.headerCenter}
+          onPress={() => setShowHolePicker(true)}
+          activeOpacity={0.7}
+          accessibilityLabel="Jump to a different hole"
+          accessibilityRole="button"
+        >
+          <View style={st.headerTitleRow}>
+            <Text style={st.headerTitle}>HOLE {currentHole}</Text>
+            <Ionicons name="chevron-expand-outline" size={12} color={GOLD} style={{ marginLeft: 4 }} />
+          </View>
           <Text style={st.headerSub}>
             Par {curHoleData.par}{curHoleData.yardage ? `  ·  ${curHoleData.yardage} yds` : ''}
           </Text>
-        </View>
+        </TouchableOpacity>
         <View style={{ flexDirection: 'row', gap: 4 }}>
           <TouchableOpacity onPress={() => navigation.navigate('RulesScreen')} style={st.headerBtn} accessibilityLabel="Rules">
             <Ionicons name="help-circle-outline" size={20} color={GOLD} />
@@ -532,24 +950,33 @@ export default function ClockedRoundScreen({ navigation, route }) {
             <Text style={[st.scCell, st.scCellPen]}>PEN</Text>
             <Text style={[st.scCell, st.scCellScore]}>SCORE</Text>
           </View>
-          {holeResults.filter((_, i) => i < holeCount).map((r, i) => (
-            <TouchableOpacity key={i} style={st.scRow} onPress={() => setEditHoleIdx(i)} activeOpacity={0.7}>
-              <Text style={[st.scCell, st.scCellHole, st.scValText]}>{i + 1}</Text>
-              <Text style={[st.scCell, st.scCellPar, st.scValText]}>{r.par}</Text>
-              {r.playerResults.map((pr, j) => (
-                <Text key={j} style={[st.scCell, st.scCellPlayer, { color: pointsColor(pr.points) }]}>
-                  {pr.points > 0 ? `+${pr.points}` : pr.points}
-                </Text>
-              ))}
-              <Text style={[st.scCell, st.scCellTime, st.scValText]}>{formatSeconds(r.elapsed)}</Text>
-              <Text style={[st.scCell, st.scCellPen, { color: r.penalty < 0 ? RED_WARN : DIM }]}>
-                {r.penalty < 0 ? r.penalty : '\u2014'}
-              </Text>
-              <Text style={[st.scCell, st.scCellScore, { color: r.holeScore >= 0 ? GREEN : RED_WARN, fontWeight: '700' }]}>
-                {r.holeScore > 0 ? `+${r.holeScore}` : r.holeScore}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {/* Sparse array \u2014 holes can be scored out of order via the hole
+              picker, so index into holeResults by real hole number and skip
+              any hole that hasn't been played yet rather than mis-labeling
+              rows by completion order. */}
+          {Array.from({ length: holeCount }, (_, i) => i)
+            .filter(i => holeResults[i] != null)
+            .map(i => {
+              const r = holeResults[i];
+              return (
+                <TouchableOpacity key={i} style={st.scRow} onPress={() => setEditHoleIdx(i)} activeOpacity={0.7}>
+                  <Text style={[st.scCell, st.scCellHole, st.scValText]}>{i + 1}</Text>
+                  <Text style={[st.scCell, st.scCellPar, st.scValText]}>{r.par}</Text>
+                  {r.playerResults.map((pr, j) => (
+                    <Text key={j} style={[st.scCell, st.scCellPlayer, { color: pointsColor(pr.points) }]}>
+                      {pr.points > 0 ? `+${pr.points}` : pr.points}
+                    </Text>
+                  ))}
+                  <Text style={[st.scCell, st.scCellTime, st.scValText]}>{formatSeconds(r.elapsed)}</Text>
+                  <Text style={[st.scCell, st.scCellPen, { color: r.penalty < 0 ? RED_WARN : DIM }]}>
+                    {r.penalty < 0 ? r.penalty : '\u2014'}
+                  </Text>
+                  <Text style={[st.scCell, st.scCellScore, { color: r.holeScore >= 0 ? GREEN : RED_WARN, fontWeight: '700' }]}>
+                    {r.holeScore > 0 ? `+${r.holeScore}` : r.holeScore}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           <View style={[st.scRow, st.scTotalRow]}>
             <Text style={[st.scCell, st.scCellHole, st.scTotalText]}>TOT</Text>
             <Text style={[st.scCell, st.scCellPar, st.scTotalText]}></Text>
@@ -581,15 +1008,45 @@ export default function ClockedRoundScreen({ navigation, route }) {
             <Text style={[st.totalValue, { color: runningSummary.totalScore >= 0 ? GREEN : RED_WARN }]}>
               {runningSummary.totalScore > 0 ? `+${runningSummary.totalScore}` : runningSummary.totalScore}
             </Text>
-            <Text style={st.totalHoles}>{holeResults.length}/{holeCount} holes</Text>
+            <Text style={st.totalHoles}>{runningSummary.holesPlayed}/{holeCount} holes</Text>
           </View>
 
-          {/* ── Shot Clock (COUNTDOWN) ── */}
+          {/* ── Shot Clock (COUNTDOWN) — the signature element ── */}
           <View style={st.clockWrap}>
-            <Text style={[st.clockDigits, { color: clkColor }]}>
-              {clockDisplay}
-            </Text>
-            {clockSuffix && <Text style={st.overLabel}>{clockSuffix}</Text>}
+            <CountdownRing
+              progress={ringProgress}
+              zone={ringZoneNow}
+              ghostProgress={ghostProgress}
+              colorOverride={holeStopped ? settledColor : null}
+              flash={verdictBeat ? { color: verdictBeat.color, key: verdictBeat.key } : null}
+            >
+              {verdictBeat ? (
+                <Animated.View
+                  style={[st.verdictCenter, { opacity: verdictOpacity, transform: [{ scale: verdictScale }] }]}
+                  pointerEvents="none"
+                  accessibilityLiveRegion="polite"
+                >
+                  <Text style={[st.verdictHeadline, { color: verdictBeat.color }]}>
+                    {verdictBeat.beat ? 'BEAT THE CLOCK' : 'OVER THE CLOCK'}
+                  </Text>
+                  <View style={st.verdictDeltaRow}>
+                    <Text style={[st.verdictBy, { color: verdictBeat.color }]}>by</Text>
+                    <Text style={[st.verdictDelta, { color: verdictBeat.color }]}>
+                      {formatSeconds(verdictBeat.delta)}
+                    </Text>
+                  </View>
+                </Animated.View>
+              ) : (
+                <>
+                  <Text style={[st.clockDigits, { color: clkColor }]}>
+                    {clockDisplay}
+                  </Text>
+                  {clockSuffix && (
+                    <Text style={[st.overLabel, holeStopped && { color: settledColor }]}>{clockSuffix}</Text>
+                  )}
+                </>
+              )}
+            </CountdownRing>
             <Text style={st.clockTimePar}>TIME PAR  {formatSeconds(curTimePar)}</Text>
             {curOfficialSeconds != null && (
               <View style={st.certifiedPill}>
@@ -599,6 +1056,12 @@ export default function ClockedRoundScreen({ navigation, route }) {
             {livePenalty < 0 && (
               <View style={st.penaltyBadge}>
                 <Text style={st.penaltyText}>{livePenalty}</Text>
+              </View>
+            )}
+            {ghostDeltaLabel && (
+              <View style={st.ghostPill}>
+                <Ionicons name="body-outline" size={10} color={ghostDeltaLabel.color} />
+                <Text style={[st.ghostPillText, { color: ghostDeltaLabel.color }]}>{ghostDeltaLabel.text}</Text>
               </View>
             )}
           </View>
@@ -684,8 +1147,10 @@ export default function ClockedRoundScreen({ navigation, route }) {
             })}
           </View>
 
-          {/* ── Frozen time display + edit (cross-platform) ── */}
-          {holeStopped && (editingTime ? (
+          {/* ── Settled hole time + verdict delta, edit (cross-platform) ──
+              Held back until the verdict beat finishes so the moment lands
+              before NEXT HOLE / FINISH ROUND is offered. */}
+          {holeStopped && !verdictBeat && (editingTime ? (
             <View style={st.frozenTimeRow}>
               <Text style={st.frozenTimeLabel}>HOLE TIME</Text>
               <TextInput
@@ -716,22 +1181,37 @@ export default function ClockedRoundScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity style={st.frozenTimeRow} onPress={() => {
+            <TouchableOpacity style={st.settledBlock} onPress={() => {
               setEditTimeStr(formatSeconds(holeFrozenTime));
               setEditingTime(true);
-            }} activeOpacity={0.7}>
+            }} activeOpacity={0.7} accessibilityLabel="Edit hole time">
               <Text style={st.frozenTimeLabel}>HOLE TIME</Text>
-              <Text style={st.frozenTimeValue}>{formatSeconds(holeFrozenTime)}</Text>
-              <Ionicons name="pencil-outline" size={12} color={DIM} style={{ marginLeft: 6 }} />
+              <View style={st.settledRow}>
+                <Text style={[st.settledValue, { color: settledColor }]}>
+                  {formatSeconds(holeFrozenTime)}
+                  <Text style={st.settledDot}>  {'·'}  </Text>
+                  {settledBeat ? 'BEAT BY ' : 'OVER BY '}{formatSeconds(Math.abs(settledDelta))}
+                </Text>
+                <Ionicons name="pencil-outline" size={12} color={DIM} style={{ marginLeft: 8 }} />
+              </View>
             </TouchableOpacity>
           ))}
 
           {/* ── Next Hole / Finish ── */}
-          {holeStopped && (
-            <TouchableOpacity style={st.nextHoleBtn} onPress={completeHole} activeOpacity={0.85}>
-              <Text style={st.nextHoleText}>
-                {currentHole >= holeCount ? 'FINISH ROUND' : 'NEXT HOLE \u2192'}
-              </Text>
+          {holeStopped && !verdictBeat && (
+            <TouchableOpacity
+              style={[st.nextHoleBtn, isFinishing && st.adjBtnDisabled]}
+              onPress={completeHole}
+              activeOpacity={0.85}
+              disabled={isFinishing}
+            >
+              {isFinishing ? (
+                <ActivityIndicator color={BG} />
+              ) : (
+                <Text style={st.nextHoleText}>
+                  {currentHole >= holeCount ? 'FINISH ROUND' : 'NEXT HOLE \u2192'}
+                </Text>
+              )}
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -755,9 +1235,80 @@ export default function ClockedRoundScreen({ navigation, route }) {
         }}
         onClose={() => setEditHoleIdx(null)}
       />
+
+      {/* ── Hole Picker — jump to any hole (shotgun starts, joining late) ── */}
+      <HolePickerModal
+        visible={showHolePicker}
+        holeCount={holeCount}
+        currentHole={currentHole}
+        holeDataState={holeDataState}
+        defaultPar={defaultPar}
+        holeResults={holeResults}
+        onSelect={jumpToHole}
+        onClose={() => setShowHolePicker(false)}
+      />
     </SafeAreaView>
   );
 }
+
+// ─── Hole Picker Modal — jump to any hole in the round ───────────────────────
+function HolePickerModal({ visible, holeCount, currentHole, holeDataState, defaultPar, holeResults, onSelect, onClose }) {
+  if (!visible) return null;
+  const holes = Array.from({ length: holeCount }, (_, i) => i + 1);
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={hp.overlay}>
+        <View style={hp.card}>
+          <View style={hp.headerRow}>
+            <Text style={hp.title}>JUMP TO HOLE</Text>
+            <TouchableOpacity onPress={onClose} style={hp.closeBtn}>
+              <Ionicons name="close" size={20} color={MUTED} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={hp.grid}>
+            {holes.map(n => {
+              const par = holeDataState[n - 1]?.par ?? defaultPar;
+              const isCurrent = n === currentHole;
+              const isPlayed  = holeResults[n - 1] != null;
+              return (
+                <TouchableOpacity
+                  key={n}
+                  style={[hp.tile, isCurrent && hp.tileCurrent]}
+                  onPress={() => onSelect(n)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[hp.tileNum, isCurrent && hp.tileNumCurrent]}>{n}</Text>
+                  <Text style={[hp.tilePar, isCurrent && hp.tileParCurrent]}>PAR {par}</Text>
+                  {isPlayed && !isCurrent && (
+                    <Ionicons name="checkmark-circle" size={12} color={GREEN} style={hp.tileCheck} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Hole Picker Modal Styles ─────────────────────────────────────────────────
+const hp = StyleSheet.create({
+  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
+  card:      { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: GOLD + '33', padding: 20, width: 320, maxHeight: 440 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  title:     { fontSize: 12, fontWeight: '700', color: GOLD, letterSpacing: 3 },
+  closeBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 4 },
+  tile:      { width: 66, height: 64, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
+  tileCurrent: { backgroundColor: '#1E4825', borderColor: GOLD, borderWidth: 2 },
+  tileNum:   { fontSize: 18, fontWeight: '700', color: CREAM, fontVariant: ['tabular-nums'] },
+  tileNumCurrent: { color: GOLD },
+  tilePar:   { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 0.5, marginTop: 2 },
+  tileParCurrent: { color: GOLD },
+  tileCheck: { position: 'absolute', top: 4, right: 4 },
+});
 
 // ─── Edit Past Hole Modal ────────────────────────────────────────────────────
 function EditHoleModal({ visible, holeResult, holeNumber, playerDefs, onSave, onClose }) {
@@ -859,6 +1410,7 @@ const st = StyleSheet.create({
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10 },
   headerBtn:     { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCenter:  { alignItems: 'center', flex: 1 },
+  headerTitleRow:{ flexDirection: 'row', alignItems: 'center' },
   headerTitle:   { fontSize: 13, fontWeight: '700', color: GOLD, letterSpacing: 3 },
   headerSub:     { fontSize: 11, color: DIM, marginTop: 2 },
   mainContent:   { paddingHorizontal: 16, paddingBottom: 20 },
@@ -869,10 +1421,18 @@ const st = StyleSheet.create({
   totalHoles:    { fontSize: 10, color: DIM },
 
   // Countdown clock
-  clockWrap:     { alignItems: 'center', paddingVertical: 20 },
-  clockDigits:   { fontSize: 64, fontWeight: '200', fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 70 },
+  clockWrap:     { alignItems: 'center', paddingVertical: 12 },
+  clockDigits:   { fontSize: 56, fontWeight: '200', fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 60 },
   overLabel:     { fontSize: 11, fontWeight: '700', color: RED_WARN, letterSpacing: 3, marginTop: 2 },
-  clockTimePar:  { fontSize: 11, fontWeight: '700', color: DIM, letterSpacing: 2.5, marginTop: 6 },
+  clockTimePar:  { fontSize: 11, fontWeight: '700', color: DIM, letterSpacing: 2.5, marginTop: 10 },
+  ghostPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10, borderWidth: 1, borderColor: BORDER, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  ghostPillText: { fontSize: 9, fontWeight: '700', letterSpacing: 1.2 },
+  // Holed-out verdict beat (ring center, ~MOTION.verdictHold)
+  verdictCenter:   { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  verdictHeadline: { ...TYPE.label, fontSize: 12, letterSpacing: 3, textAlign: 'center' },
+  verdictDeltaRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 4 },
+  verdictBy:       { fontSize: 18, fontWeight: '300', letterSpacing: 0.5, opacity: 0.85 },
+  verdictDelta:    { ...TYPE.heroNumber, fontSize: 56, lineHeight: 60 },
   certifiedPill: { borderWidth: 1, borderColor: '#C9A84C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginTop: 4 },
   certifiedText: { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
   penaltyBadge:  { marginTop: 8, backgroundColor: 'rgba(232,93,74,0.12)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(232,93,74,0.3)' },
@@ -913,8 +1473,12 @@ const st = StyleSheet.create({
 
   // Frozen time (tappable to edit)
   frozenTimeRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8, paddingVertical: 6 },
-  frozenTimeLabel:  { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 2 },
-  frozenTimeValue:  { fontSize: 14, fontWeight: '600', color: CREAM, fontVariant: ['tabular-nums'] },
+  frozenTimeLabel:  { ...TYPE.label, letterSpacing: 2 },
+  // Settled verdict block — "0:22 · BEAT BY 4:38", persistent after the hold
+  settledBlock:     { alignItems: 'center', marginBottom: 10, paddingVertical: 6, gap: 4 },
+  settledRow:       { flexDirection: 'row', alignItems: 'center' },
+  settledValue:     { ...TYPE.statNumber, fontSize: 20, fontWeight: '600', letterSpacing: 1 },
+  settledDot:       { color: DIM, fontWeight: '400' },
   frozenTimeInput:  { fontSize: 14, fontWeight: '600', color: CREAM, fontVariant: ['tabular-nums'], backgroundColor: BG, borderWidth: 1, borderColor: GOLD + '44', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, minWidth: 50, textAlign: 'center' },
 
   // Next hole

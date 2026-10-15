@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, Dimensions, Alert, Share as RNShare,
@@ -9,6 +9,10 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { StatCard, RoundCard } from '../components/ClockedShareCard';
+import { useAuth } from '../context/AuthContext';
+import { getReferralStats } from '../lib/referrals';
+import { supabase } from '../lib/supabase';
+import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -20,6 +24,7 @@ function formatRoundTime(mins) {
 }
 
 export default function ShareScreen({ navigation, route }) {
+  const { user } = useAuth();
   const p = route.params ?? {};
 
   const courseName      = p.courseName ?? 'Quick Play';
@@ -48,6 +53,57 @@ export default function ShareScreen({ navigation, route }) {
   const [saving, setSaving]           = useState(false);
   const [toast, setToast]             = useState('');
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
+
+  // Referral — surfaced right here, right after a round confirms, when the
+  // player is already in a share-happy mindset. This is the primary referral
+  // moment now; the Profile screen still carries a lightweight version too.
+  const [referralCode, setReferralCode] = useState(null);
+  useEffect(() => {
+    if (!user?.id) return;
+    getReferralStats(user.id).then(({ code }) => setReferralCode(code));
+  }, [user?.id]);
+
+  // Clocked Score — computed here (not passed in via params) so the share
+  // card can lead with the app's real headline metric instead of a raw
+  // points total that means nothing to someone who doesn't have the app.
+  const [clockedScore, setClockedScore] = useState(null);
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const { data: rounds } = await supabase
+          .from('rounds')
+          .select('id, hole_scores, created_at')
+          .eq('user_id', user.id)
+          .eq('round_format', 'clocked')
+          .eq('flagged', false)
+          .not('hole_scores', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        const { data: profileRow } = await supabase
+          .from('profiles').select('full_name, username, handicap_index').eq('id', user.id).maybeSingle();
+        const playerName = profileRow?.full_name || profileRow?.username || 'Player';
+
+        const roundStats = (rounds ?? [])
+          .map(r => extractPlayerRoundStats(r.hole_scores, playerName))
+          .filter(Boolean);
+        const rating = computeFullRating({ roundStats, handicapIndex: profileRow?.handicap_index });
+        setClockedScore(rating.clockedScore);
+      } catch {
+        setClockedScore(null);
+      }
+    })();
+  }, [user?.id]);
+
+  const inviteFriend = async () => {
+    if (!referralCode) return;
+    try {
+      await RNShare.share({
+        message: `Just played a round on Clocked — the app that tracks pace of play. Use my code ${referralCode} when you sign up! https://clocked.golf/join?ref=${referralCode}`,
+      });
+    } catch {}
+  };
 
   const goHome    = () => navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2800); };
@@ -105,7 +161,7 @@ export default function ShareScreen({ navigation, route }) {
     holes,
     difficulty,
     penalties: penaltyCount,
-    clockedScore: null, // not available at share time
+    clockedScore,
     date,
     holeScores,
     roundTime,
@@ -163,6 +219,20 @@ export default function ShareScreen({ navigation, route }) {
         ))}
       </View>
 
+      {/* Invite a friend — the new primary referral moment */}
+      {!!referralCode && (
+        <TouchableOpacity style={s.inviteCard} onPress={inviteFriend} activeOpacity={0.85}>
+          <View style={s.inviteIconWrap}>
+            <Ionicons name="gift-outline" size={16} color="#C9A84C" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.inviteTitle}>Invite a friend to play</Text>
+            <Text style={s.inviteSub}>Your code: {referralCode}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#7A6E58" />
+        </TouchableOpacity>
+      )}
+
       {/* Toast */}
       {!!toast && (
         <View style={s.toast}>
@@ -215,6 +285,11 @@ const s = StyleSheet.create({
 
   toast:        { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A44', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
   toastText:    { fontSize: 13, color: '#7DC87A', fontWeight: '500' },
+
+  inviteCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#C9A84C33', borderRadius: 14, marginHorizontal: 20, marginTop: 10, paddingVertical: 12, paddingHorizontal: 14 },
+  inviteIconWrap:{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#C9A84C1A', alignItems: 'center', justifyContent: 'center' },
+  inviteTitle:   { fontSize: 13, fontWeight: '600', color: '#F5EDD8' },
+  inviteSub:     { fontSize: 11, color: '#B8A882', marginTop: 1 },
 
   actions:      { paddingHorizontal: 20, paddingBottom: 24, paddingTop: 10, gap: 8 },
   btnRow:       { flexDirection: 'row', gap: 10 },

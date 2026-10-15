@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import InitialsAvatar from '../components/InitialsAvatar';
 import ChallengeButton from '../components/ChallengeButton';
 import { sendPushToUser } from '../lib/notifications';
+import { totalPointsFromHoleScores } from '../lib/clockedSport';
 
 const PAGE_SIZE = 20;
 
@@ -29,9 +30,12 @@ function timeAgo(isoStr) {
   return `${mo[d.getMonth()]} ${d.getDate()}`;
 }
 
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
+// Per-round points color (raw PTS from a round's hole_scores/team_score,
+// not the 0–100 aggregate Clocked Score).
+function ptsColor(pts) {
+  if (pts == null) return '#B8A882';
+  if (pts >= 8) return '#7DC87A';
+  if (pts >= 0) return '#C9A84C';
   return '#C07A6A';
 }
 
@@ -64,7 +68,7 @@ function SkeletonCard() {
 
 // ─── Round Content Card ───────────────────────────────────────────────────────
 function RoundContentCard({ content, navigation }) {
-  const pop = content?.pop_score;
+  const pts = content?.team_score;
   const parts = [
     content?.holes     ? `${content.holes}h`             : null,
     content?.transport ?? null,
@@ -72,9 +76,9 @@ function RoundContentCard({ content, navigation }) {
     content?.duration_minutes ? formatTime(content.duration_minutes) : null,
   ].filter(Boolean);
 
-  const leftBorderColor = pop != null
-    ? pop >= 4.0 ? '#7DC87A'
-    : pop >= 3.0 ? '#C9A84C'
+  const leftBorderColor = pts != null
+    ? pts >= 8 ? '#7DC87A'
+    : pts >= 0 ? '#C9A84C'
     : '#5A5A5A'
     : '#7DC87A33';
 
@@ -89,10 +93,10 @@ function RoundContentCard({ content, navigation }) {
           <Text style={s.roundCourse} numberOfLines={1}>{content?.course_name ?? '—'}</Text>
           {parts.length > 0 && <Text style={s.roundDetails}>{parts.join(' · ')}</Text>}
         </View>
-        {pop != null && (
-          <View style={[s.popBadge, { borderColor: popColor(pop) + '88', backgroundColor: popColor(pop) + '12' }]}>
-            <Text style={[s.popScore, { color: popColor(pop) }]}>{pop.toFixed(1)}</Text>
-            <Text style={[s.popLabel, { color: popColor(pop) }]}>CLK</Text>
+        {pts != null && (
+          <View style={[s.popBadge, { borderColor: ptsColor(pts) + '88', backgroundColor: ptsColor(pts) + '12' }]}>
+            <Text style={[s.popScore, { color: ptsColor(pts) }]}>{pts > 0 ? `+${pts}` : pts}</Text>
+            <Text style={[s.popLabel, { color: ptsColor(pts) }]}>PTS</Text>
           </View>
         )}
       </View>
@@ -165,7 +169,7 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
         <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: item.user_id })} activeOpacity={0.8}>
           <View>
-            <InitialsAvatar name={item.full_name} size={40} />
+            <InitialsAvatar name={item.full_name} size={40} avatarUrl={item.avatar_url} />
             {isLive && <View style={s.avatarLiveDot} />}
           </View>
         </TouchableOpacity>
@@ -243,8 +247,10 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
               <Text style={s.courseLeaderEmoji}>🏆</Text>
               <View style={{ flex: 1 }}>
                 <Text style={s.courseLeaderText}>{item.content?.description ?? `${handle} is the fastest here`}</Text>
-                {item.content?.pop_score != null && (
-                  <Text style={s.courseLeaderScore}>{item.content.pop_score.toFixed(1)} CLK</Text>
+                {item.content?.team_score != null && (
+                  <Text style={s.courseLeaderScore}>
+                    {item.content.team_score > 0 ? `+${item.content.team_score}` : item.content.team_score} PTS
+                  </Text>
                 )}
               </View>
             </View>
@@ -306,10 +312,15 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
       if (!data || data.length === 0) { setComments([]); return; }
       const uids = [...new Set(data.map(c => c.user_id))];
       const { data: profs } = await supabase
-        .from('profiles').select('id, username, full_name').in('id', uids);
+        .from('profiles').select('id, username, full_name, avatar_url').in('id', uids);
       const pm = {};
       (profs ?? []).forEach(p => { pm[p.id] = p; });
-      setComments(data.map(c => ({ ...c, username: pm[c.user_id]?.username, full_name: pm[c.user_id]?.full_name })));
+      setComments(data.map(c => ({
+        ...c,
+        username: pm[c.user_id]?.username,
+        full_name: pm[c.user_id]?.full_name,
+        avatar_url: pm[c.user_id]?.avatar_url,
+      })));
     } catch (e) {
       // silent fail
     } finally {
@@ -360,7 +371,7 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
             const name = item.username ? `@${item.username}` : (item.full_name?.split(' ')[0] ?? 'Golfer');
             return (
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <InitialsAvatar name={item.full_name} size={32} />
+                <InitialsAvatar name={item.full_name} size={32} avatarUrl={item.avatar_url} />
                 <View style={{ flex: 1, backgroundColor: '#0D1A0F', borderRadius: 12, padding: 10 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: '#F5EDD8' }}>{name}</Text>
@@ -412,13 +423,16 @@ function ComposeModal({ visible, userId, onClose, onPosted }) {
     setText('');
     setAttachRound(false);
     supabase.from('rounds')
-      .select('id, course_name, pop_score, holes, transport, players, duration_minutes')
+      .select('id, course_name, round_format, hole_scores, holes, transport, players, duration_minutes')
       .eq('user_id', userId)
-      .not('pop_score', 'is', null)
+      .eq('round_format', 'clocked')
+      .not('hole_scores', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then(({ data }) => setRecentRound(data ?? null));
+      .then(({ data }) => setRecentRound(data
+        ? { ...data, team_score: totalPointsFromHoleScores(data.hole_scores) }
+        : null));
   }, [visible, userId]);
 
   const submit = async () => {
@@ -430,7 +444,8 @@ function ComposeModal({ visible, userId, onClose, onPosted }) {
         text: body,
         ...(attachRound && recentRound ? { attached_round: {
           course_name:      recentRound.course_name,
-          pop_score:        recentRound.pop_score,
+          round_format:     recentRound.round_format,
+          team_score:       recentRound.team_score,
           duration_minutes: recentRound.duration_minutes,
           holes:            recentRound.holes,
           transport:        recentRound.transport,
@@ -532,15 +547,21 @@ export default function ActivityFeedScreen({ navigation }) {
   const followingRef   = useRef([]);
   const activeTabRef   = useRef('following');
 
+  // Best points per course, from this user's own clocked rounds — feeds
+  // ChallengeButton's "beat my score" comparison. Points-based (per-round),
+  // not the 0–100 aggregate Clocked Score.
   useEffect(() => {
     if (!uid) return;
-    supabase.from('rounds').select('course_name, pop_score')
-      .eq('user_id', uid).not('pop_score', 'is', null)
-      .order('pop_score', { ascending: false }).limit(100)
+    supabase.from('rounds').select('course_name, hole_scores')
+      .eq('user_id', uid).eq('round_format', 'clocked').not('hole_scores', 'is', null)
+      .limit(200)
       .then(({ data }) => {
         const map = {};
         for (const r of data ?? []) {
-          if (r.course_name && map[r.course_name] == null) map[r.course_name] = r.pop_score;
+          if (!r.course_name) continue;
+          const pts = totalPointsFromHoleScores(r.hole_scores);
+          if (pts == null) continue;
+          if (map[r.course_name] == null || pts > map[r.course_name]) map[r.course_name] = pts;
         }
         setMyScoreMap(map);
       });
@@ -577,12 +598,13 @@ export default function ActivityFeedScreen({ navigation }) {
     // Enrich with profile data
     if (rows.length > 0) {
       const uids = [...new Set(rows.map(r => r.user_id))];
-      const { data: profs } = await supabase.from('profiles').select('id, username, full_name').in('id', uids);
+      const { data: profs } = await supabase.from('profiles').select('id, username, full_name, avatar_url').in('id', uids);
       const pm = {};
       (profs ?? []).forEach(p => { pm[p.id] = p; });
       rows.forEach(r => {
-        r.username  = pm[r.user_id]?.username  ?? null;
-        r.full_name = pm[r.user_id]?.full_name ?? null;
+        r.username   = pm[r.user_id]?.username   ?? null;
+        r.full_name  = pm[r.user_id]?.full_name  ?? null;
+        r.avatar_url = pm[r.user_id]?.avatar_url ?? null;
       });
 
       // User's likes

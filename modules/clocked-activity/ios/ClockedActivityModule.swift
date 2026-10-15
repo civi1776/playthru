@@ -12,8 +12,22 @@ struct ClockWidgetAttributes: ActivityAttributes {
     }
 }
 
+// Shape of the "Holed Out" signal written by HoledOutIntent (in the widget
+// extension) into the shared App Group UserDefaults. Mirrors the JSON dict
+// the intent writes — see targets/clock-widget/HoledOutIntent.swift.
+struct PendingHoleCompletionRecord: Record {
+    @Field var holeNumber: Int = 0
+    @Field var timestamp: Double = 0
+}
+
 public class ClockedActivityModule: Module {
     private var currentActivityId: String?
+
+    // Must match APP_GROUP_ID in plugins/withClockWidget.js and the group
+    // referenced in targets/clock-widget/HoledOutIntent.swift /
+    // ClockWidget.entitlements / ClockedGolf's own entitlements.
+    private static let appGroupId = "group.com.civiswings.playthru"
+    private static let pendingHoleCompletionKey = "pendingHoleCompletion"
 
     public func definition() -> ModuleDefinition {
         Name("ClockedActivityModule")
@@ -74,6 +88,28 @@ public class ClockedActivityModule: Module {
         AsyncFunction("areActivitiesEnabled") { () -> Bool in
             guard #available(iOS 16.2, *) else { return false }
             return ActivityAuthorizationInfo().areActivitiesEnabled
+        }
+
+        // Read back the pending "Holed Out" signal left by the lock-screen
+        // Live Activity button, if any. Does NOT clear it — the JS side
+        // clears explicitly after deciding whether it still applies.
+        AsyncFunction("getPendingHoleCompletion") { () -> PendingHoleCompletionRecord? in
+            guard let defaults = UserDefaults(suiteName: Self.appGroupId) else { return nil }
+            guard let data = defaults.data(forKey: Self.pendingHoleCompletionKey) else { return nil }
+            guard
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let hole = json["holeNumber"] as? Int,
+                let ts = json["timestamp"] as? Double
+            else { return nil }
+
+            var record = PendingHoleCompletionRecord()
+            record.holeNumber = hole
+            record.timestamp = ts
+            return record
+        }
+
+        AsyncFunction("clearPendingHoleCompletion") {
+            UserDefaults(suiteName: Self.appGroupId)?.removeObject(forKey: Self.pendingHoleCompletionKey)
         }
     }
 

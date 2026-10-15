@@ -26,16 +26,21 @@ export default function ResetPasswordScreen({ navigation }) {
       return;
     }
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (updateError) {
-      setError(updateError.message);
-      return;
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+      setSuccess(true);
+      setTimeout(() => {
+        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      }, 2000);
+    } catch (e) {
+      setError(e.message || 'Something went wrong. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    setSuccess(true);
-    setTimeout(() => {
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
-    }, 2000);
   };
 
   return (

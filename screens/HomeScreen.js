@@ -12,6 +12,9 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { scheduleWeeklyDigest } from '../lib/notifications';
 import { ROUND_STATE_KEY, ROUND_STALENESS_MS } from '../lib/roundConstants';
+import { fetchClockedRatingForUser, computeNationalRank } from '../lib/clockedRating';
+import { totalPointsFromHoleScores } from '../lib/clockedSport';
+import { scoreTier } from '../lib/theme';
 
 
 function HomeSkeleton() {
@@ -79,30 +82,13 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
-  return '#C07A6A';
-}
-
-function popTierLabel(score) {
-  if (score >= 4.0) return 'Fast';
-  if (score >= 3.0) return 'Average';
-  return 'Slow';
-}
-
-function popBgColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#C9A84C';
-  return '#C07A6A';
-}
-
-function TrendChart({ rounds, color }) {
+function TrendChart({ rounds, color, maxPoints }) {
   const MAX_H = 54;
+  const denom = maxPoints > 0 ? maxPoints : 1;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: MAX_H + 8, gap: 3, marginVertical: 8 }}>
       {rounds.map((r, i) => {
-        const h = Math.max(4, ((r.pop_score ?? 0) / 5) * MAX_H);
+        const h = Math.max(4, Math.min(1, (r.points ?? 0) / denom) * MAX_H);
         const opacity = 0.4 + (i / Math.max(rounds.length - 1, 1)) * 0.6;
         return (
           <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -126,7 +112,7 @@ function PlayerHomeScreen({ navigation }) {
   const [myScoreMap,     setMyScoreMap]     = useState({});
   const [featuredRound, setFeaturedRound] = useState(null);
   const [lastRound, setLastRound]         = useState(null);
-  const [monthlyDelta, setMonthlyDelta]   = useState(undefined);
+  const [clockedRating, setClockedRating] = useState({ clockedScore: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
   const [totalRounds, setTotalRounds]     = useState(0);
   const [savedRound, setSavedRound]       = useState(null);
   const [unreadCount, setUnreadCount]     = useState(0);
@@ -193,13 +179,16 @@ function PlayerHomeScreen({ navigation }) {
 
   useEffect(() => {
     if (!user?.id) return;
-    supabase.from('rounds').select('course_name, pop_score')
-      .eq('user_id', user.id).not('pop_score', 'is', null)
-      .order('pop_score', { ascending: false }).limit(100)
+    supabase.from('rounds').select('course_name, hole_scores')
+      .eq('user_id', user.id).eq('round_format', 'clocked').not('hole_scores', 'is', null)
+      .limit(200)
       .then(({ data }) => {
         const map = {};
         for (const r of data ?? []) {
-          if (r.course_name && map[r.course_name] == null) map[r.course_name] = r.pop_score;
+          const pts = totalPointsFromHoleScores(r.hole_scores);
+          if (r.course_name && pts != null && (map[r.course_name] == null || pts > map[r.course_name])) {
+            map[r.course_name] = pts;
+          }
         }
         setMyScoreMap(map);
       });
@@ -221,28 +210,38 @@ function PlayerHomeScreen({ navigation }) {
       setHasRounds(total > 0);
       setTotalRounds(total);
 
-      // Section 4: Pace trend — last 10 rounds ordered ASC
-      const { data: trendData } = await supabase
+      // Pace trend — points per clocked round, last 10 ordered ASC
+      const { data: trendRoundsRaw } = await supabase
         .from('rounds')
-        .select('pop_score, created_at')
+        .select('hole_scores, created_at')
         .eq('user_id', uid)
-        .not('pop_score', 'is', null)
+        .eq('round_format', 'clocked')
+        .not('hole_scores', 'is', null)
         .order('created_at', { ascending: true })
         .limit(10);
-      setPaceTrend(trendData ?? []);
+      const trendRounds = (trendRoundsRaw ?? [])
+        .map(r => ({ points: totalPointsFromHoleScores(r.hole_scores), created_at: r.created_at }))
+        .filter(r => r.points != null);
+      setPaceTrend(trendRounds);
 
-      // Featured round — best pop_score ever
-      const { data: bestRound } = await supabase
+      // Featured round — best round by points among clocked rounds
+      const { data: clockedForFeatured } = await supabase
         .from('rounds')
-        .select('id, course_name, pop_score, holes, transport, players, duration_minutes, created_at')
+        .select('id, course_name, hole_scores, holes, transport, players, duration_minutes, created_at')
         .eq('user_id', uid)
-        .not('pop_score', 'is', null)
-        .order('pop_score', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setFeaturedRound(bestRound ?? null);
+        .eq('round_format', 'clocked')
+        .not('hole_scores', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      let bestRound = null;
+      let bestPoints = -Infinity;
+      for (const r of clockedForFeatured ?? []) {
+        const pts = totalPointsFromHoleScores(r.hole_scores);
+        if (pts != null && pts > bestPoints) { bestPoints = pts; bestRound = { ...r, points: pts }; }
+      }
+      setFeaturedRound(bestRound);
 
-      // Last round — most recent (any round, regardless of pop_score)
+      // Last round — most recent (any round, any format)
       const { data: latestRound } = await supabase
         .from('rounds')
         .select('*')
@@ -250,26 +249,13 @@ function PlayerHomeScreen({ navigation }) {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      setLastRound(latestRound ?? null);
+      setLastRound(latestRound
+        ? { ...latestRound, points: totalPointsFromHoleScores(latestRound.hole_scores) }
+        : null);
 
-      // Monthly delta — this month vs last month average pop_score
-      const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: recentRounds } = await supabase
-        .from('rounds')
-        .select('pop_score, created_at')
-        .eq('user_id', uid)
-        .not('pop_score', 'is', null)
-        .gte('created_at', sixtyDaysAgo);
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const thisMonth = (recentRounds ?? []).filter(r => new Date(r.created_at) >= thirtyDaysAgo);
-      const lastMonth = (recentRounds ?? []).filter(r => new Date(r.created_at) < thirtyDaysAgo);
-      if (thisMonth.length > 0 && lastMonth.length > 0) {
-        const thisAvg = thisMonth.reduce((s, r) => s + r.pop_score, 0) / thisMonth.length;
-        const lastAvg = lastMonth.reduce((s, r) => s + r.pop_score, 0) / lastMonth.length;
-        setMonthlyDelta(((thisAvg - lastAvg) / lastAvg) * 100);
-      } else {
-        setMonthlyDelta(null);
-      }
+      // Real Clocked Score (0–100) — same computation Leaderboard/ShareScreen use
+      const rating = await fetchClockedRatingForUser(supabase, uid, profile);
+      setClockedRating(rating);
 
       // Unread notification count for bell badge
       if (uid) {
@@ -288,26 +274,22 @@ function PlayerHomeScreen({ navigation }) {
     }
   };
 
-  // Schedule weekly digest + monthly challenge whenever profile score is available
+  // Schedule weekly digest + monthly challenge whenever a real Clocked Score is available
   useEffect(() => {
-    if (!profile?.pop_score || !user?.id) return;
+    if (clockedRating.clockedScore == null || !user?.id) return;
     (async () => {
       try {
-        const ps = profile.pop_score;
-        const { count: rankCount } = await supabase
-          .from('profiles').select('*', { count: 'exact', head: true })
-          .gt('pop_score', ps);
-        const rank = (rankCount ?? 0) + 1;
+        const rank = await computeNationalRank(supabase, user.id);
         const startOfMonth = new Date();
         startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
         const { count: roundsThisMonth } = await supabase
           .from('rounds').select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .gte('created_at', startOfMonth.toISOString());
-        await scheduleWeeklyDigest(ps, rank, roundsThisMonth ?? 0);
+        await scheduleWeeklyDigest(clockedRating.clockedScore, rank, roundsThisMonth ?? 0);
       } catch (e) { /* silent fail */ }
     })();
-  }, [profile?.pop_score]);
+  }, [clockedRating.clockedScore]);
 
   const handleDiscard = () => {
     Alert.alert(
@@ -349,7 +331,7 @@ function PlayerHomeScreen({ navigation }) {
   }, []));
 
   const firstName = profile?.full_name?.split(' ')[0] ?? '';
-  const popScore  = profile?.pop_score;
+  const clockedScore = clockedRating.clockedScore;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -425,33 +407,37 @@ function PlayerHomeScreen({ navigation }) {
               >
                 <Ionicons name="information-circle-outline" size={20} color="#C9A84C" />
               </TouchableOpacity>
-              {popScore != null
-                ? <Gauge score={popScore} />
+              {clockedScore != null
+                ? <>
+                    <Gauge score={clockedScore} max={100} />
+                    <Text style={[styles.tierName, { color: scoreTier(clockedScore, clockedRating.isProvisional).color }]}>
+                      {scoreTier(clockedScore, clockedRating.isProvisional).name}
+                    </Text>
+                  </>
                 : <View style={{ alignItems: 'center', paddingVertical: 36 }}>
                     <Text style={{ fontSize: 56, fontWeight: '100', color: '#C9A84C44' }}>—</Text>
                     <Text style={{ fontSize: 10, fontWeight: '700', color: '#C9A84C66', letterSpacing: 2, marginTop: 8 }}>LOG A ROUND TO EARN YOUR SCORE</Text>
                   </View>
               }
               <View style={styles.scoreRow}>
-                <View style={styles.scoreStat} accessible={true} accessibilityLabel={`National average 3.9`}>
-                  <Text style={styles.scoreStatLabel}>NAT'L AVG</Text>
-                  <Text style={styles.scoreStatValue} accessibilityRole="text">3.9</Text>
+                <View style={styles.scoreStat} accessible={true} accessibilityLabel={`${totalRounds} rounds logged`}>
+                  <Text style={styles.scoreStatLabel}>ROUNDS</Text>
+                  <Text style={styles.scoreStatValue} accessibilityRole="text">{totalRounds}</Text>
                 </View>
-                <View style={styles.scoreStat} accessible={true} accessibilityLabel={`Your Clocked Score ${popScore != null ? popScore.toFixed(1) : 'not yet earned'}`}>
-                  <Text style={styles.scoreStatLabel}>YOU</Text>
-                  <Text style={styles.scoreStatValue} accessibilityRole="text">{popScore != null ? popScore.toFixed(1) : '--'}</Text>
-                </View>
-                <View style={styles.scoreStat} accessible={true} accessibilityLabel={`Monthly change ${monthlyDelta == null ? 'not available' : `${monthlyDelta >= 0 ? 'up' : 'down'} ${Math.abs(monthlyDelta).toFixed(1)} percent`}`}>
-                  <Text style={styles.scoreStatLabel}>MONTHLY</Text>
-                  {monthlyDelta == null ? (
-                    <Text style={styles.scoreStatValue} accessibilityRole="text">--</Text>
-                  ) : (
-                    <Text style={[styles.scoreStatValue, { color: monthlyDelta >= 0 ? '#7DC87A' : '#C07A6A' }]} accessibilityRole="text">
-                      {monthlyDelta >= 0 ? '↑' : '↓'}{Math.abs(monthlyDelta).toFixed(1)}%
-                    </Text>
-                  )}
+                <View style={styles.scoreStat} accessible={true} accessibilityLabel={clockedScore == null ? 'Status not yet earned' : clockedRating.isProvisional ? 'Status provisional' : 'Status established'}>
+                  <Text style={styles.scoreStatLabel}>STATUS</Text>
+                  <Text style={styles.scoreStatValue} accessibilityRole="text">
+                    {clockedScore == null ? '--' : clockedRating.isProvisional ? 'Provisional' : 'Established'}
+                  </Text>
                 </View>
               </View>
+              {clockedRating.isProvisional && clockedScore != null && (
+                <Text style={styles.provisionalHint}>
+                  {clockedRating.roundsNeeded > 0
+                    ? `Play ${clockedRating.roundsNeeded} more round${clockedRating.roundsNeeded === 1 ? '' : 's'} to make it official.`
+                    : 'Score established.'}
+                </Text>
+              )}
               {profile?.handicap_index != null && (
                 <View style={styles.hcpRow}>
                   <Text style={styles.hcpLabel}>HANDICAP INDEX</Text>
@@ -470,11 +456,11 @@ function PlayerHomeScreen({ navigation }) {
               const now = new Date();
               const sameMonth = now.getMonth() === roundDate.getMonth() && now.getFullYear() === roundDate.getFullYear();
               const sameYear  = now.getFullYear() === roundDate.getFullYear();
-              const label = sameMonth ? 'Best Clocked Score this month'
-                : sameYear ? 'Fastest round this year'
-                : 'Best Clocked Score ever';
-              const sc = r.pop_score;
-              const badgeColor = sc >= 4.0 ? '#7DC87A' : sc >= 3.0 ? '#C9A84C' : '#C07A6A';
+              const label = sameMonth ? 'Best round this month'
+                : sameYear ? 'Best round this year'
+                : 'Best round ever';
+              const pts = r.points;
+              const badgeColor = pts >= 8 ? '#7DC87A' : pts >= 0 ? '#C9A84C' : '#C07A6A';
               const detailParts = [
                 formatShortDate(r.created_at),
                 r.holes ? `${r.holes}h` : null,
@@ -490,8 +476,8 @@ function PlayerHomeScreen({ navigation }) {
                   </View>
                   <View style={styles.featuredBody}>
                     <View style={[styles.featuredBadge, { borderColor: badgeColor }]}>
-                      <Text style={[styles.featuredBadgeScore, { color: badgeColor }]}>{sc.toFixed(1)}</Text>
-                      <Text style={[styles.featuredBadgePop, { color: badgeColor }]}>CLK</Text>
+                      <Text style={[styles.featuredBadgeScore, { color: badgeColor }]}>{pts > 0 ? `+${pts}` : pts}</Text>
+                      <Text style={[styles.featuredBadgePop, { color: badgeColor }]}>PTS</Text>
                     </View>
                     <View style={{ flex: 1, marginHorizontal: 12 }}>
                       <Text style={styles.featuredCourse} numberOfLines={1}>{r.course_name ?? '—'}</Text>
@@ -507,7 +493,7 @@ function PlayerHomeScreen({ navigation }) {
               <View style={styles.emptyCard}>
                 <Ionicons name="golf" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
                 <Text style={styles.emptyText}>Log your first round to get started</Text>
-                <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('Log')} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('ClockedSetup')} activeOpacity={0.8}>
                   <Text style={styles.emptyBtnText}>LOG A ROUND</Text>
                 </TouchableOpacity>
               </View>
@@ -516,8 +502,8 @@ function PlayerHomeScreen({ navigation }) {
             {/* ── Last Round ── */}
             {lastRound && (() => {
               const lr = lastRound;
-              const sc = lr.pop_score;
-              const badgeColor = sc == null ? '#B8A882' : sc >= 4.0 ? '#7DC87A' : sc >= 3.0 ? '#C9A84C' : '#C07A6A';
+              const pts = lr.points;
+              const badgeColor = pts == null ? '#B8A882' : pts >= 8 ? '#7DC87A' : pts >= 0 ? '#C9A84C' : '#C07A6A';
               const parts = [
                 formatShortDate(lr.created_at),
                 lr.holes ? `${lr.holes}h` : null,
@@ -538,9 +524,9 @@ function PlayerHomeScreen({ navigation }) {
                     </View>
                     <View style={{ alignItems: 'center', marginLeft: 16 }}>
                       <Text style={[styles.lastRoundScore, { color: badgeColor }]}>
-                        {sc != null ? sc.toFixed(1) : '—'}
+                        {pts != null ? (pts > 0 ? `+${pts}` : pts) : '—'}
                       </Text>
-                      <Text style={styles.lastRoundScoreLabel}>CLK</Text>
+                      <Text style={styles.lastRoundScoreLabel}>PTS</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -548,9 +534,10 @@ function PlayerHomeScreen({ navigation }) {
             })()}
 
             {/* ── Course of the Day ── */}
+            {/* courses.pop_score is retired (only ever written by the orphaned
+                LiveRoundScreen), so this card leads with avg_time — the real,
+                actively-maintained pace signal — instead of a frozen 0–5 number. */}
             {!loadingCourse && courseOfDay && (() => {
-              const cotdPop = courseOfDay.pop_score && courseOfDay.pop_score > 0 ? courseOfDay.pop_score : 3.5;
-              const cotdTier = cotdPop >= 4.0 ? 'Fast' : cotdPop >= 3.0 ? 'Average' : 'Slow';
               const cotdAvgTime = courseOfDay.avg_time
                 ? `${Math.floor(courseOfDay.avg_time / 60)}h ${courseOfDay.avg_time % 60}m`
                 : '--';
@@ -573,30 +560,14 @@ function PlayerHomeScreen({ navigation }) {
                     </View>
                   </View>
 
-                  {/* POPScore accent row */}
+                  {/* Avg time accent row */}
                   <View style={styles.cotdPopRow}>
-                    <Text style={styles.cotdPopNum}>{cotdPop.toFixed(1)}</Text>
+                    <Text style={styles.cotdPopNum}>{cotdAvgTime}</Text>
                     <View>
-                      <Text style={styles.cotdPopLabel}>COURSE CLOCKED SCORE</Text>
+                      <Text style={styles.cotdPopLabel}>AVERAGE ROUND TIME</Text>
                       <Text style={styles.cotdPopRounds}>
                         Based on {courseOfDay.total_rounds || 0} round{courseOfDay.total_rounds !== 1 ? 's' : ''}
                       </Text>
-                    </View>
-                  </View>
-
-                  {/* Stats row */}
-                  <View style={styles.cotdStatsRow}>
-                    <View>
-                      <Text style={styles.cotdStatLabel}>AVG TIME</Text>
-                      <Text style={styles.cotdStatValue}>{cotdAvgTime}</Text>
-                    </View>
-                    <View>
-                      <Text style={styles.cotdStatLabel}>ROUNDS</Text>
-                      <Text style={styles.cotdStatValue}>{courseOfDay.total_rounds || 0}</Text>
-                    </View>
-                    <View>
-                      <Text style={styles.cotdStatLabel}>TIER</Text>
-                      <Text style={[styles.cotdStatValue, { color: '#7DC87A' }]}>{cotdTier}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -622,8 +593,8 @@ function PlayerHomeScreen({ navigation }) {
                 recentActivity.map((item) => {
                   const initials = (item.full_name || item.username || 'G')[0].toUpperCase();
                   const handle   = item.username ? `@${item.username}` : (item.full_name?.split(' ')[0] ?? 'Golfer');
-                  const popRaw   = item.content?.pop_score != null ? parseFloat(item.content.pop_score) : null;
-                  const pop      = popRaw != null ? popRaw.toFixed(1) : null;
+                  const ptsRaw   = item.content?.team_score != null ? parseFloat(item.content.team_score) : null;
+                  const pts      = ptsRaw != null ? (ptsRaw > 0 ? `+${ptsRaw}` : String(ptsRaw)) : null;
                   const course   = item.content?.course_name || null;
                   const isLive   = item.type === 'live_round_started';
                   const isMilestone = item.type === 'milestone';
@@ -631,10 +602,10 @@ function PlayerHomeScreen({ navigation }) {
                   const transportDetail = item.content?.transport;
                   const milestoneTitle  = item.content?.title ?? null;
 
-                  const leftBorderColor = popRaw == null
+                  const leftBorderColor = ptsRaw == null
                     ? '#2A3B2C'
-                    : popRaw >= 4.0 ? '#7DC87A'
-                    : popRaw >= 3.0 ? '#C9A84C'
+                    : ptsRaw >= 8 ? '#7DC87A'
+                    : ptsRaw >= 0 ? '#C9A84C'
                     : '#8B4040';
 
                   return (
@@ -691,11 +662,11 @@ function PlayerHomeScreen({ navigation }) {
                               <Text style={styles.feedMuted}>{[holesDetail && `${holesDetail} holes`, transportDetail].filter(Boolean).join(' · ')}</Text>
                             )}
 
-                            {/* CLK score badge */}
-                            {pop != null && (
+                            {/* Points badge */}
+                            {pts != null && (
                               <View style={styles.feedScoreBadge}>
-                                <Text style={styles.feedScoreLabel}>CLK</Text>
-                                <Text style={styles.feedScoreValue}>{pop}</Text>
+                                <Text style={styles.feedScoreLabel}>PTS</Text>
+                                <Text style={styles.feedScoreValue}>{pts}</Text>
                               </View>
                             )}
 
@@ -727,30 +698,31 @@ function PlayerHomeScreen({ navigation }) {
               {paceTrend.length < 3 ? (
                 <View style={styles.feedEmpty}>
                   <Text style={styles.feedEmptyText}>Log 3 rounds to see your trend.</Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('Log')} style={styles.feedEmptyBtn} activeOpacity={0.8}>
+                  <TouchableOpacity onPress={() => navigation.navigate('ClockedSetup')} style={styles.feedEmptyBtn} activeOpacity={0.8}>
                     <Text style={styles.feedEmptyBtnText}>LOG A ROUND</Text>
                   </TouchableOpacity>
                 </View>
               ) : (() => {
-                const first = paceTrend[0].pop_score;
-                const last  = paceTrend[paceTrend.length - 1].pop_score;
+                const first = paceTrend[0].points;
+                const last  = paceTrend[paceTrend.length - 1].points;
                 const trendUp = last >= first;
                 const color = trendUp ? '#7DC87A' : '#C07A6A';
-                const avg = paceTrend.reduce((s, r) => s + (r.pop_score || 0), 0) / paceTrend.length;
+                const avg = paceTrend.reduce((s, r) => s + (r.points || 0), 0) / paceTrend.length;
+                const maxPoints = Math.max(1, ...paceTrend.map(r => r.points ?? 0));
                 return (
                   <>
-                    <TrendChart rounds={paceTrend} color={color} />
+                    <TrendChart rounds={paceTrend} color={color} maxPoints={maxPoints} />
                     <Text style={[styles.trendLabel, { color }]}>
                       {trendUp ? '↑ Trending up' : '↓ Trending down'}
                     </Text>
                     <View style={styles.trendStats}>
                       <View style={styles.cotdStat}>
                         <Text style={styles.scoreStatLabel}>LAST ROUND</Text>
-                        <Text style={styles.cotdStatValue}>{last.toFixed(1)}</Text>
+                        <Text style={styles.cotdStatValue}>{last > 0 ? `+${last}` : last} pts</Text>
                       </View>
                       <View style={styles.cotdStat}>
                         <Text style={styles.scoreStatLabel}>AVG LAST {paceTrend.length}</Text>
-                        <Text style={styles.cotdStatValue}>{avg.toFixed(1)}</Text>
+                        <Text style={styles.cotdStatValue}>{avg.toFixed(1)} pts</Text>
                       </View>
                     </View>
                   </>
@@ -775,14 +747,14 @@ function PlayerHomeScreen({ navigation }) {
 
       {/* FABs */}
       <View style={styles.fabRow}>
-        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('Log')} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('ClockedSetup')} activeOpacity={0.8}>
           <Text style={styles.fabText}>+ LOG PACE ROUND</Text>
         </TouchableOpacity>
         {savedRound ? (
           <View style={[styles.fabLive, styles.fabLiveResume]}>
             <TouchableOpacity
               style={{ flex: 1, alignItems: 'center' }}
-              onPress={() => navigation.navigate('LiveRound')}
+              onPress={() => navigation.navigate('ClockedSetup')}
               activeOpacity={0.8}
             >
               <Text style={styles.fabLiveText}>▶ RESUME</Text>
@@ -793,7 +765,7 @@ function PlayerHomeScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={styles.fabLive} onPress={() => navigation.navigate('LiveRound')} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.fabLive} onPress={() => navigation.navigate('ClockedSetup')} activeOpacity={0.8}>
             <Text style={styles.fabLiveText}>▶ LIVE ROUND</Text>
           </TouchableOpacity>
         )}
@@ -818,7 +790,9 @@ const styles = StyleSheet.create({
   hcpLabel:         { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
   hcpValue:         { fontSize: 14, fontWeight: '600', color: '#C9A84C' },
   popInfoLink:      { fontSize: 12, color: '#C9A84C', textAlign: 'center', textDecorationLine: 'underline' },
+  provisionalHint:  { fontSize: 11, color: '#B8A882', textAlign: 'center', marginTop: 8 },
   scoreRow:         { flexDirection: 'row', gap: 32, marginTop: 12 },
+  tierName:         { fontSize: 11, fontWeight: '800', letterSpacing: 3, marginTop: -6 },
   scoreStat:        { alignItems: 'center' },
   scoreStatLabel:   { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2, marginBottom: 4 },
   scoreStatValue:   { fontSize: 18, fontWeight: '400', color: '#B8A882' },

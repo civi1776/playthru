@@ -65,7 +65,7 @@ const s = StyleSheet.create({
   wordmark: {
     fontSize: 38,
     fontWeight: '400',
-    color: '#C9A84C',
+    color: '#F0CB5B',
     letterSpacing: 8,
     fontFamily: 'serif',
     marginBottom: 20,

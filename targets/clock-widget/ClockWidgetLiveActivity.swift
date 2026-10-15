@@ -75,6 +75,24 @@ struct ClockWidgetLiveActivity: Widget {
                 .font(.system(size: 44, weight: .ultraLight).monospacedDigit())
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
+
+            // ── Holed Out — interactive, runs in-process via LiveActivityIntent ──
+            // iOS 17+ only (interactive Live Activity buttons aren't available
+            // before that); on 16.2–16.x the widget still shows/updates fine,
+            // just without this button.
+            if #available(iOS 17.0, *) {
+                Button(intent: HoledOutIntent(hole: context.attributes.hole)) {
+                    Text("HOLED OUT")
+                        .font(.system(size: 12, weight: .bold))
+                        .kerning(2)
+                        .foregroundColor(bgColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+                .background(gold)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

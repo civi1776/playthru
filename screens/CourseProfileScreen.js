@@ -45,8 +45,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { totalPointsFromHoleScores } from '../lib/clockedSport';
 import SkeletonLoader from '../components/SkeletonLoader';
 import CourseAvatar from '../components/CourseAvatar';
+import InitialsAvatar from '../components/InitialsAvatar';
 
 function CourseProfileSkeleton() {
   return (
@@ -91,9 +93,12 @@ function formatDuration(minutes) {
   return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
+// pop_score is a dead legacy column (frozen, never updated by any reachable
+// code path) — leaderboard/activity now rank by real per-round points instead.
+function ptsColor(pts) {
+  if (pts == null) return '#7A6E58';
+  if (pts >= 8) return '#7DC87A';
+  if (pts >= 0) return '#C9A84C';
   return '#C07A6A';
 }
 
@@ -138,6 +143,8 @@ export default function CourseProfileScreen({ navigation, route }) {
   const [paceRating, setPaceRating]       = useState(0);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [submitting, setSubmitting]       = useState(false);
+  const [certifiedHoleCount, setCertifiedHoleCount] = useState(0);
+  const [certifiedBy, setCertifiedBy]     = useState(null);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -152,7 +159,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     if (initialCourse.id != null) {
       const { data } = await supabase
         .from('courses')
-        .select('id, name, city, state, par, pop_score, total_rounds, avg_time, description, website')
+        .select('id, name, city, state, par, total_rounds, avg_time, description, website, clocked_certified, certified_at')
         .eq('id', initialCourse.id)
         .maybeSingle();
       course = data;
@@ -160,7 +167,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     if (!course && initialCourse.name) {
       const { data } = await supabase
         .from('courses')
-        .select('id, name, city, state, par, pop_score, total_rounds, avg_time, description, website')
+        .select('id, name, city, state, par, total_rounds, avg_time, description, website, clocked_certified, certified_at')
         .eq('name', initialCourse.name)
         .maybeSingle();
       course = data;
@@ -178,11 +185,25 @@ export default function CourseProfileScreen({ navigation, route }) {
       setFollowed(!!followRow);
     }
 
+    // Official time pars — only fetched for certified courses. This is what
+    // ClockedSetupScreen uses to override the difficulty-tier defaults with
+    // field-measured values; surfacing it here is what makes the certification
+    // visible and sellable on the course's own page.
+    if (course?.id && course?.clocked_certified) {
+      const { data: tpRows } = await supabase
+        .from('course_time_pars')
+        .select('hole_number, certified_by')
+        .eq('course_id', course.id)
+        .eq('certified', true);
+      setCertifiedHoleCount(tpRows?.length ?? 0);
+      setCertifiedBy(tpRows?.[0]?.certified_by ?? null);
+    }
+
     // All rounds at this course — live query, keyed by name (reliable across both formats)
     const courseName = course?.name ?? initialCourse.name;
     const { data: allRounds } = await supabase
       .from('rounds')
-      .select('id, pop_score, duration_minutes, holes, created_at, user_id, round_format, flagged, profiles(full_name, username)')
+      .select('id, hole_scores, duration_minutes, holes, created_at, user_id, round_format, flagged, profiles(full_name, username)')
       .eq('course_name', courseName)
       .eq('flagged', false)
       .order('created_at', { ascending: false });
@@ -201,8 +222,13 @@ export default function CourseProfileScreen({ navigation, route }) {
         }
       }
 
-      // Leaderboard: best round per unique user, sorted by pop_score desc, top 10
-      const sorted = [...allRounds].sort((a, b) => (b.pop_score ?? 0) - (a.pop_score ?? 0));
+      // Attach real per-round points (computed from persisted hole_scores)
+      const withPoints = allRounds.map(r => ({ ...r, _points: totalPointsFromHoleScores(r.hole_scores) }));
+
+      // Leaderboard: best round per unique user, sorted by points desc, top 10.
+      // Rounds without scorable hole data (no points) can't be ranked, so they're excluded here.
+      const eligible = withPoints.filter(r => r._points != null);
+      const sorted = [...eligible].sort((a, b) => b._points - a._points);
       const seen = new Set();
       const best = [];
       for (const r of sorted) {
@@ -211,8 +237,8 @@ export default function CourseProfileScreen({ navigation, route }) {
       }
       setLeaderboard(best);
 
-      // Recent activity: last 10
-      setRecentRounds(allRounds.slice(0, 10));
+      // Recent activity: last 10 (points shown when available, '—' otherwise)
+      setRecentRounds(withPoints.slice(0, 10));
     }
 
     // Reviews — use the resolved course id
@@ -294,13 +320,13 @@ export default function CourseProfileScreen({ navigation, route }) {
     ]);
   };
 
-  const pop          = parseFloat(courseData?.pop_score ?? initialCourse.avgPop ?? 3.5) || 3.5;
   const totalRounds  = liveRoundCount || courseData?.total_rounds || initialCourse.rounds || 0;
   const par          = courseData?.par ?? initialCourse.par ?? 72;
   const description  = courseData?.description;
   const location     = initialCourse.location
     ?? [initialCourse.city, initialCourse.state].filter(Boolean).join(', ')
     ?? '';
+  const isCertified  = !!courseData?.clocked_certified;
 
   return (
     <SafeAreaView style={s.container}>
@@ -338,21 +364,19 @@ export default function CourseProfileScreen({ navigation, route }) {
             </View>
             <Text style={s.courseName}>{initialCourse.name}</Text>
             {!!location && <Text style={s.courseLocation}>{location}</Text>}
-          </View>
-
-          {/* POPScore hero */}
-          <View style={s.popHeroCard}>
-            <Text style={[s.popHeroNum, { color: popColor(pop) }]}>{pop.toFixed(1)}</Text>
-            <Text style={s.popHeroLabel}>COURSE CLOCKED SCORE</Text>
-            {totalRounds > 0 && (
-              <Text style={s.popHeroRounds}>Based on {Number(totalRounds).toLocaleString()} rounds</Text>
-            )}
-            {avgDuration != null && (
-              <View style={s.popHeroTimeRow}>
-                <Ionicons name="time-outline" size={12} color="#B8A882" />
-                <Text style={s.popHeroTime}>avg pace {formatDuration(avgDuration)}</Text>
+            {isCertified && (
+              <View style={s.certifiedBadge}>
+                <Ionicons name="checkmark-circle" size={12} color="#090F0A" style={{ marginRight: 5 }} />
+                <Text style={s.certifiedBadgeText}>TIME PAR CERTIFIED</Text>
               </View>
             )}
+          </View>
+
+          {/* Follow card — the old "POPScore" hero here was built from the dead,
+              frozen pop_score column and duplicated the real avg-time numbers
+              already shown in the stats row and "Average Round Time" card
+              below, so it was removed rather than reskinned. */}
+          <View style={s.popHeroCard}>
             <TouchableOpacity
               style={[s.followBtn, followed && s.followingBtn]}
               onPress={toggleFollow}
@@ -400,17 +424,49 @@ export default function CourseProfileScreen({ navigation, route }) {
             </View>
           </View>
 
-          {/* Average Round Time */}
-          {(courseData?.avg_time || avgDuration) && (
+          {/* Average Round Time + Time Par Certification (one card, not two) */}
+          {(courseData?.avg_time || avgDuration || isCertified) && (
             <View style={s.avgTimeCard}>
-              <Text style={s.avgTimeLabel}>AVERAGE ROUND TIME</Text>
-              <Text style={s.avgTimeValue}>
-                {formatDuration(courseData?.avg_time ?? avgDuration)}
-              </Text>
-              {totalRounds > 0 && (
-                <Text style={s.avgTimeSub}>
-                  based on {totalRounds} round{totalRounds === 1 ? '' : 's'}
-                </Text>
+              {(courseData?.avg_time || avgDuration) && (
+                <>
+                  <Text style={s.avgTimeLabel}>AVERAGE ROUND TIME</Text>
+                  <Text style={s.avgTimeValue}>
+                    {formatDuration(courseData?.avg_time ?? avgDuration)}
+                  </Text>
+                  {totalRounds > 0 && (
+                    <Text style={s.avgTimeSub}>
+                      based on {totalRounds} round{totalRounds === 1 ? '' : 's'}
+                    </Text>
+                  )}
+                </>
+              )}
+              {isCertified && (
+                <View style={[s.timeParBlock, (courseData?.avg_time || avgDuration) && s.timeParBlockDivider]}>
+                  <View style={s.timeParHeader}>
+                    <Ionicons name="checkmark-circle" size={13} color="#C9A84C" />
+                    <Text style={s.timeParLabel}>TIME PAR CERTIFIED</Text>
+                  </View>
+                  <Text style={s.timeParBody}>
+                    Field-measured, not estimated — every hole runs on official ratings instead of difficulty-tier defaults.
+                  </Text>
+                  <View style={s.timeParMetaRow}>
+                    <Text style={s.timeParMeta}>
+                      {certifiedHoleCount > 0 ? `${certifiedHoleCount} hole${certifiedHoleCount === 1 ? '' : 's'} certified` : 'Certified'}
+                    </Text>
+                    {!!courseData?.certified_at && (
+                      <>
+                        <Text style={s.timeParMetaDot}>{'\u00B7'}</Text>
+                        <Text style={s.timeParMeta}>{formatDate(courseData.certified_at)}</Text>
+                      </>
+                    )}
+                    {!!certifiedBy && (
+                      <>
+                        <Text style={s.timeParMetaDot}>{'\u00B7'}</Text>
+                        <Text style={s.timeParMeta}>{certifiedBy}</Text>
+                      </>
+                    )}
+                  </View>
+                </View>
               )}
             </View>
           )}
@@ -443,9 +499,12 @@ export default function CourseProfileScreen({ navigation, route }) {
                       <Text style={[s.leaderName, i === 0 && { color: '#C9A84C' }]}>{name}</Text>
                       <Text style={s.leaderDate}>{formatDate(round.created_at)}</Text>
                     </View>
-                    <Text style={[s.leaderPop, { color: popColor(round.pop_score) }]}>
-                      {round.pop_score?.toFixed(1) ?? '—'}
-                    </Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={[s.leaderPop, { color: ptsColor(round._points) }]}>
+                        {round._points != null ? `+${round._points}` : '—'}
+                      </Text>
+                      {round._points != null && <Text style={s.ptsLabel}>PTS</Text>}
+                    </View>
                   </View>
                 );
               })
@@ -478,9 +537,12 @@ export default function CourseProfileScreen({ navigation, route }) {
                           {round.duration_minutes ? `  ·  ${formatDuration(round.duration_minutes)}` : ''}
                         </Text>
                       </View>
-                      <Text style={[s.activityPop, { color: popColor(round.pop_score) }]}>
-                        {round.pop_score?.toFixed(1) ?? '—'}
-                      </Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[s.activityPop, { color: ptsColor(round._points) }]}>
+                          {round._points != null ? `+${round._points}` : '—'}
+                        </Text>
+                        {round._points != null && <Text style={s.ptsLabel}>PTS</Text>}
+                      </View>
                     </View>
                   );
                 })}
@@ -574,13 +636,15 @@ export default function CourseProfileScreen({ navigation, route }) {
                   const uid = session?.user?.id;
                   const isOwn = review.user_id === uid;
                   const name = review.profiles?.full_name ?? review.profiles?.username ?? 'Unknown';
-                  const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
                   return (
                     <View key={review.id} style={s.reviewCard}>
                       <View style={s.reviewHeader}>
-                        <View style={s.reviewAvatar}>
-                          <Text style={s.reviewAvatarText}>{initials}</Text>
-                        </View>
+                        <InitialsAvatar
+                          name={review.profiles?.full_name}
+                          username={review.profiles?.username}
+                          avatarUrl={review.profiles?.avatar_url}
+                          size={32}
+                        />
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <Text style={s.reviewerName}>{name}</Text>
@@ -666,6 +730,18 @@ const s = StyleSheet.create({
   avgTimeValue:       { fontSize: 28, fontWeight: '300', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
   avgTimeSub:         { fontSize: 11, color: '#7A6E58', marginTop: 2 },
 
+  // Certification badge (hero) + Time Par certification block (lives inside avgTimeCard)
+  certifiedBadge:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#C9A84C', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10, alignSelf: 'flex-start' },
+  certifiedBadgeText: { fontSize: 9, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
+  timeParBlock:       { gap: 8 },
+  timeParBlockDivider:{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#C9A84C22' },
+  timeParHeader:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  timeParLabel:       { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+  timeParBody:        { fontSize: 12, color: '#B8A882', lineHeight: 18 },
+  timeParMetaRow:     { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  timeParMeta:        { fontSize: 11, color: '#7A6E58' },
+  timeParMetaDot:     { fontSize: 11, color: '#7A6E58' },
+
   // Section
   section:            { paddingHorizontal: 16, marginBottom: 10 },
   sectionLabel:       { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2, marginBottom: 10 },
@@ -682,6 +758,7 @@ const s = StyleSheet.create({
   leaderName:         { fontSize: 15, fontWeight: '500', color: '#F5EDD8' },
   leaderDate:         { fontSize: 10, color: '#B8A88266', marginTop: 2 },
   leaderPop:          { fontSize: 26, fontWeight: '300' },
+  ptsLabel:           { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, textAlign: 'right' },
 
   // Recent Activity
   activityCard:       { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', overflow: 'hidden' },
@@ -707,8 +784,6 @@ const s = StyleSheet.create({
   submitBtnText:      { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
   reviewCard:         { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8 },
   reviewHeader:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 8 },
-  reviewAvatar:       { width: 32, height: 32, borderRadius: 16, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C33', alignItems: 'center', justifyContent: 'center' },
-  reviewAvatarText:   { fontSize: 12, fontWeight: '700', color: '#C9A84C' },
   reviewerName:       { fontSize: 13, fontWeight: '600', color: '#F5EDD8' },
   reviewTime:         { fontSize: 10, color: '#B8A88255', marginTop: 2 },
   verifiedBadge:      { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#7DC87A15', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },

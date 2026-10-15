@@ -3,8 +3,18 @@ import { View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getCoursePhoto } from '../lib/googlePlaces';
 
-// Module-level session cache: "courseName|city" → url string | null
+// Module-level session cache: "courseName|city" → url string.
+// Only successful lookups are cached — a null result usually just means
+// this particular render burst got rate-limited by Google (course search
+// lists mount many CourseAvatars at once), not that the course truly has
+// no photo, so we don't want to poison the cache and hide the thumbnail
+// for the rest of the session.
 const photoCache = {};
+// Module-level in-flight map so the same course rendered by multiple cards
+// at once (e.g. the "Near You" strip and the main list both showing the
+// same course) shares a single network request instead of each card
+// firing its own duplicate call to the google-places edge function.
+const inFlightRequests = {};
 
 export default function CourseAvatar({ courseName, city, size = 40 }) {
   const cacheKey = `${courseName}|${city || ''}`;
@@ -19,10 +29,18 @@ export default function CourseAvatar({ courseName, city, size = 40 }) {
       return;
     }
     let cancelled = false;
-    getCoursePhoto(courseName, city).then(url => {
-      photoCache[cacheKey] = url;
+
+    if (!inFlightRequests[cacheKey]) {
+      inFlightRequests[cacheKey] = getCoursePhoto(courseName, city).finally(() => {
+        delete inFlightRequests[cacheKey];
+      });
+    }
+
+    inFlightRequests[cacheKey].then(url => {
+      if (url) photoCache[cacheKey] = url;
       if (!cancelled) setPhotoUrl(url);
     });
+
     return () => { cancelled = true; };
   }, [cacheKey]);
 

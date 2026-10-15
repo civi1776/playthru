@@ -161,12 +161,12 @@ export default function NotificationCenterScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container:   { flex: 1, backgroundColor: '#090F0A' },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 64, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(201,168,76,0.1)' },
+  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 64, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(125,200,122,0.1)' },
   back:        { width: 38, height: 38, justifyContent: 'center' },
   headerTitle: { fontSize: 13, fontFamily: 'Montserrat_700Bold', color: '#C9A84C', letterSpacing: 2.5 },
   row:         { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
-  unread:      { backgroundColor: 'rgba(201,168,76,0.04)' },
-  iconWrap:    { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(201,168,76,0.08)', alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 1 },
+  unread:      { backgroundColor: 'rgba(125,200,122,0.04)' },
+  iconWrap:    { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(125,200,122,0.08)', alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 1 },
   content:     { flex: 1 },
   title:       { fontSize: 14, fontWeight: '600', color: '#F5F0E8', marginBottom: 2 },
   body:        { fontSize: 13, color: '#B8A882', lineHeight: 18, marginBottom: 4 },

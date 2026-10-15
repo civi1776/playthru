@@ -16,18 +16,23 @@ export default function ForgotPasswordScreen({ navigation }) {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
-      redirectTo: 'playthru://auth/callback',
-    });
-    setLoading(false);
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
-      Alert.alert(
-        'Check your email',
-        `We sent a password reset link to ${trimmed}. Tap the link in the email to reset your password.`,
-        [{ text: 'OK', onPress: () => navigation.navigate('SignIn') }],
-      );
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+        redirectTo: 'playthru://auth/callback',
+      });
+      if (error) {
+        Alert.alert('Error', error.message);
+      } else {
+        Alert.alert(
+          'Check your email',
+          `We sent a password reset link to ${trimmed}. Tap the link in the email to reset your password.`,
+          [{ text: 'OK', onPress: () => navigation.navigate('SignIn') }],
+        );
+      }
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Something went wrong. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import InitialsAvatar from '../components/InitialsAvatar';
 import CourseAvatar from '../components/CourseAvatar';
+import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,9 +25,19 @@ function timeAgo(isoStr) {
   return `${mo[d.getMonth()]} ${d.getDate()}`;
 }
 
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
+// Aggregate 0–100 Clocked Score color — matches LeaderboardScreen's clockedColor().
+function clockedColor(score) {
+  if (score == null) return '#7A6E58';
+  if (score >= 70) return '#7DC87A';
+  if (score >= 40) return '#C9A84C';
+  return '#B8A882';
+}
+
+// Per-round points color (raw PTS, not the 0–100 aggregate score).
+function ptsColor(pts) {
+  if (pts == null) return '#B8A882';
+  if (pts >= 8) return '#7DC87A';
+  if (pts >= 0) return '#C9A84C';
   return '#C07A6A';
 }
 
@@ -34,6 +45,13 @@ function formatTime(minutes) {
   if (!minutes) return null;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function formatAvgTime(minutes) {
+  if (!minutes) return null;
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
@@ -65,7 +83,7 @@ function SignupGateModal({ visible, onClose, onSignup, feature }) {
 function TopBanner({ onSignup }) {
   return (
     <View style={p.banner}>
-      <Text style={p.bannerText}>Log your rounds to get your Speed Handicap</Text>
+      <Text style={p.bannerText}>Log your rounds to get your Clocked Score</Text>
       <TouchableOpacity style={p.bannerBtn} onPress={onSignup} activeOpacity={0.85}>
         <Text style={p.bannerBtnText}>JOIN FREE</Text>
       </TouchableOpacity>
@@ -85,8 +103,8 @@ function PodiumItem({ entry, rank, height, accentColor, onPress }) {
         <InitialsAvatar name={entry.name} size={rank === 1 ? 50 : 42} />
       </View>
       <Text style={p.podiumName} numberOfLines={1}>{entry.name.split(' ')[0]}</Text>
-      <Text style={[p.podiumPop, { color: popColor(entry.pop), fontSize: rank === 1 ? 26 : 22 }]}>
-        {entry.pop?.toFixed(1) ?? '—'}
+      <Text style={[p.podiumPop, { color: clockedColor(entry.pop), fontSize: rank === 1 ? 26 : 22 }]}>
+        {entry.pop ?? '—'}
       </Text>
     </TouchableOpacity>
   );
@@ -100,50 +118,76 @@ function LeaderboardTab({ navigation, showGate }) {
   useEffect(() => {
     (async () => {
       try {
-        const [{ data: profiles }, { count }] = await Promise.all([
+        // Public first-impression screen — build the same real, batch-computed
+        // Clocked Score board LeaderboardScreen uses (one query for clocked
+        // rounds, one for confirmed participations), instead of the retired
+        // profiles.pop_score column, which is frozen/stale on real accounts.
+        const [{ count }, { data: clockedRounds }] = await Promise.all([
+          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('account_type', 'golfer'),
           supabase
-            .from('profiles')
-            .select('id, full_name, username, pop_score, hometown')
-            .eq('account_type', 'golfer')
-            .not('pop_score', 'is', null)
-            .order('pop_score', { ascending: false })
-            .limit(50),
-          supabase
-            .from('profiles')
-            .select('id', { count: 'exact', head: true })
-            .eq('account_type', 'golfer'),
+            .from('rounds')
+            .select('id, user_id, hole_scores')
+            .eq('round_format', 'clocked')
+            .eq('flagged', false)
+            .not('hole_scores', 'is', null),
         ]);
         setTotal(count ?? 0);
 
-        // Fetch round counts for tiebreaker
-        const ids = (profiles ?? []).map(pr => pr.id);
-        let roundCounts = {};
-        if (ids.length > 0) {
-          const { data: rData } = await supabase
-            .from('rounds')
-            .select('user_id')
-            .in('user_id', ids)
-            .not('pop_score', 'is', null);
-          (rData ?? []).forEach(r => {
-            roundCounts[r.user_id] = (roundCounts[r.user_id] ?? 0) + 1;
-          });
+        if (!clockedRounds?.length) { setData([]); setLoading(false); return; }
+
+        const byUser = {};
+        const roundMap = {};
+        for (const r of clockedRounds) {
+          if (!byUser[r.user_id]) byUser[r.user_id] = [];
+          byUser[r.user_id].push(r);
+          roundMap[r.id ?? ''] = r;
         }
 
-        const sorted = [...(profiles ?? [])].sort((a, b) => {
-          if (b.pop_score !== a.pop_score) return b.pop_score - a.pop_score;
-          return (roundCounts[b.id] ?? 0) - (roundCounts[a.id] ?? 0);
-        });
+        const roundIds = clockedRounds.map(r => r.id).filter(Boolean);
+        let participations = [];
+        if (roundIds.length) {
+          const { data: parts } = await supabase
+            .from('round_participants')
+            .select('round_id, user_id, player_key')
+            .eq('status', 'confirmed')
+            .in('round_id', roundIds);
+          participations = parts ?? [];
+        }
+        for (const pt of participations) {
+          if (!byUser[pt.user_id]) byUser[pt.user_id] = [];
+          const already = byUser[pt.user_id].some(r => (r.id ?? r.round_id) === pt.round_id);
+          if (!already && roundMap[pt.round_id]) {
+            byUser[pt.user_id].push({ ...roundMap[pt.round_id], _playerKey: pt.player_key });
+          }
+        }
 
-        setData(
-          sorted.map((pr, i) => ({
-            rank:   i + 1,
-            userId: pr.id,
-            name:   pr.full_name || pr.username || 'Golfer',
-            handle: pr.username ? `@${pr.username}` : '',
-            pop:    pr.pop_score,
-            city:   pr.hometown ?? null,
-          }))
-        );
+        const userIds = Object.keys(byUser);
+        const { data: profiles } = await supabase
+          .from('profiles').select('id, full_name, username, handicap_index, hometown')
+          .in('id', userIds);
+        const profileMap = {};
+        (profiles ?? []).forEach(pr => { profileMap[pr.id] = pr; });
+
+        const entries = userIds.map(userId => {
+          const prof = profileMap[userId];
+          const playerName = prof?.full_name || prof?.username || 'Golfer';
+          const roundStats = byUser[userId]
+            .map(r => extractPlayerRoundStats(r.hole_scores, r._playerKey ?? playerName))
+            .filter(Boolean);
+          const rating = computeFullRating({ roundStats, handicapIndex: prof?.handicap_index });
+          return {
+            userId,
+            name: playerName,
+            handle: prof?.username ? `@${prof.username}` : '',
+            pop: rating.clockedScore,
+            roundsUsed: rating.roundsUsed,
+            city: prof?.hometown ?? null,
+          };
+        }).filter(e => e.pop != null && e.pop > 0);
+
+        entries.sort((a, b) => (b.pop - a.pop) || (b.roundsUsed - a.roundsUsed));
+
+        setData(entries.slice(0, 50).map((e, i) => ({ ...e, rank: i + 1 })));
       } catch (e) {
         // silent fail
       } finally {
@@ -206,8 +250,8 @@ function LeaderboardTab({ navigation, showGate }) {
                 <Text style={p.leaderSub}>{entry.handle || entry.city}</Text>
               )}
             </View>
-            <Text style={[p.leaderPop, { color: popColor(entry.pop) }]}>
-              {entry.pop?.toFixed(1) ?? '—'}
+            <Text style={[p.leaderPop, { color: clockedColor(entry.pop) }]}>
+              {entry.pop ?? '—'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -219,7 +263,8 @@ function LeaderboardTab({ navigation, showGate }) {
 // ─── ACTIVITY TAB ─────────────────────────────────────────────────────────────
 
 function PreviewRoundCard({ content }) {
-  const pop   = content?.pop_score;
+  // Round-level points (content.team_score), not the 0–100 aggregate score.
+  const pts   = content?.team_score;
   const parts = [
     content?.holes    ? `${content.holes}h`  : null,
     content?.transport ?? null,
@@ -234,10 +279,10 @@ function PreviewRoundCard({ content }) {
           <Text style={p.roundCourse} numberOfLines={1}>{content?.course_name ?? '—'}</Text>
           {parts.length > 0 && <Text style={p.roundDetails}>{parts.join(' · ')}</Text>}
         </View>
-        {pop != null && (
-          <View style={[p.popBadge, { borderColor: popColor(pop) }]}>
-            <Text style={[p.popScore, { color: popColor(pop) }]}>{pop.toFixed(1)}</Text>
-            <Text style={[p.popLabel, { color: popColor(pop) }]}>POP</Text>
+        {pts != null && (
+          <View style={[p.popBadge, { borderColor: ptsColor(pts) }]}>
+            <Text style={[p.popScore, { color: ptsColor(pts) }]}>{pts > 0 ? `+${pts}` : pts}</Text>
+            <Text style={[p.popLabel, { color: ptsColor(pts) }]}>PTS</Text>
           </View>
         )}
       </View>
@@ -393,17 +438,19 @@ function CoursesTab({ navigation }) {
   useEffect(() => {
     (async () => {
       try {
+        // courses.pop_score is retired (only ever written by the orphaned
+        // LiveRoundScreen), so this tab shows real pace instead: avg_time
+        // and total_rounds, which are live columns kept up to date by
+        // logged clocked rounds.
         const { data } = await supabase
           .from('courses')
-          .select('id, name, city, state, pop_score, total_rounds, avg_time')
-          .not('pop_score', 'is', null)
+          .select('id, name, city, state, total_rounds, avg_time')
           .order('total_rounds', { ascending: false })
           .limit(60);
         setCourses(
           (data ?? []).map(c => ({
             ...c,
             location: [c.city, c.state].filter(Boolean).join(', '),
-            avgPop:   c.pop_score,
             rounds:   c.total_rounds ?? 0,
             avgTime:  c.avg_time ?? null,
           }))
@@ -453,7 +500,7 @@ function CoursesTab({ navigation }) {
               key={course.id}
               style={p.courseCard}
               activeOpacity={0.8}
-              onPress={() => navigation.navigate('CourseProfile', { course: { name: course.name } })}
+              onPress={() => navigation.navigate('CourseProfile', { course: { id: course.id, name: course.name } })}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <CourseAvatar courseName={course.name} size={44} />
@@ -461,12 +508,10 @@ function CoursesTab({ navigation }) {
                   <Text style={p.courseName} numberOfLines={1}>{course.name}</Text>
                   {course.location ? <Text style={p.courseLocation}>{course.location}</Text> : null}
                 </View>
-                {course.avgPop != null && (
-                  <View style={[p.coursePopBadge, { borderColor: popColor(course.avgPop) + '66' }]}>
-                    <Text style={[p.coursePopText, { color: popColor(course.avgPop) }]}>
-                      {course.avgPop.toFixed(1)}
-                    </Text>
-                    <Text style={[p.coursePopLabel, { color: popColor(course.avgPop) }]}>AVG POP</Text>
+                {course.avgTime != null && (
+                  <View style={p.coursePopBadge}>
+                    <Text style={p.coursePopText}>{formatAvgTime(course.avgTime)}</Text>
+                    <Text style={p.coursePopLabel}>AVG ROUND</Text>
                   </View>
                 )}
               </View>
@@ -653,8 +698,8 @@ const p = StyleSheet.create({
   courseCard:  { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10 },
   courseName:  { fontSize: 15, fontWeight: '600', color: '#F5EDD8' },
   courseLocation: { fontSize: 11, color: '#B8A882', marginTop: 2 },
-  coursePopBadge: { alignItems: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 },
-  coursePopText:  { fontSize: 18, fontWeight: '300' },
-  coursePopLabel: { fontSize: 7, fontWeight: '700', letterSpacing: 1 },
+  coursePopBadge: { alignItems: 'center', borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 },
+  coursePopText:  { fontSize: 14, fontWeight: '500', color: '#F5EDD8' },
+  coursePopLabel: { fontSize: 7, fontWeight: '700', letterSpacing: 1, color: '#C9A84C', marginTop: 2 },
   courseRounds:   { fontSize: 10, color: '#7A6E58', marginTop: 8, fontWeight: '500' },
 });

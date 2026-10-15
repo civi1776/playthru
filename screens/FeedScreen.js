@@ -5,6 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, RefreshControl, Modal, KeyboardAvoidingView, Platform,
+  Animated, Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,8 +15,47 @@ import { useAuth } from '../context/AuthContext';
 import InitialsAvatar from '../components/InitialsAvatar';
 import CourseAvatar from '../components/CourseAvatar';
 import { sendPushToUser } from '../lib/notifications';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ROUND_STATE_KEY, ROUND_STALENESS_MS } from '../lib/roundConstants';
+import { scoreTier, COLOR } from '../lib/theme';
+
+// "Very recent" window for the live pulse indicator — purely presentational,
+// mirrors the freshness cue used on the live-round banner elsewhere in the app.
+const RECENT_WINDOW_MS = 5 * 60 * 1000;
+
+// ─── PulseDot — HUD-style radar ping ────────────────────────────────────────
+// A solid dot with an expanding, fading ring behind it. Native-driver only
+// (opacity + scale), so it's cheap even when a few instances are mounted at
+// once in a scrolling list.
+function PulseDot({ color = COLOR.green, size = 6 }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 0, useNativeDriver: true }),
+        Animated.delay(500),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  const scale   = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] });
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0] });
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', width: size, height: size, borderRadius: size / 2,
+          backgroundColor: color, opacity, transform: [{ scale }],
+        }}
+      />
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />
+    </View>
+  );
+}
 
 const PAGE_SIZE = 20;
 
@@ -31,12 +71,6 @@ function timeAgo(isoStr) {
   const d = new Date(isoStr);
   const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${mo[d.getMonth()]} ${d.getDate()}`;
-}
-
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
-  return '#C07A6A';
 }
 
 function formatTime(minutes) {
@@ -56,17 +90,17 @@ function formatClockDelta(totalElapsed, totalTimePar) {
   return delta >= 0 ? `beat the clock by ${timeStr}` : `over by ${timeStr}`;
 }
 
-function paceScoreColor(pop) {
-  if (pop >= 4.5) return '#7DC87A';
-  if (pop >= 4.0) return '#C9A84C';
-  if (pop >= 3.5) return '#F0CB5B';
-  return '#E85D4A';
-}
-
 // ─── Round Content Card ──────────────────────────────────────────────────────
 function RoundContentCard({ content, navigation }) {
   const isOnTheClock = content?.round_format === 'clocked';
+  // Legacy fallback for old-format (non-clocked) rounds logged before the
+  // Clocked Score rewrite — these real rows still carry the deprecated 0-5
+  // pop_score field. No new rounds create it, but existing history does, so
+  // convert it to the current 0-100 scale for display rather than showing
+  // the old number.
   const pop = content?.pop_score;
+  const legacyClockedScore = pop != null ? Math.round(pop * 20) : null;
+  const legacyTier = legacyClockedScore != null ? scoreTier(legacyClockedScore) : null;
   const teamScore = content?.team_score;
 
   const parts = [
@@ -79,53 +113,109 @@ function RoundContentCard({ content, navigation }) {
   const clockResult = isOnTheClock
     ? formatClockDelta(content?.total_elapsed, content?.total_time_par)
     : null;
+  // Sign of the clock delta drives color/icon — "color IS information" per
+  // the design system, so a round that ran over should read red, not green.
+  const beatTheClock = (content?.total_elapsed != null && content?.total_time_par != null)
+    ? (content.total_time_par - content.total_elapsed) >= 0
+    : null;
+
+  // "Hero" pop for a round worth noticing: an APEX/CONTENDER legacy score,
+  // or a clearly strong on-the-clock result. Presentational thresholds only.
+  const legacyIsHero = legacyTier && (legacyTier.name === 'APEX' || legacyTier.name === 'CONTENDER');
+  const clockIsHero  = isOnTheClock && teamScore != null && teamScore >= 10;
+  const isHero = legacyIsHero || clockIsHero;
+  const heroColor = clockIsHero ? COLOR.gold : (legacyTier?.color ?? COLOR.gold);
 
   return (
     <TouchableOpacity
-      style={[s.roundCard, isOnTheClock && s.roundCardClocked]}
+      style={[
+        s.roundCard,
+        isOnTheClock && s.roundCardClocked,
+        isHero && {
+          borderColor: `${heroColor}77`, backgroundColor: `${heroColor}12`,
+          shadowColor: heroColor, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 10, elevation: 4,
+        },
+      ]}
       onPress={() => content?.course_name && navigation?.navigate('CourseProfile', { course: { name: content.course_name } })}
       activeOpacity={0.85}
     >
       {/* Clock badge for on-the-clock rounds */}
       {isOnTheClock && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-          <Ionicons name="timer-outline" size={11} color="#C9A84C" />
-          <Text style={{ fontSize: 10, color: '#C9A84C', fontWeight: '700', letterSpacing: 1.5 }}>ON THE CLOCK</Text>
+          <Ionicons name="timer-outline" size={11} color={COLOR.gold} />
+          <Text style={s.clockTag}>ON THE CLOCK</Text>
+          {isHero && (
+            <Text style={[s.clockTag, { color: heroColor, marginLeft: 2 }]}>
+              {'· '}{legacyIsHero ? legacyTier.name : 'STRONG ROUND'}
+            </Text>
+          )}
         </View>
       )}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        {content?.course_name ? <CourseAvatar courseName={content.course_name} city={content.city ?? null} size={44} /> : null}
+        {content?.course_name ? <CourseAvatar courseName={content.course_name} city={content.city ?? null} size={isHero ? 48 : 44} /> : null}
         <View style={{ flex: 1 }}>
           <Text style={s.roundCourse} numberOfLines={1}>{content?.course_name || 'Quick Play'}</Text>
           {parts.length > 0 && <Text style={s.roundDetails}>{parts.join(' \u00B7 ')}</Text>}
-          {clockResult && <Text style={s.clockResult}>{clockResult}</Text>}
+          {clockResult && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
+              <Ionicons
+                name={beatTheClock === false ? 'trending-down' : 'trending-up'}
+                size={11}
+                color={beatTheClock === false ? COLOR.red : COLOR.green}
+              />
+              <Text style={[s.clockResult, { color: beatTheClock === false ? COLOR.red : COLOR.green }]}>{clockResult}</Text>
+            </View>
+          )}
         </View>
-        {/* Score badge */}
+        {/* Score badge \u2014 hero number treatment */}
         {isOnTheClock && teamScore != null ? (
-          <View style={[s.scoreBadge, { borderColor: '#C9A84C44', minHeight: 52 }]}>
-            <Text style={[s.scoreBadgeNum, { color: '#C9A84C', fontSize: 22 }]}>
+          <View style={[s.scoreBadge, { borderColor: `${heroColor}55` }, isHero && s.scoreBadgeHero]}>
+            <Text style={[s.scoreBadgeNum, { color: heroColor, fontSize: isHero ? 28 : 22 }]}>
               {teamScore > 0 ? `+${teamScore}` : teamScore}
             </Text>
-            <Text style={[s.scoreBadgeLabel, { color: '#C9A84C' }]}>PTS</Text>
+            <Text style={[s.scoreBadgeLabel, { color: heroColor }]}>PTS</Text>
           </View>
-        ) : pop != null ? (
-          <View style={[s.scoreBadge, { minHeight: 52 }]}>
-            <Text style={[s.scoreBadgeNum, { color: paceScoreColor(pop), fontSize: 22 }]}>{pop.toFixed(1)}</Text>
-            <Text style={s.scoreBadgeLabel}>pace</Text>
+        ) : legacyClockedScore != null ? (
+          <View style={[s.scoreBadge, { borderColor: `${heroColor}55` }, isHero && s.scoreBadgeHero]}>
+            <Text style={[s.scoreBadgeNum, { color: legacyTier.color, fontSize: isHero ? 28 : 22 }]}>{legacyClockedScore}</Text>
+            <Text style={s.scoreBadgeLabel}>CLK</Text>
           </View>
         ) : null}
+        <Ionicons name="chevron-forward" size={14} color={COLOR.dim} style={{ marginLeft: 2 }} />
       </View>
     </TouchableOpacity>
   );
 }
 
 // ─── Feed Item ───────────────────────────────────────────────────────────────
+// Each row reads like a telemetry line: a colored accent edge keyed to what
+// happened, a live pulse when it's fresh, a hero glow when it's a great
+// round, a badge (not a text block) for milestones.
 function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, onComment }) {
   const handle = item.username ? `@${item.username}` : (item.full_name?.split(' ')[0] ?? 'Golfer');
   const liked  = likedIds.has(item.id);
   const cCount = commentCounts[item.id] ?? 0;
 
   const isOnTheClock = item.content?.round_format === 'clocked';
+
+  // Accent color — keys the left edge + live pulse to what kind of thing
+  // this is, reusing the same tier logic as the round card so the signal is
+  // consistent whether you're scanning the edge or reading the number.
+  const accentColor = (() => {
+    if (item.type === 'live_round_started') return COLOR.green;
+    if (item.type === 'milestone') return COLOR.gold;
+    if (item.type === 'course_review') return COLOR.green;
+    if (item.type === 'round_logged') {
+      if (isOnTheClock) {
+        if (item.content?.team_score != null) return COLOR.gold;
+        if (item.content?.pop_score != null) return scoreTier(Math.round(item.content.pop_score * 20)).color;
+      }
+      return COLOR.dim;
+    }
+    return COLOR.dim;
+  })();
+
+  const isRecent = !!item.created_at && (Date.now() - new Date(item.created_at).getTime()) < RECENT_WINDOW_MS;
 
   const actionLabel = (() => {
     switch (item.type) {
@@ -146,12 +236,16 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
   const isLive = item.type === 'live_round_started';
 
   return (
-    <View style={[s.feedCard, isLive && s.feedCardLive]}>
+    <View style={[s.feedCard, { borderLeftColor: `${accentColor}88` }, isLive && s.feedCardLive]}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
         <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: item.user_id })} activeOpacity={0.8}>
           <View>
             <InitialsAvatar name={item.full_name} size={36} avatarUrl={item.avatar_url} />
-            {isLive && <View style={s.avatarLiveDot} />}
+            {isLive && (
+              <View style={s.avatarLiveDot}>
+                <PulseDot color={COLOR.green} size={8} />
+              </View>
+            )}
           </View>
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -159,7 +253,10 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
             <TouchableOpacity onPress={() => navigation.navigate('PublicProfile', { userId: item.user_id })} activeOpacity={0.8}>
               <Text style={s.handle}>{handle}</Text>
             </TouchableOpacity>
-            <Text style={s.timestamp}>{timeAgo(item.created_at)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              {isRecent && <PulseDot color={COLOR.green} size={5} />}
+              <Text style={s.timestamp}>{timeAgo(item.created_at)}</Text>
+            </View>
           </View>
 
           {actionLabel && <Text style={s.actionLabel}>{actionLabel}</Text>}
@@ -174,17 +271,21 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
 
           {isLive && (
             <View style={s.liveBanner}>
-              <View style={s.liveDot} />
+              <PulseDot color={COLOR.green} size={6} />
               <Text style={s.liveLabel}>Playing at {item.content?.course_name ?? 'a course'}</Text>
+              <View style={s.liveTag}><Text style={s.liveTagText}>LIVE</Text></View>
             </View>
           )}
 
           {item.type === 'milestone' && item.content?.title && (
             <View style={s.milestoneCard}>
-              <View style={s.milestoneIcon}>
-                <Ionicons name="star" size={20} color="#C9A84C" />
+              <View style={s.milestoneBadgeRing}>
+                <View style={s.milestoneBadgeCore}>
+                  <Ionicons name="trophy" size={20} color={COLOR.bg} />
+                </View>
               </View>
               <View style={{ flex: 1 }}>
+                <Text style={s.milestoneEyebrow}>ACHIEVEMENT UNLOCKED</Text>
                 <Text style={s.milestoneTitle}>{item.content.title}</Text>
                 {item.content.body && <Text style={s.milestoneBody}>{item.content.body}</Text>}
               </View>
@@ -194,11 +295,11 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
           {/* Actions */}
           <View style={s.actionBar}>
             <TouchableOpacity style={s.actionBtn} onPress={() => onLike(item, liked)} activeOpacity={0.7}>
-              <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={liked ? '#7DC87A' : '#7A6E58'} />
-              {item.likes > 0 && <Text style={[s.actionCount, liked && { color: '#7DC87A' }]}>{item.likes}</Text>}
+              <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={liked ? COLOR.green : COLOR.dim} />
+              {item.likes > 0 && <Text style={[s.actionCount, liked && { color: COLOR.green }]}>{item.likes}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={s.actionBtn} onPress={() => onComment(item)} activeOpacity={0.7}>
-              <Ionicons name="chatbubble-outline" size={13} color="#7A6E58" />
+              <Ionicons name="chatbubble-outline" size={13} color={COLOR.dim} />
               {cCount > 0 && <Text style={s.actionCount}>{cCount}</Text>}
             </TouchableOpacity>
           </View>
@@ -382,19 +483,6 @@ export default function FeedScreen({ navigation }) {
   const [commentSheet,  setCommentSheet]  = useState(null);
   const [showPlusMenu,  setShowPlusMenu]  = useState(false);
 
-  // Saved live round detection
-  const [savedRound, setSavedRound] = useState(null);
-  useEffect(() => {
-    AsyncStorage.getItem(ROUND_STATE_KEY).then(raw => {
-      if (!raw) return;
-      try {
-        const p = JSON.parse(raw);
-        if (p?.startTs && Date.now() - p.startTs < ROUND_STALENESS_MS) {
-          setSavedRound({ courseName: p.course?.name, currentHole: p.currentHole });
-        }
-      } catch {}
-    });
-  }, []);
 
   const offsetRef    = useRef(0);
   const followingRef = useRef([]);
@@ -506,17 +594,20 @@ export default function FeedScreen({ navigation }) {
     })();
   }, []));
 
-  // ── List header: just the feed tabs (slim) ──
+  // ── List header: tournament promo + feed tabs (slim) ──
   const ListHeader = () => (
     <View>
-      {/* Resume banner (only when a live round is in progress) */}
-      {savedRound && (
-        <TouchableOpacity style={s.resumeBanner} onPress={() => navigation.navigate('LiveRound')} activeOpacity={0.8}>
-          <View style={s.resumeDot} />
-          <Text style={s.resumeText}>Resume: {savedRound.courseName ?? 'round'} \u00B7 Hole {savedRound.currentHole}</Text>
-          <Ionicons name="chevron-forward" size={14} color="#7DC87A" />
-        </TouchableOpacity>
-      )}
+      {/* Tournament promo banner */}
+      <TouchableOpacity style={s.tourneyBanner} onPress={() => navigation.navigate('Tournament')} activeOpacity={0.85}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <PulseDot color={COLOR.green} size={5} />
+            <Text style={s.tourneyBannerEyebrow}>CLOCKED GOLF TOURNAMENT SERIES</Text>
+          </View>
+          <Text style={s.tourneyBannerTitle}>Interest applications are open — apply to compete</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={COLOR.green} />
+      </TouchableOpacity>
 
       {/* Feed tabs */}
       <View style={s.tabRow}>
@@ -551,14 +642,10 @@ export default function FeedScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Plus menu dropdown */}
+      {/* Plus menu dropdown — one way to play: on the clock */}
       {showPlusMenu && (
         <View style={s.plusMenu}>
-          <TouchableOpacity style={s.plusMenuItem} onPress={() => { setShowPlusMenu(false); navigation.navigate('Log'); }} activeOpacity={0.8}>
-            <Ionicons name="add-circle-outline" size={16} color="#7A6E58" />
-            <Text style={s.plusMenuText}>Log a round</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.plusMenuItem} onPress={() => { setShowPlusMenu(false); navigation.navigate('LiveRound'); }} activeOpacity={0.8}>
+          <TouchableOpacity style={s.plusMenuItem} onPress={() => { setShowPlusMenu(false); navigation.navigate('ClockedSetup'); }} activeOpacity={0.8}>
             <Ionicons name="play-outline" size={16} color="#7A6E58" />
             <Text style={s.plusMenuText}>Play on the clock</Text>
           </TouchableOpacity>
@@ -630,6 +717,11 @@ const s = StyleSheet.create({
   resumeDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#7DC87A' },
   resumeText:   { flex: 1, fontSize: 12, color: '#7DC87A', fontWeight: '600' },
 
+  // Tournament promo
+  tourneyBanner:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 8, marginBottom: 4, backgroundColor: 'rgba(125,200,122,0.08)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#7DC87A33' },
+  tourneyBannerEyebrow: { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5, marginBottom: 3 },
+  tourneyBannerTitle:   { fontSize: 13, fontWeight: '600', color: '#F5EDD8' },
+
   // Tabs
   tabRow:      { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#7DC87A18' },
   tab:         { flex: 1, paddingVertical: 10, alignItems: 'center' },
@@ -637,37 +729,62 @@ const s = StyleSheet.create({
   tabText:     { fontSize: 10, fontWeight: '700', color: '#7A6E58', letterSpacing: 2 },
   tabTextActive: { color: '#C9A84C' },
 
-  // Feed card
-  feedCard:      { paddingHorizontal: 16, paddingVertical: 14 },
-  feedCardLive:  { borderLeftWidth: 3, borderLeftColor: '#7DC87A', paddingLeft: 13, backgroundColor: 'rgba(125,200,122,0.03)' },
-  avatarLiveDot: { position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#7DC87A', borderWidth: 1.5, borderColor: '#131A14' },
+  // Feed card — a telemetry tile, not a social post: flat surface, a colored
+  // left edge keyed to what happened, no gradients.
+  feedCard:      {
+    marginHorizontal: 12, marginTop: 10, paddingHorizontal: 14, paddingVertical: 14,
+    backgroundColor: 'rgba(255,255,255,0.015)', borderRadius: 14,
+    borderWidth: 1, borderColor: 'rgba(125,200,122,0.08)', borderLeftWidth: 3,
+  },
+  feedCardLive:  { backgroundColor: 'rgba(125,200,122,0.05)', borderColor: 'rgba(125,200,122,0.18)' },
+  avatarLiveDot: {
+    position: 'absolute', bottom: -2, right: -2, width: 13, height: 13, borderRadius: 6.5,
+    backgroundColor: '#090F0A', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(125,200,122,0.5)',
+  },
   handle:        { fontSize: 13, fontWeight: '700', color: '#F5EDD8' },
   timestamp:     { fontSize: 9, color: 'rgba(184,168,130,0.5)' },
   actionLabel:   { fontSize: 12, color: '#B8A882', marginTop: 1, marginBottom: 6 },
   postText:      { fontSize: 14, color: '#F5EDD8', lineHeight: 20, marginTop: 4, marginBottom: 6 },
-  divider:       { height: 1, backgroundColor: '#7DC87A0D', marginLeft: 62 },
+  divider:       { height: 2 },
 
-  // Round card
-  roundCard:      { marginTop: 6, backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#7DC87A14' },
+  // Round card — the inner readout panel
+  roundCard:      { marginTop: 6, backgroundColor: '#0D1A0F', borderRadius: 12, padding: 11, borderWidth: 1, borderColor: '#7DC87A14' },
   roundCardClocked: { borderColor: '#C9A84C44' },
   roundCourse:    { fontSize: 13, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
   roundDetails:   { fontSize: 10, color: '#B8A882' },
-  clockResult:    { fontSize: 10, color: '#7DC87A', marginTop: 2, fontWeight: '500' },
+  clockResult:    { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
+  clockTag:       { fontSize: 10, color: '#C9A84C', fontWeight: '700', letterSpacing: 1.5 },
 
-  // Score badge (redesigned — labeled)
-  scoreBadge:     { borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center', minWidth: 48 },
-  scoreBadgeNum:  { fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  // Score badge — hero number treatment for a great round
+  scoreBadge:     { borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center', minWidth: 48, minHeight: 52, justifyContent: 'center' },
+  scoreBadgeHero: { paddingHorizontal: 13, paddingVertical: 7, borderWidth: 1.5 },
+  scoreBadgeNum:  { fontWeight: '200', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
   scoreBadgeLabel:{ fontSize: 7, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginTop: 1 },
 
   // Live banner
   liveBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#7DC87A0D', borderRadius: 8, padding: 8, marginTop: 6, borderWidth: 1, borderColor: '#7DC87A22' },
-  liveDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: '#7DC87A' },
-  liveLabel:     { fontSize: 12, color: '#F5EDD8', fontWeight: '600' },
+  liveLabel:     { fontSize: 12, color: '#F5EDD8', fontWeight: '600', flex: 1 },
+  liveTag:       { backgroundColor: 'rgba(125,200,122,0.15)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  liveTagText:   { fontSize: 8, fontWeight: '800', color: '#7DC87A', letterSpacing: 1.5 },
 
-  // Milestone card
-  milestoneCard:   { marginTop: 6, backgroundColor: '#C9A84C18', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  milestoneIcon:   { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C9A84C22', alignItems: 'center', justifyContent: 'center' },
-  milestoneTitle:  { fontSize: 14, fontWeight: '700', color: '#F5EDD8', marginBottom: 2 },
+  // Milestone — a badge, not a text block
+  milestoneCard:   {
+    marginTop: 6, backgroundColor: '#C9A84C14', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: 16, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    shadowColor: '#C9A84C', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 3,
+  },
+  milestoneBadgeRing: {
+    width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: '#C9A84C77',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  milestoneBadgeCore: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: '#C9A84C',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#F0CB5B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 6, elevation: 2,
+  },
+  milestoneEyebrow: { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 2, textTransform: 'uppercase' },
+  milestoneTitle:  { fontSize: 15, fontWeight: '800', color: '#F5EDD8', marginBottom: 2 },
   milestoneBody:   { fontSize: 12, color: '#B8A882', lineHeight: 17 },
 
   // Actions

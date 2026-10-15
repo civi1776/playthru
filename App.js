@@ -13,11 +13,11 @@ import { setupNotifications, refreshPushToken } from './lib/notifications';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CLOCKED_ROUND_STATE_KEY } from './lib/clockedRoundConstants';
+import { COLOR } from './lib/theme';
 
 import HomeScreen             from './screens/HomeScreen';
 import FeedScreen             from './screens/FeedScreen';
 import RulesScreen            from './screens/RulesScreen';
-import LogScreen          from './screens/LogScreen';
 import CoursesScreen      from './screens/CoursesScreen';
 import ProfileScreen      from './screens/ProfileScreen';
 import LeaderboardScreen  from './screens/LeaderboardScreen';
@@ -28,11 +28,9 @@ import SignInScreen        from './screens/SignInScreen';
 import SearchUsersScreen  from './screens/SearchUsersScreen';
 import ShareScreen        from './screens/ShareScreen';
 import CourseProfileScreen from './screens/CourseProfileScreen';
-import ClaimRoundScreen      from './screens/ClaimRoundScreen';
 import POPScoreInfoScreen    from './screens/POPScoreInfoScreen';
 import PublicProfileScreen   from './screens/PublicProfileScreen';
 import ActivityFeedScreen    from './screens/ActivityFeedScreen';
-import LiveRoundScreen      from './screens/LiveRoundScreen';
 import ResetPasswordScreen  from './screens/ResetPasswordScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 // GamesScreen retired — the sport is the one game
@@ -45,6 +43,10 @@ import ClockedSetupScreen        from './screens/ClockedSetupScreen';
 import ClockedRoundScreen        from './screens/ClockedRoundScreen';
 import ConfirmRoundScreen        from './screens/ConfirmRoundScreen';
 import OnboardingScreen          from './screens/OnboardingScreen';
+import TournamentScreen          from './screens/TournamentScreen';
+import TournamentApplyScreen     from './screens/TournamentApplyScreen';
+import RivalryScreen             from './screens/RivalryScreen';
+import AdminScreen               from './screens/AdminScreen';
 
 // ─── Deep link helpers ────────────────────────────────────────────────────────
 function parseUrlParams(url) {
@@ -219,7 +221,7 @@ function BottomNav({ state, navigation }) {
 const nav = StyleSheet.create({
   container: {
     width: '100%', height: 72, backgroundColor: '#090D0A',
-    borderTopWidth: 1, borderTopColor: '#7DC87A33',
+    borderTopWidth: 1, borderTopColor: '#C9A84C33',
     flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center',
   },
   item:  { alignItems: 'center', justifyContent: 'center', flex: 1, paddingTop: 4 },
@@ -242,10 +244,20 @@ const nav = StyleSheet.create({
   playIconWrap: { position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 52, height: 52 },
   playLabel: { fontSize: 9, fontFamily: 'Montserrat_700Bold', letterSpacing: 1.5, marginTop: 3, color: PLAY_GOLD },
 
-  // Active round banner
-  roundBanner:       { backgroundColor: PLAY_GOLD, paddingVertical: 10, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  roundBannerText:   { color: '#090F0A', fontWeight: '700', fontSize: 12, letterSpacing: 1 },
-  roundBannerAction: { color: '#090F0A', fontSize: 11 },
+  // Active round banner — floating card anchored above the tab bar (72px
+  // tall) instead of docked to the top of the screen, so it sits in the
+  // easy-to-reach lower third of the display on any phone size.
+  roundBanner: {
+    position: 'absolute', left: 16, right: 16, bottom: 90,
+    backgroundColor: COLOR.surface, borderWidth: 1, borderColor: COLOR.gold,
+    borderRadius: 16, paddingVertical: 12, paddingHorizontal: 18,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: COLOR.gold, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
+    zIndex: 999,
+  },
+  roundBannerText:   { color: COLOR.gold, fontWeight: '700', fontSize: 12, letterSpacing: 1 },
+  roundBannerAction: { color: COLOR.cream, fontSize: 11, fontWeight: '600' },
 });
 
 // ─── Main app (tab navigator) ─────────────────────────────────────────────────
@@ -270,13 +282,7 @@ function MainApp({ navigation }) {
   };
 
   return (
-    <>
-      {hasActiveRound && (
-        <TouchableOpacity style={nav.roundBanner} onPress={resumeActiveRound} activeOpacity={0.9}>
-          <Text style={nav.roundBannerText}>ROUND IN PROGRESS</Text>
-          <Text style={nav.roundBannerAction}>TAP TO RESUME {'\u2192'}</Text>
-        </TouchableOpacity>
-      )}
+    <View style={{ flex: 1 }}>
       <Tab.Navigator
         tabBar={props => <BottomNav {...props} />}
         screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
@@ -286,11 +292,18 @@ function MainApp({ navigation }) {
         <Tab.Screen name="Play"  component={FeedScreen} />
         <Tab.Screen name="Ranks" component={LeaderboardScreen} />
         <Tab.Screen name="You"   component={ProfileScreen} />
-        {/* Hidden: reachable via navigate() from stack, no visible tab */}
-        <Tab.Screen name="Log"         component={LogScreen} />
       </Tab.Navigator>
+      {/* Floating "round in progress" banner \u2014 anchored low, above the tab
+          bar, so it's reachable one-handed instead of pinned to the very
+          top of the screen where a thumb can't comfortably reach it. */}
+      {hasActiveRound && (
+        <TouchableOpacity style={nav.roundBanner} onPress={resumeActiveRound} activeOpacity={0.9}>
+          <Text style={nav.roundBannerText}>ROUND IN PROGRESS</Text>
+          <Text style={nav.roundBannerAction}>TAP TO RESUME {'\u2192'}</Text>
+        </TouchableOpacity>
+      )}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
-    </>
+    </View>
   );
 }
 
@@ -430,7 +443,7 @@ function AppNavigator() {
         break;
       case 'still_playing':
       case 'interaction_ladder':
-        navRef.current.navigate('LiveRound');
+        navRef.current.navigate('Feed');
         break;
       case 'inactivity':
       case 'weekly_digest':
@@ -561,14 +574,16 @@ function AppNavigator() {
         <RootStack.Screen name="SearchUsers"   component={SearchUsersScreen} />
         <RootStack.Screen name="Share"         component={ShareScreen} />
         <RootStack.Screen name="CourseProfile" component={CourseProfileScreen} />
-        <RootStack.Screen name="ClaimRound"    component={ClaimRoundScreen} />
         <RootStack.Screen name="POPScoreInfo"   component={POPScoreInfoScreen} />
         <RootStack.Screen name="PublicProfile"  component={PublicProfileScreen} />
+        <RootStack.Screen name="Rivalry"        component={RivalryScreen} />
+        <RootStack.Screen name="Admin"          component={AdminScreen} />
         <RootStack.Screen name="ActivityFeed"   component={ActivityFeedScreen} />
-        <RootStack.Screen name="LiveRound"       component={LiveRoundScreen} />
         <RootStack.Screen name="ResetPassword"   component={ResetPasswordScreen} />
         <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         {/* Games screen retired — the sport is the one game */}
+        {/* LiveRound retired 2026-07-14 — ClockedRound (ClockedSetup → ClockedRound)
+            is the one way to play. Untimed logging (Log/ClaimRound) also retired. */}
         <RootStack.Screen name="Settings"       component={SettingsScreen} />
         <RootStack.Screen name="EditProfile"    component={EditProfileScreen} />
         <RootStack.Screen name="Paywall"        component={PaywallScreen} />
@@ -580,6 +595,8 @@ function AppNavigator() {
         <RootStack.Screen name="ClockedSetup"   component={ClockedSetupScreen} />
         <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} />
         <RootStack.Screen name="ConfirmRound"  component={ConfirmRoundScreen} />
+        <RootStack.Screen name="Tournament"       component={TournamentScreen} />
+        <RootStack.Screen name="TournamentApply"  component={TournamentApplyScreen} />
       </RootStack.Navigator>
     </NavigationContainer>
 

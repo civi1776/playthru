@@ -47,3 +47,30 @@ export async function areActivitiesEnabled(): Promise<boolean> {
   try { return await Native.areActivitiesEnabled(); }
   catch { return false; }
 }
+
+// ─── Lock-screen "Holed Out" hand-off ───────────────────────────────────────
+// The Live Activity's button runs inside the widget extension process (via a
+// LiveActivityIntent) and can't reach Supabase or app state directly, so it
+// writes a small signal into the shared App Group UserDefaults instead. The
+// RN app reads it back here the next time it comes to the foreground and
+// applies it as if the in-app "HOLED OUT" button had been tapped.
+export type PendingHoleCompletion = { holeNumber: number; timestamp: number } | null;
+
+export async function getPendingHoleCompletion(): Promise<PendingHoleCompletion> {
+  if (!Native) return null;
+  try {
+    const result = await Native.getPendingHoleCompletion();
+    if (!result || typeof result.holeNumber !== "number" || typeof result.timestamp !== "number") {
+      return null;
+    }
+    return { holeNumber: result.holeNumber, timestamp: result.timestamp };
+  } catch {
+    return null;
+  }
+}
+
+export async function clearPendingHoleCompletion(): Promise<void> {
+  if (!Native) return;
+  try { await Native.clearPendingHoleCompletion(); }
+  catch {}
+}

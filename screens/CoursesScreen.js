@@ -88,17 +88,9 @@ function fallbackCoordsForCourse(course) {
   return FL_CITY_COORDS[cityKey] ?? null;
 }
 
-function popColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#D4B86A';
-  return '#C07A6A';
-}
-
-function popBgColor(score) {
-  if (score >= 4.0) return '#7DC87A';
-  if (score >= 3.0) return '#C9A84C';
-  return '#C07A6A';
-}
+// pop_score is a dead legacy column (frozen, never updated by any reachable
+// code path) — this screen now relies solely on the live avg_time/total_rounds
+// pace signal, so the old pop_score color helpers were removed.
 
 function formatAvgTime(minutes) {
   if (!minutes) return null;
@@ -111,7 +103,6 @@ function normalise(c) {
   return {
     ...c,
     location:    [c.city, c.state].filter(Boolean).join(', '),
-    avgPop:      c.pop_score ?? 3.5,
     rounds:      c.total_rounds ?? 0,
     avgDuration: c.avg_duration_minutes ?? c.avg_time ?? null,
     yourRounds:  0,
@@ -211,8 +202,8 @@ export default function CoursesScreen({ navigation }) {
     try {
       const { data, error: err } = await supabase
         .from('courses')
-        .select('id, name, city, state, course_type, holes, pop_score, total_rounds, avg_time, latitude, longitude')
-        .order('total_rounds', { ascending: false, nullsFirst: false })
+        .select('id, name, city, state, course_type, holes, total_rounds, avg_time, latitude, longitude')
+        .order('avg_time', { ascending: true, nullsFirst: false })
         .limit(200);
       if (err) throw err;
       const rows = (data && data.length > 0) ? data.map(normalise) : LOCAL_COURSES;
@@ -320,14 +311,10 @@ export default function CoursesScreen({ navigation }) {
               contentContainerStyle={{ paddingHorizontal: 22, gap: 10 }}
             >
               {nearbyCourses.map((c) => {
-                const showPop = (c.total_rounds ?? 0) >= 15 && c.pop_score != null;
                 const distLabel = c._dist < 10
                   ? `${c._dist.toFixed(1)} mi`
                   : `${Math.round(c._dist)} mi`;
-                const nearbyDisplayPop = c.pop_score && c.pop_score > 0 ? c.pop_score : 3.5;
-                const nearbyTimeStr = c.avg_time && !isNaN(c.avg_time)
-                  ? `${Math.floor(c.avg_time / 60)}h ${Math.round(c.avg_time % 60)}m`
-                  : null;
+                const nearbyTimeStr = formatAvgTime(c.avg_time);
                 return (
                   <TouchableOpacity
                     key={c.id ?? c.name}
@@ -339,11 +326,10 @@ export default function CoursesScreen({ navigation }) {
                     <Text style={s.nearbyName} numberOfLines={2}>{c.name}</Text>
                     <Text style={s.nearbyCity}>{[c.city, c.state].filter(Boolean).join(', ')}</Text>
                     <Text style={s.nearbyDist}>{distLabel}</Text>
-                    <Text style={[s.nearbyPop, { color: popColor(nearbyDisplayPop) }]}>
-                      {nearbyDisplayPop.toFixed(1)}
-                    </Text>
-                    {nearbyTimeStr != null && (
-                      <Text style={s.nearbyTime}>{nearbyTimeStr}</Text>
+                    {nearbyTimeStr != null ? (
+                      <Text style={s.nearbyTime}>{nearbyTimeStr} avg</Text>
+                    ) : (
+                      <Text style={s.nearbyNoData}>Not enough rounds yet</Text>
                     )}
                   </TouchableOpacity>
                 );
@@ -373,7 +359,7 @@ export default function CoursesScreen({ navigation }) {
           <CourseSkeletons />
         ) : displayed.length === 0 ? (
           <View style={s.emptyState}>
-            <Ionicons name="location-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+            <Ionicons name="location-outline" size={48} color="rgba(125,200,122,0.3)" style={{ marginBottom: 14 }} />
             <Text style={s.emptyText}>
               {isSearching ? 'No courses found. Try a different name.' : 'No courses available.'}
             </Text>
@@ -403,17 +389,30 @@ export default function CoursesScreen({ navigation }) {
                     </View>
                   </View>
 
-                  {/* POPScore accent row */}
+                  {/* Pace accent row — real avg_time/total_rounds only; the old
+                      "COURSE CLOCKED SCORE" number here came from the dead,
+                      frozen pop_score column and was removed. */}
                   {(() => {
-                    const displayPop = course.pop_score && course.pop_score > 0 ? course.pop_score : 3.5;
+                    const timeStr = formatAvgTime(course.avgDuration);
+                    if (!timeStr) {
+                      return (
+                        <View style={s.noDataRow}>
+                          <Ionicons name="time-outline" size={13} color="#7A6E5888" />
+                          <Text style={s.courseNoData}>Not enough rounds yet</Text>
+                        </View>
+                      );
+                    }
                     return (
                       <View style={s.popAccentRow}>
-                        <Text style={s.popAccentNum}>{displayPop.toFixed(1)}</Text>
-                        <View>
-                          <Text style={s.popAccentLabel}>COURSE CLOCKED SCORE</Text>
+                        <Ionicons name="timer-outline" size={20} color="#7DC87A" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.popAccentLabel}>AVG ROUND TIME</Text>
                           <Text style={s.popAccentRounds}>
                             {course.rounds || 0} round{course.rounds !== 1 ? 's' : ''}
                           </Text>
+                        </View>
+                        <View style={s.paceChip}>
+                          <Text style={s.paceChipText}>{timeStr}</Text>
                         </View>
                       </View>
                     );
@@ -453,8 +452,11 @@ const s = StyleSheet.create({
   popAccentNum:   { fontSize: 22, fontWeight: '700', color: '#F5EDD8', fontFamily: 'Georgia' },
   popAccentLabel: { fontSize: 8, letterSpacing: 1, color: '#7DC87A', fontWeight: '600' },
   popAccentRounds:{ fontSize: 9, color: '#B8A882', marginTop: 1 },
+  paceChip:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#7DC87A14', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  paceChipText:   { fontSize: 11, fontWeight: '700', color: '#7DC87A', fontVariant: ['tabular-nums'] },
   courseAvgTime:  { fontSize: 11, color: '#B8A882', fontFamily: 'monospace', marginTop: 3 },
-  courseNoData:   { fontSize: 9, color: '#7A6E5888', textAlign: 'center', marginTop: 3, lineHeight: 13 },
+  courseNoData:   { fontSize: 11, color: '#7A6E5888' },
+  noDataRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8, marginTop: 10 },
   courseMeta:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   courseMetaText: { fontSize: 11, color: '#B8A88288' },
   courseYours:    { fontSize: 10, fontWeight: '600', color: '#7DC87A' },
@@ -471,8 +473,8 @@ const s = StyleSheet.create({
   nearbyName:        { fontSize: 13, fontWeight: '600', color: '#F5EDD8', lineHeight: 18 },
   nearbyCity:        { fontSize: 10, color: '#7A6E58' },
   nearbyDist:        { fontSize: 10, color: '#C9A84C88', marginTop: 1 },
-  nearbyPop:         { fontSize: 22, fontWeight: '300', color: '#C9A84C44', marginTop: 4 },
-  nearbyTime:        { fontSize: 10, color: '#B8A882' },
+  nearbyTime:        { fontSize: 11, fontWeight: '600', color: '#7DC87A', marginTop: 4 },
+  nearbyNoData:      { fontSize: 10, color: '#7A6E5888', marginTop: 4 },
   locationDenied:    { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 22, paddingTop: 8, paddingBottom: 4 },
   locationDeniedText:{ fontSize: 11, color: '#7A6E58' },
 });

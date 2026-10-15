@@ -29,7 +29,6 @@ export default function EditProfileScreen({ navigation }) {
   const [email,      setEmail]      = useState(user?.email          ?? '');
   const [homeCourse, setHomeCourse] = useState(profile?.home_course  ?? '');
   const [country,    setCountry]    = useState(profile?.home_country ?? '');
-  const [handicap,   setHandicap]   = useState(profile?.handicap != null ? String(profile.handicap) : '');
   const [bio,        setBio]        = useState(profile?.bio          ?? '');
 
   const [avatarUrl, setAvatarUrl]       = useState(profile?.avatar_url ?? null);
@@ -96,9 +95,10 @@ export default function EditProfileScreen({ navigation }) {
         return;
       }
 
-      // 5. Get public URL, cache-bust, save to profile
+      // 5. Get public URL, cache-bust (same file path every upload, so
+      //    without this RN's Image cache would keep showing the old photo)
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = urlData?.publicUrl;
+      const publicUrl = urlData?.publicUrl ? `${urlData.publicUrl}?t=${Date.now()}` : null;
       if (!publicUrl) {
         Alert.alert('Error', 'Could not get image URL.');
         return;
@@ -163,7 +163,6 @@ export default function EditProfileScreen({ navigation }) {
           username:     trimmedUsername,
           home_course:  homeCourse.trim()  || null,
           home_country: country.trim()     || null,
-          handicap:     handicap !== ''    ? parseFloat(handicap) : null,
           bio:          bio.trim()         || null,
         })
         .eq('id', user.id);
@@ -300,18 +299,6 @@ export default function EditProfileScreen({ navigation }) {
               placeholder="Country"
               placeholderTextColor="#3A5C3C"
             />
-          </Field>
-
-          <Field label="HANDICAP (MANUAL OVERRIDE)">
-            <TextInput
-              style={s.input}
-              value={handicap}
-              onChangeText={setHandicap}
-              placeholder="e.g. 12.4"
-              placeholderTextColor="#3A5C3C"
-              keyboardType="decimal-pad"
-            />
-            <Text style={s.fieldNote}>Overrides your calculated handicap index.</Text>
           </Field>
 
           <Field label="BIO">

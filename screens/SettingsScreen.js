@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 export default function SettingsScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const handleEditProfile = () => navigation.navigate('EditProfile');
 
@@ -71,6 +71,20 @@ export default function SettingsScreen({ navigation }) {
             <Ionicons name="chevron-forward" size={16} color="#4A5C4B" />
           </TouchableOpacity>
         </View>
+
+        {/* Admin — only visible to admin accounts */}
+        {profile?.account_type === 'admin' && (
+          <>
+            <Text style={[s.sectionLabel, { marginTop: 32 }]}>ADMIN</Text>
+            <View style={s.card}>
+              <TouchableOpacity style={s.row} onPress={() => navigation.navigate('Admin')} activeOpacity={0.7}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#C9A84C" style={s.rowIcon} />
+                <Text style={s.rowLabel}>Review Queue</Text>
+                <Ionicons name="chevron-forward" size={16} color="#4A5C4B" />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         {/* Danger zone */}
         <Text style={[s.sectionLabel, { marginTop: 32 }]}>DANGER ZONE</Text>
