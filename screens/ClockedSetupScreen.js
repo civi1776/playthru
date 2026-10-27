@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import { sanitizeSearchText } from '../lib/profileColumns';
 import { CLOCKED_LAST_TRANSPORT_KEY, CLOCKED_DEFAULT_TRANSPORT } from '../lib/clockedRoundConstants';
 import { searchCourses } from '../lib/courses';
 import { useAuth } from '../context/AuthContext';
@@ -134,7 +135,7 @@ export default function ClockedSetupScreen({ navigation }) {
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, username, handicap_index')
-        .or(`username.ilike.%${playerQuery.trim()}%,full_name.ilike.%${playerQuery.trim()}%`)
+        .or(`username.ilike.%${sanitizeSearchText(playerQuery)}%,full_name.ilike.%${sanitizeSearchText(playerQuery)}%`)
         .neq('id', user?.id ?? '')
         .limit(8);
       setPlayerResults(data ?? []);

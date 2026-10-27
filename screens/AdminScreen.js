@@ -82,7 +82,10 @@ export default function AdminScreen({ navigation }) {
     setBusyId(null);
   };
 
-  if (profile && profile.account_type !== 'admin') {
+  // No profile yet (still loading, or signed out) is treated as not-admin.
+  // RLS on the queue tables is the real boundary; this just avoids firing
+  // queries and showing an empty admin UI to non-admins.
+  if (profile?.account_type !== 'admin') {
     return (
       <SafeAreaView style={s.container}>
         <View style={s.center}>

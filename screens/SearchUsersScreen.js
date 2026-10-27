@@ -22,6 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { sanitizeSearchText } from '../lib/profileColumns';
 import { useAuth } from '../context/AuthContext';
 import { sendLocalNotification, sendPushToUser } from '../lib/notifications';
 import SkeletonLoader from '../components/SkeletonLoader';
@@ -85,7 +86,7 @@ export default function SearchUsersScreen({ navigation }) {
       const { data, error: err } = await supabase
         .from('profiles')
         .select('id, full_name, username, handicap_index, home_course, avatar_url')
-        .or(`username.ilike.%${text}%,full_name.ilike.%${text}%`)
+        .or(`username.ilike.%${sanitizeSearchText(text)}%,full_name.ilike.%${sanitizeSearchText(text)}%`)
         .neq('id', myUid ?? '')
         .limit(20);
       if (err) throw err;

@@ -721,13 +721,6 @@ export default function ClockedRoundScreen({ navigation, route }) {
             'round_confirm',
             { round_id: savedRoundId, player_key: p.player_key },
           ).catch(() => {});
-          supabase.from('notifications').insert({
-            user_id: p.user_id,
-            type: 'round_confirm',
-            title: 'Confirm your round',
-            body: `${loggerName} logged an on-the-clock round at ${course?.name ?? 'a course'}.`,
-            meta: { round_id: savedRoundId, player_key: p.player_key },
-          }).catch(() => {});
         }
       }
 

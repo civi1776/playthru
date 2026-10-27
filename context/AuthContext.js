@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+import { PROFILE_COLUMNS } from '../lib/profileColumns';
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
 
 const AuthContext = createContext(null);
@@ -14,7 +15,7 @@ export function AuthProvider({ children }) {
   // Fetch all columns — strip date_of_birth client-side (COPPA: don't hold DOB in memory)
   const loadProfile = async (userId) => {
     if (!userId) { setProfile(null); return; }
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    const { data, error } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle();
     if (error) { setProfile(null); return; }
     if (data) {
       const { date_of_birth: _dob, ...safe } = data;
@@ -61,7 +62,7 @@ export function AuthProvider({ children }) {
   const refreshProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return null;
-    const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+    const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', session.user.id).maybeSingle();
     if (data) {
       const { date_of_birth: _dob, ...safe } = data;
       setProfile(safe);

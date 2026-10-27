@@ -73,15 +73,15 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: CORS });
   }
 
-  // Lightweight auth — accept either anon key or any Bearer JWT
-  // This blocks random web requests without crashing on JWT verification
+  // Auth — the caller must present the project's anon key. (verify_jwt is off
+  // for this function so the website can call it; a bare "Bearer ey…" prefix
+  // used to be accepted here, which was a prefix test rather than a check.)
   const authHeader = req.headers.get('Authorization') ?? '';
   const apiKeyHeader = req.headers.get('apikey') ?? '';
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
-  const hasValidKey = apiKeyHeader === ANON_KEY ||
-                      authHeader === `Bearer ${ANON_KEY}` ||
-                      authHeader.startsWith('Bearer ey'); // valid JWT format
+  const hasValidKey = ANON_KEY.length > 0 &&
+    (apiKeyHeader === ANON_KEY || authHeader === `Bearer ${ANON_KEY}`);
 
   if (!hasValidKey) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS });
@@ -89,7 +89,14 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const query = (url.searchParams.get('q') ?? url.searchParams.get('query') ?? '').trim();
+    // The query is interpolated into a PostgREST `.or()` filter below, so
+    // strip the characters that would let a caller append filter clauses
+    // (`,` `(` `)` `.`) and the ilike wildcards, and cap the length.
+    const query = (url.searchParams.get('q') ?? url.searchParams.get('query') ?? '')
+      .replace(/[%_,().\\"'`]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 60);
 
     if (query.length < 2) {
       return Response.json({ courses: [], source: 'local' }, { headers: CORS });

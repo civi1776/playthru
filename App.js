@@ -16,10 +16,8 @@ import { CLOCKED_ROUND_STATE_KEY } from './lib/clockedRoundConstants';
 import { ActiveRoundContext, ACTIVE_ROUND_MAX_AGE_MS } from './lib/activeRound';
 import { COLOR } from './lib/theme';
 
-import HomeScreen             from './screens/HomeScreen';
 import FeedScreen             from './screens/FeedScreen';
 import RulesScreen            from './screens/RulesScreen';
-import CoursesScreen      from './screens/CoursesScreen';
 import ProfileScreen      from './screens/ProfileScreen';
 import LeaderboardScreen  from './screens/LeaderboardScreen';
 import SplashScreen       from './screens/SplashScreen';
@@ -567,18 +565,10 @@ function AppNavigator() {
       // Set up push notifications once after auth is confirmed
       if (!notificationsSetupRef.current) {
         notificationsSetupRef.current = true;
+        // setupNotifications() saves the device's current Expo push token to
+        // the profile every time it runs, so there is no need to read
+        // push_token back first (and the client can no longer read it).
         setupNotifications();
-        // One-time token save for existing users who have no token
-        (async () => {
-          const { data: profileCheck } = await supabase
-            .from('profiles')
-            .select('push_token')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          if (!profileCheck?.push_token) {
-            refreshPushToken().catch(() => {});
-          }
-        })();
       }
       return;
     }

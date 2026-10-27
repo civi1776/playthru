@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { PROFILE_COLUMNS } from '../lib/profileColumns';
 import { useAuth } from '../context/AuthContext';
 import { sendLocalNotification, sendPushToUser } from '../lib/notifications';
 import ChallengeButton from '../components/ChallengeButton';
@@ -122,7 +123,7 @@ export default function PublicProfileScreen({ navigation, route }) {
 
       try {
         const [{ data: profileData }, { data: roundsData }, { data: followData }] = await Promise.all([
-          supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+          supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
           supabase.from('rounds')
             .select('id, course_name, created_at, holes, duration_minutes, round_format, active_game, hole_scores')
             .eq('user_id', userId)

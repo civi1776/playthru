@@ -21,9 +21,14 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 
-const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
-const strOrNull = (v: unknown): string | null => str(v) || null;
-const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+// Every free-text field is length-capped: this endpoint is reachable without
+// a session (the website form posts here) and writes with the service role,
+// so unbounded input would be a cheap way to bloat the table.
+const SHORT = 120;   // names, handles, sport, slug
+const LONG  = 2000;  // "why compete"
+const str = (v: unknown, max = SHORT): string => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+const strOrNull = (v: unknown, max = SHORT): string | null => str(v, max) || null;
+const isEmail = (v: string) => v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -45,7 +50,7 @@ serve(async (req) => {
   const player1_sport    = str(body.player1_sport);
   const player2_name     = str(body.player2_name);
   const player2_sport    = str(body.player2_sport);
-  const why_compete      = str(body.why_compete);
+  const why_compete      = str(body.why_compete, LONG);
 
   if (!team_name)             return json({ error: 'Team name is required.' }, 400);
   if (!isEmail(contact_email)) return json({ error: 'A valid contact email is required.' }, 400);
@@ -69,6 +74,19 @@ serve(async (req) => {
     const { data: userData } = await supabase.auth.getUser(token);
     user_id = userData?.user?.id ?? null;
   }
+  // A website submission can't be linked to an account, and an app
+  // submission is always linked — so usernames are only trusted when they
+  // belong to the verified caller's own profile. Anything else is dropped
+  // rather than letting a stranger "apply as" another member.
+  let verified_username: string | null = null;
+  if (user_id) {
+    const { data: prof } = await supabase.from('profiles').select('username').eq('id', user_id).maybeSingle();
+    verified_username = prof?.username ?? null;
+  }
+  const claimedUsername = (v: unknown) => {
+    const u = strOrNull(v);
+    return u && verified_username && u.toLowerCase() === verified_username.toLowerCase() ? verified_username : null;
+  };
 
   const { data, error } = await supabase
     .from('tournament_applications')
@@ -82,11 +100,13 @@ serve(async (req) => {
       player1_handicap:  strOrNull(body.player1_handicap),
       player1_sport,
       player1_instagram: strOrNull(body.player1_instagram),
-      player1_username:  strOrNull(body.player1_username),
+      player1_username:  claimedUsername(body.player1_username),
       player2_name,
       player2_handicap:  strOrNull(body.player2_handicap),
       player2_sport,
       player2_instagram: strOrNull(body.player2_instagram),
+      // Player 2 is a different person; their handle can't be verified here
+      // and is kept only as a free-text hint for the reviewer.
       player2_username:  strOrNull(body.player2_username),
       why_compete,
       status: 'pending',

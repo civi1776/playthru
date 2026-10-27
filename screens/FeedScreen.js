@@ -361,17 +361,9 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
         const name = me?.username ? `@${me.username}` : (me?.full_name?.split(' ')[0] ?? 'Someone');
         const snippet = body.length > 60 ? body.slice(0, 60) + '\u2026' : body;
 
-        // Push notification
-        sendPushToUser(activity.user_id, `${name} commented`, `"${snippet}"`, 'comment', { activity_id: activity.id }).catch(() => {});
-
-        // In-app notification row
-        supabase.from('notifications').insert({
-          user_id: activity.user_id,
-          type: 'comment',
-          title: `${name} commented`,
-          body: `"${snippet}"`,
-          meta: { activity_id: activity.id, round_id: activity.round_id ?? null },
-        }).catch(() => {});
+        // Push + in-app inbox row (both written server-side by send-push)
+        sendPushToUser(activity.user_id, `${name} commented`, `"${snippet}"`, 'comment',
+          { activity_id: activity.id, round_id: activity.round_id ?? null }).catch(() => {});
       }
     } catch {} finally { setPosting(false); }
   };

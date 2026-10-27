@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { TouchableOpacity, Text, StyleSheet, Alert, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { sendPushToUser } from '../lib/notifications';
 import { useAuth } from '../context/AuthContext';
 
 export default function ChallengeButton({ targetUserId, targetUsername, courseName, challengerScore, variant }) {
@@ -36,16 +37,14 @@ export default function ChallengeButton({ targetUserId, targetUsername, courseNa
                 .select('id')
                 .maybeSingle();
               const myHandle = myProfile?.username ? `@${myProfile.username}` : 'Someone';
-              await supabase.from('notifications').insert({
-                user_id: targetUserId,
-                type:    'challenge_received',
-                title:   "You've been challenged! ⚡",
-                body:    `${myHandle} challenges you at ${courseName}. Beat their ${challengerScore != null ? `${scoreStr} Clocked Score` : 'score'}.`,
-                meta:    { challenge_id: ch?.id, challenger_id: user.id, challenger_username: myProfile?.username ?? '', course_name: courseName },
-              });
-              supabase.functions.invoke('send-push', {
-                body: { userId: targetUserId, title: "You've been challenged! ⚡", body: `${courseName} · Beat ${scoreStr} in 30 days.` },
-              }).catch(() => {});
+              // Push + inbox row are both written server-side by send-push.
+              await sendPushToUser(
+                targetUserId,
+                "You've been challenged! ⚡",
+                `${myHandle} challenges you at ${courseName}. Beat their ${challengerScore != null ? `${scoreStr} Clocked Score` : 'score'}.`,
+                'challenge_received',
+                { challenge_id: ch?.id, challenger_id: user.id, challenger_username: myProfile?.username ?? '', course_name: courseName },
+              );
             } catch { /* silent fail */ }
             setSending(false);
           },

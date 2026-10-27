@@ -19,7 +19,6 @@
       "backgroundColor": "#090F0A",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "Clocked uses your location to show nearby courses first.",
         "NSPhotoLibraryUsageDescription": "Clocked uses your photo library so you can set a profile picture.",
         "NSCameraUsageDescription": "Clocked uses your camera to take a profile photo.",
         "NSPhotoLibraryAddUsageDescription": "Clocked saves your Clocked Score share card to your photo library.",
@@ -44,8 +43,6 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
@@ -84,12 +81,6 @@
         "expo-image-picker",
         {
           "photosPermission": "Clocked uses your photo library so you can set a profile picture."
-        }
-      ],
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Clocked uses your location to show nearby courses first."
         }
       ],
       "expo-audio",

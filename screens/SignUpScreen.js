@@ -31,31 +31,7 @@ function withTimeout(promise, ms = NETWORK_TIMEOUT_MS) {
   ]);
 }
 
-// ─── Welcome email builder ────────────────────────────────────────────────────
-function buildWelcomeEmail({ firstName, username, referralCode }) {
-  const name = firstName || username || 'Golfer';
-  return `<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background:#090F0A;font-family:Georgia,serif;">
-  <div style="max-width:520px;margin:40px auto;background:#0D1A0F;border-radius:16px;border:1px solid rgba(125,200,122,0.25);padding:40px 36px;">
-    <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:#C9A84C;letter-spacing:5px;font-family:Arial,sans-serif;">CLOCKED GOLF</p>
-    <p style="margin:0 0 28px;font-size:9px;color:rgba(125,200,122,0.5);letter-spacing:3px;font-family:Arial,sans-serif;">GOLF ON THE CLOCK</p>
-    <h1 style="margin:0 0 8px;font-size:26px;font-weight:400;color:#F5EDD8;">Welcome, ${name}.</h1>
-    <p style="margin:0 0 24px;font-size:13px;color:rgba(245,237,216,0.6);letter-spacing:1px;font-family:Arial,sans-serif;">YOUR ACCOUNT IS READY</p>
-    <hr style="border:none;border-top:1px solid rgba(125,200,122,0.15);margin:0 0 24px;" />
-    <p style="margin:0 0 20px;font-size:15px;color:#F5EDD8;line-height:1.6;">Log your first round to get your official Clocked Score and see where you rank nationally.</p>
-    ${referralCode ? `
-    <div style="background:rgba(125,200,122,0.08);border:1px solid rgba(125,200,122,0.2);border-radius:10px;padding:16px 20px;margin-bottom:24px;">
-      <p style="margin:0 0 4px;font-size:9px;font-weight:700;color:rgba(125,200,122,0.6);letter-spacing:3px;font-family:Arial,sans-serif;">YOUR REFERRAL CODE</p>
-      <p style="margin:0;font-size:22px;font-weight:700;color:#C9A84C;letter-spacing:4px;font-family:Arial,sans-serif;">${referralCode}</p>
-      <p style="margin:6px 0 0;font-size:12px;color:rgba(245,237,216,0.5);font-family:Arial,sans-serif;">Share with friends.</p>
-    </div>` : ''}
-    <p style="margin:0 0 6px;font-size:12px;color:rgba(245,237,216,0.4);font-family:Arial,sans-serif;">Questions? <a href="mailto:hello@clocked.golf" style="color:#C9A84C;">hello@clocked.golf</a></p>
-    <p style="margin:0;font-size:11px;color:rgba(245,237,216,0.25);font-family:Arial,sans-serif;">Clocked Golf</p>
-  </div>
-</body>
-</html>`;
-}
+// The welcome email template now lives in the send-email Edge Function.
 
 export default function SignUpScreen({ navigation }) {
   const { refreshProfile } = useAuth();
@@ -191,17 +167,16 @@ export default function SignUpScreen({ navigation }) {
         read: false,
       }).catch(() => {});
 
-      // 7. Welcome email (fire-and-forget)
+      // 7. Welcome email (fire-and-forget). The template is rendered server-
+      // side and always goes to the signed-in user's own address — the
+      // function no longer accepts a recipient or raw HTML from the client.
       const nameParts = fullNameVal.split(' ');
       supabase.functions.invoke('send-email', {
         body: {
-          to: emailVal,
-          subject: "Welcome to Clocked Golf",
-          html: buildWelcomeEmail({
-            firstName: nameParts[0] || '',
-            username: usernameVal,
-            referralCode: refCode,
-          }),
+          template: 'welcome',
+          firstName: nameParts[0] || '',
+          username: usernameVal,
+          referralCode: refCode,
         },
       }).catch(() => {});
 
