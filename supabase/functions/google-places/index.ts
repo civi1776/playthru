@@ -1,9 +1,11 @@
 // ─── google-places — course photo lookup proxy ──────────────────────────────
 // Keeps GOOGLE_PLACES_API_KEY server-side. Returns { photoUrl } only.
 //
-// Auth: the caller must present the project's anon key (apikey header or
-// Bearer). A bare "Bearer ey…" prefix used to be accepted — it was a
-// prefix test, not a check — and is no longer.
+// Auth: the gateway verifies the JWT (verify_jwt = true in config.toml);
+// requestHasProjectKey() additionally checks the token is for this project.
+// A bare "Bearer ey…" prefix used to be accepted and is no longer.
+import { requestHasProjectKey } from '../_shared/callerKey.ts';
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -16,12 +18,7 @@ const noPhoto = () => Response.json({ photoUrl: null }, { headers: CORS });
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
-  const authHeader   = req.headers.get('Authorization') ?? '';
-  const apiKeyHeader = req.headers.get('apikey') ?? '';
-  const ANON_KEY     = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-  const hasValidKey  = ANON_KEY.length > 0 &&
-    (apiKeyHeader === ANON_KEY || authHeader === `Bearer ${ANON_KEY}`);
-  if (!hasValidKey) {
+  if (!(await requestHasProjectKey(req))) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS });
   }
 

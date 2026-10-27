@@ -9,7 +9,7 @@ Method: static review of every client-side database call (verified against the l
 
 Before this work the app's security boundary was almost entirely the RLS *row* policies, and several of them were wide enough that any holder of the public anon key (which ships inside the app binary) could read every user's email address and Expo push token, and any signed-in user could promote themselves to admin, grant themselves Pro, or send email from `hello@clocked.golf` to anyone. Those are fixed in code (edge functions, client) and in a prepared migration (database). After the migration is applied, remaining risk is moderate and mostly structural: scores are still self-reported by design, the auth session is stored unencrypted on device, and the public edge endpoints have no rate limiting beyond what is built into send-push.
 
-**Status of the database migration: written, dry-run verified, NOT applied.** It is a production change; see §6.
+**Status: the database migration was applied and all five edge functions were deployed on 2026-10-27**, after the dry-run below and with explicit authorization. Live verification results are in §5.
 
 ## 2. Code removed or simplified
 
@@ -71,7 +71,9 @@ Severity uses Critical / High / Medium / Low / Info. "Verified" means reproduced
 - **Fix:** Migration §6/§7 — policy dropped, UPDATE granted to `authenticated` (now scoped by the admin policy only), all write privileges removed from `anon`, TRUNCATE/TRIGGER/REFERENCES removed everywhere, defaults set for future tables.
 
 ### SEC-09 — Medium — Weak auth prefix check in `google-places` and `search-courses`
-- `authHeader.startsWith('Bearer ey')` accepted literally `Bearer ey`. Both billable upstream calls (Google Places ×2, GolfCourseAPI) were reachable without the anon key. **Fix:** exact anon-key match; input length caps; `google-places` only returns redirect targets on Google hosts.
+- `authHeader.startsWith('Bearer ey')` accepted literally `Bearer ey`. Both billable upstream calls (Google Places ×2, GolfCourseAPI) were reachable without the anon key.
+- **Discovered during deployment:** the platform-injected `SUPABASE_ANON_KEY` inside the functions does *not* equal the legacy anon JWT embedded in the app (digest mismatch; an exact-match check returned 401 for the real app). The old "exact match" branches had therefore never been what admitted the app; only the prefix test was.
+- **Fix:** `supabase/functions/_shared/callerKey.ts` — the token must decode as a Supabase JWT for this project ref with role `anon`/`authenticated` and an unexpired `exp`; if a `JWT_SECRET` secret is configured the HS256 signature is verified as well (recommended: `npx supabase secrets set JWT_SECRET=<project JWT secret from the dashboard>`). `google-places` additionally has gateway verification (`verify_jwt = true`). Input length caps; `google-places` only returns redirect targets on Google hosts. Verified live: real anon key → handler reached; `Bearer ey` → 401; forged claims for another project ref → 401.
 
 ### SEC-10 — Low — `tournament-apply` accepts unbounded unauthenticated input with the service role
 - Reachable by design (website form). **Fix:** per-field length caps (120 / 2000 chars), email length cap, and `player1_username` is only stored when it matches the verified caller's own profile (so applicants can't "apply as" another member). Rate limiting still needs infrastructure (see §7).
@@ -104,7 +106,7 @@ Severity uses Critical / High / Medium / Low / Info. "Verified" means reproduced
 - `package.json`, `package-lock.json`, `app.json` — dependency and permission removal; audit fixes.
 
 **Backend (edge functions — must be deployed, see §6)**
-- `supabase/functions/send-push/index.ts`, `send-email/index.ts`, `google-places/index.ts` — rewritten.
+- `supabase/functions/send-push/index.ts`, `send-email/index.ts`, `google-places/index.ts` — rewritten; `supabase/functions/_shared/callerKey.ts` *(new)* — project-key check shared by the key-gated functions.
 - `supabase/functions/search-courses/index.ts`, `tournament-apply/index.ts` — auth / validation patches.
 - `supabase/config.toml` — explicit `verify_jwt` per function.
 
@@ -117,26 +119,24 @@ Severity uses Critical / High / Medium / Low / Info. "Verified" means reproduced
 |---|---|
 | Migration dry-run (full file inside `BEGIN … ROLLBACK`) | Ran without error. Privilege assertions: anon/authenticated cannot read `email`/`push_token`, can read `username`/`bio`; anon cannot INSERT rounds; authenticated can; authenticated can UPDATE courses (admin policy only), cannot UPDATE app_config, cannot TRUNCATE; broad course policy gone; 3 triggers installed; `update_profile_safe` gone. |
 | Guard behaviour as simulated `authenticated` client (rolled back) | A: insert claiming admin/pro/referral_count=99 → stored as golfer/false/0. B: update own `account_type` → `42501`. C: update of allowed fields incl. `bio`, first-time `email` → OK. D: `select email` → permission denied. E: round insert claiming `verified` → stored `self_reported`, `flagged_count 0`. F: `holes=7` → rejected. G: `increment_referral_count` through the guard → `referred_by` set, referrer count +1. H1: participant confirms own row → OK. H2: participant changes `total_points` → `42501`. I: anon can still read public profile columns. |
+| **Live verification after apply + deploy** (anonymous, from outside) | `profiles?select=email,push_token` → 401 permission denied; `profiles?select=id,username,avatar_url` → 200; `profiles?select=*` → 401 (so old app builds must be updated); anon `INSERT rounds` → 401; `send-push` / `send-email` with anon key only → 401; `google-places` / `search-courses` with `Bearer ey` or a forged token → 401; with the real anon key both reach their handlers. With the simulator's genuine user session: `send-email` bogus template → 400 "Unknown template", `send-push` bad userId → 400 — i.e. session auth passes and validation rejects, as designed. The app relaunched on the migrated database and restored its session through the explicit-column profile read. |
 | Production JS bundle (`expo export --platform ios`) | Succeeded: 4.2 MB Hermes bundle, exit 0, no warnings about missing modules. |
 | Simulator smoke test (iPhone 17 Pro, dev client on the modified JS) | Cold launch restores the session through the explicit-column profile read; Feed, Profile (You) and Find Players render; a search for `ale,(x` (filter metacharacters) returns normal results instead of a PostgREST parse error. Writes were not exercised against production data. |
 | `npm audit --omit=dev` | 4 high, all `zod` via `@expo/cli` (build tooling). |
 | Existing test suite | None exists in the repo. Lint/type-check configs: none (JS project, `tsconfig` only extends Expo's base). |
 
-## 6. Outstanding — requires your action
+## 6. Done on 2026-10-27, and what is still outstanding
 
-1. **Apply the migration** (production database change). Recommended: take a dashboard backup first, then
-   ```bash
-   cd ~/Documents/playthru && npx supabase db push --linked
-   ```
-   Then add `'bio'` to `PROFILE_COLUMNS` in `lib/profileColumns.js` so the Edit Profile screen pre-fills it. **Ship the app build that contains the explicit-column reads before or together with the migration**; the old binary's `select('*')` on profiles fails after the migration (users on old builds would be stuck on the loading gate → Welcome).
-2. **Deploy the edge functions** (the old `send-push` and `send-email` stay exploitable until then):
-   ```bash
-   cd ~/Documents/playthru && npx supabase functions deploy send-push send-email google-places search-courses tournament-apply
-   ```
-   The client change to `sendPushToUser` and the new `send-email` payload are not backward compatible with the *old* functions, so deploy functions and app together.
-3. **Rotate nothing** — no private credential was found exposed. The anon key is public by design.
-4. **Course search 500** (found earlier, unrelated to security) still needs the function logs from the dashboard.
-5. **Native rebuild** (`npx expo run:ios` / EAS build) — two native packages and a permission were removed.
+**Applied / deployed**
+- Migration `20261027120000_security_hardening.sql` applied to the production database through `supabase db query --linked` in a single transaction (the same path as the dry-run). `supabase db push` could not be used: the remote migration history contains 22 dashboard-applied versions that were never checked into the repo. Both local migrations were then recorded with `supabase migration repair --status applied`. To make `db push` usable again, run `npx supabase db pull` once and commit the resulting files.
+- All five edge functions deployed (`send-push`, `send-email`, `google-places`, `search-courses`, `tournament-apply`) with the `verify_jwt` settings in `config.toml`.
+- `'bio'` added to `PROFILE_COLUMNS` now that the column exists.
+
+**Still outstanding**
+1. **Ship the app build.** Old binaries do `select('*')` on profiles, which now fails → users on old builds will hit the loading gate and land on Welcome until they update. Also, the old client's `send-email` payload (`to/subject/html`) is rejected by the new function (harmless: welcome email just doesn't send for old builds). Requires a native rebuild anyway (two native packages and a permission were removed): `npx expo run:ios` / EAS build, then App Store submission with `min_build_number` in `app_config` bumped once the new build is out.
+2. **Optional but recommended:** set `JWT_SECRET` as a function secret so `search-courses` verifies signatures rather than claims (see SEC-09).
+3. **Course search 500** (found earlier, unrelated to security) still needs the function logs from the dashboard.
+4. **Rotate nothing** — no private credential was found exposed. The anon key is public by design.
 
 ## 7. Operational recommendations
 
@@ -150,7 +150,7 @@ Severity uses Critical / High / Medium / Low / Info. "Verified" means reproduced
 
 ## 8. Files changed
 
-Added: `lib/profileColumns.js`, `supabase/migrations/20261027120000_security_hardening.sql`, `docs/SECURITY_AUDIT_2026-10.md`.
+Added: `lib/profileColumns.js`, `supabase/functions/_shared/callerKey.ts`, `supabase/migrations/20261027120000_security_hardening.sql`, `docs/SECURITY_AUDIT_2026-10.md`.
 Modified: `App.js`, `app.json`, `package.json`, `package-lock.json`, `context/AuthContext.js`, `lib/notifications.js`, `lib/popScore.js`, `lib/referrals.js`, `components/ChallengeButton.js`, `screens/AdminScreen.js`, `screens/ClockedRoundScreen.js`, `screens/ClockedSetupScreen.js`, `screens/FeedScreen.js`, `screens/PublicProfileScreen.js`, `screens/SearchUsersScreen.js`, `screens/SignUpScreen.js`, `supabase/config.toml`, `supabase/functions/{send-push,send-email,google-places,search-courses,tournament-apply}/index.ts`.
 Deleted: `screens/LiveRoundScreen.js`, `screens/HomeScreen.js`, `screens/CoursesScreen.js`, `lib/gameEngines.js`, `lib/mockGreens.js`, `lib/geo.js`, `lib/handicap.js`, `components/RangefinderCard.js`, `hooks/useCurrentLocation.js`.
 Untracked (kept on disk): `.env`, `supabase/.temp/*`.

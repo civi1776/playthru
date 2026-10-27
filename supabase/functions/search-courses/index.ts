@@ -61,6 +61,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requestHasProjectKey } from '../_shared/callerKey.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -73,17 +74,11 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: CORS });
   }
 
-  // Auth — the caller must present the project's anon key. (verify_jwt is off
-  // for this function so the website can call it; a bare "Bearer ey…" prefix
-  // used to be accepted here, which was a prefix test rather than a check.)
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const apiKeyHeader = req.headers.get('apikey') ?? '';
-  const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-
-  const hasValidKey = ANON_KEY.length > 0 &&
-    (apiKeyHeader === ANON_KEY || authHeader === `Bearer ${ANON_KEY}`);
-
-  if (!hasValidKey) {
+  // Auth — the caller must present a project API key / session JWT (see
+  // _shared/callerKey.ts). verify_jwt is off at the gateway for this function
+  // so the website can call it; a bare "Bearer ey…" prefix used to be
+  // accepted here, which was a prefix test rather than a check.
+  if (!(await requestHasProjectKey(req))) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS });
   }
 
