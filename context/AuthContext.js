@@ -25,10 +25,23 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Resolve the profile BEFORE clearing `initializing`. The root navigator
+    // picks its initial route from (session && profile), so if we flip the
+    // flag while the profile is still in flight a returning user sees the
+    // Welcome screen flash before being reset to Main.
+    // Capped so a hung network can't leave the app on the loading spinner:
+    // after the cap we proceed with whatever we have (profile may still land
+    // later and the navigator reacts to it).
+    const PROFILE_WAIT_CAP_MS = 6000;
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) loadProfile(session.user.id);
+      if (session?.user) {
+        await Promise.race([
+          loadProfile(session.user.id),
+          new Promise(resolve => setTimeout(resolve, PROFILE_WAIT_CAP_MS)),
+        ]);
+      }
       setInitializing(false);
     });
 

@@ -32,9 +32,11 @@ export default function TournamentApplyScreen({ navigation }) {
   const [email, setEmail]             = useState(profile?.email || user?.email || '');
   const [p1Name, setP1Name]           = useState(profile?.full_name || '');
   const [p1Handicap, setP1Handicap]   = useState(profile?.handicap_index != null ? String(profile.handicap_index) : '');
+  const [p1Sport, setP1Sport]         = useState('');
   const [p1Instagram, setP1Instagram] = useState('');
   const [p2Name, setP2Name]           = useState('');
   const [p2Handicap, setP2Handicap]   = useState('');
+  const [p2Sport, setP2Sport]         = useState('');
   const [p2Instagram, setP2Instagram] = useState('');
   const [p2Username, setP2Username]   = useState('');
   const [whyCompete, setWhyCompete]   = useState('');
@@ -44,11 +46,11 @@ export default function TournamentApplyScreen({ navigation }) {
   const [errorMsg, setErrorMsg]     = useState(null);
 
   const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  const canSubmit = teamName.trim() && isEmail(email.trim()) && p1Name.trim() && p2Name.trim() && whyCompete.trim() && !submitting;
+  const canSubmit = teamName.trim() && isEmail(email.trim()) && p1Name.trim() && p1Sport.trim() && p2Name.trim() && p2Sport.trim() && whyCompete.trim() && !submitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) {
-      Alert.alert('Missing info', 'Team name, email, both player names, and why your team should compete are required.');
+      Alert.alert('Missing info', 'Team name, email, both player names, the sport each player played, and why your team should compete are required.');
       return;
     }
     setSubmitting(true);
@@ -62,10 +64,12 @@ export default function TournamentApplyScreen({ navigation }) {
           contact_email: email.trim(),
           player1_name: p1Name.trim(),
           player1_handicap: p1Handicap.trim(),
+          player1_sport: p1Sport.trim(),
           player1_instagram: p1Instagram.trim(),
           player1_username: profile?.username || null,
           player2_name: p2Name.trim(),
           player2_handicap: p2Handicap.trim(),
+          player2_sport: p2Sport.trim(),
           player2_instagram: p2Instagram.trim(),
           player2_username: p2Username.trim(),
           why_compete: whyCompete.trim(),
@@ -90,7 +94,7 @@ export default function TournamentApplyScreen({ navigation }) {
           <Text style={s.successBody}>
             Thank you for applying to the Clocked Golf tournament series. We review every application personally and will be in touch as tournaments are announced in your area. Selected teams will receive full entry details and next steps.
           </Text>
-          <Text style={s.successClosing}>Welcome to golf on the clock.</Text>
+          <Text style={s.successClosing}>The athletic way to play golf.</Text>
           <TouchableOpacity style={s.doneBtn} onPress={() => navigation.navigate('Main')} activeOpacity={0.85}>
             <Text style={s.doneBtnText}>DONE</Text>
           </TouchableOpacity>
@@ -111,7 +115,7 @@ export default function TournamentApplyScreen({ navigation }) {
 
           <Text style={s.eyebrow}>APPLY TO COMPETE</Text>
           <Text style={s.title}>The Clocked Golf Tournament Series</Text>
-          <Text style={s.subtitle}>Tell us about your game. We'll reach out as tournaments are announced in your area.</Text>
+          <Text style={s.subtitle}>This series is for athletes. Tell us what you played, tell us about your game, and we'll reach out as tournaments are announced in your area.</Text>
 
           <Field label="TEAM NAME">
             <TextInput style={s.input} value={teamName} onChangeText={setTeamName} placeholder="Your team name" placeholderTextColor="#3A5C3C" />
@@ -128,6 +132,9 @@ export default function TournamentApplyScreen({ navigation }) {
           <Field label="HANDICAP">
             <TextInput style={s.input} value={p1Handicap} onChangeText={setP1Handicap} placeholder="e.g. 4.2" placeholderTextColor="#3A5C3C" keyboardType="numbers-and-punctuation" />
           </Field>
+          <Field label="SPORT YOU PLAYED" note="Any sport, any level. High school, college, club, rec league, or pro.">
+            <TextInput style={s.input} value={p1Sport} onChangeText={setP1Sport} placeholder="Lacrosse — college" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
+          </Field>
           <Field label="INSTAGRAM (OPTIONAL)">
             <TextInput style={s.input} value={p1Instagram} onChangeText={setP1Instagram} placeholder="@handle" placeholderTextColor="#3A5C3C" autoCapitalize="none" />
           </Field>
@@ -138,6 +145,9 @@ export default function TournamentApplyScreen({ navigation }) {
           </Field>
           <Field label="HANDICAP">
             <TextInput style={s.input} value={p2Handicap} onChangeText={setP2Handicap} placeholder="e.g. 8.7" placeholderTextColor="#3A5C3C" keyboardType="numbers-and-punctuation" />
+          </Field>
+          <Field label="SPORT THEY PLAYED" note="Any sport, any level.">
+            <TextInput style={s.input} value={p2Sport} onChangeText={setP2Sport} placeholder="Soccer — high school" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
           </Field>
           <Field label="INSTAGRAM (OPTIONAL)">
             <TextInput style={s.input} value={p2Instagram} onChangeText={setP2Instagram} placeholder="@handle" placeholderTextColor="#3A5C3C" autoCapitalize="none" />

@@ -7,6 +7,7 @@ export default function WelcomeScreen({ navigation }) {
       {/* Upper third — wordmark */}
       <View style={s.upper}>
         <Text style={s.wordmark}>CLOCKED</Text>
+        <Text style={s.motto}>THE ATHLETIC WAY TO PLAY GOLF.</Text>
       </View>
 
       {/* Center block — hero copy */}
@@ -65,6 +66,10 @@ const s = StyleSheet.create({
   wordmark: {
     fontSize: 13, fontWeight: '700', color: '#F5EDD8',
     letterSpacing: 6,
+  },
+  motto: {
+    fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2,
+    marginTop: 8,
   },
   center: {
     paddingHorizontal: 28,

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useActiveRoundInset } from '../lib/activeRound';
 import {
   computeTimePar, timePenalty, pointsForHole, formatSeconds,
   DEFAULT_CLOCK_COEFFICIENTS, DEFAULT_PENALTY_PARAMS,
@@ -158,6 +159,9 @@ function WorkedExample() {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function RulesScreen({ navigation }) {
+  // Extra bottom padding while the floating ROUND IN PROGRESS banner is up,
+  // so the last section isn't hidden underneath it.
+  const bannerInset = useActiveRoundInset();
   const playCTA = () => {
     const root = navigation.getParent();
     if (root) root.navigate('ClockedSetup');
@@ -168,7 +172,7 @@ export default function RulesScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       <View style={s.tabHeader}><Text style={s.tabHeaderText}>The On-the-Clock Rules</Text></View>
 
-      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: 40 + bannerInset }]} showsVerticalScrollIndicator={false}>
 
         {/* HERO */}
         <View style={s.hookBlock}>

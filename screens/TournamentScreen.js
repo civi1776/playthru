@@ -7,12 +7,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLOR, SPACING, RADIUS } from '../lib/theme';
 
 const WHO_LIST = [
-  'Competitive golfers',
-  'Former athletes',
-  'Club champions',
-  'College players',
-  'High-level amateurs',
-  'People who compete',
+  'High school',
+  'College',
+  'Club',
+  'Rec league',
+  'Pro',
+  'Any sport. Any level.',
 ];
 
 const FORMAT_ITEMS = [
@@ -40,13 +40,13 @@ export default function TournamentScreen({ navigation }) {
 
         {/* Hero */}
         <View style={s.hero}>
-          <Text style={s.overline}>NATIONWIDE {'\u00B7'} SERIES APPLICATIONS OPEN</Text>
+          <Text style={s.overline}>NATIONWIDE {'\u00B7'} THE TOURNAMENT FOR ATHLETES</Text>
           <Text style={s.heroTitle}>The Clocked Golf</Text>
           <Text style={s.heroSub}>Tournament Series</Text>
           <View style={s.heroDivider} />
           <Text style={s.heroStatement}>
-            The first competitive golf format built around{' '}
-            <Text style={s.heroStatementStrong}>pace, pressure, and performance.</Text>
+            The tournament for athletes.{' '}
+            <Text style={s.heroStatementStrong}>If you've competed in another sport, this is your golf tournament.</Text>
           </Text>
 
           <View style={s.metaRow}>
@@ -69,13 +69,29 @@ export default function TournamentScreen({ navigation }) {
 
         {/* Declaration */}
         <View style={s.section}>
-          <Text style={s.eyebrow}>A NEW KIND OF COMPETITION</Text>
-          <Text style={s.declarationLine}>Golf has never had a shot clock.</Text>
-          <Text style={[s.declarationLine, s.accent]}>Until now.</Text>
+          <Text style={s.eyebrow}>BUILT FOR ATHLETES</Text>
+          <Text style={s.declarationLine}>You've competed before.</Text>
+          <Text style={[s.declarationLine, s.accent]}>Now compete in golf.</Text>
           <Text style={s.body}>
-            The Clocked Golf Tournament Series is the foundation of a national competitive circuit built around pace, pressure, and performance. Two-player teams. A visible shot clock on every hole. Live scoring. Real consequences for slow play.{'\n\n'}
-            This format makes golf feel like an athletic team sport — not a solitary leisure activity. Every shot carries consequence. Every decision matters.
+            The Clocked Golf Tournament Series is a national circuit for people who treat golf like a sport. Two-player teams. Nine holes. A visible shot clock on every hole. Live scoring. Real consequences for slow play.{'\n\n'}
+            No four-hour strolls. You play fast, you play under pressure, and your score counts.
           </Text>
+        </View>
+
+        {/* Eligibility */}
+        <View style={s.section}>
+          <Text style={s.eyebrow}>WHO CAN COMPETE</Text>
+          <Text style={s.sectionTitle}>You must have played another organized sport.</Text>
+          <Text style={[s.body, { marginBottom: 16 }]}>
+            Any sport. Any level. If you suited up for a team and competed, you qualify. We ask what you played on the application.
+          </Text>
+          <View style={s.whoList}>
+            {WHO_LIST.map(item => (
+              <View key={item} style={s.whoItem}>
+                <Text style={s.whoItemText}>{item}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Format */}
@@ -98,17 +114,10 @@ export default function TournamentScreen({ navigation }) {
         {/* Who */}
         <View style={s.section}>
           <Text style={s.eyebrow}>WHO WE'RE LOOKING FOR</Text>
-          <Text style={s.sectionTitle}>People who embrace pressure rather than avoid it.</Text>
-          <Text style={[s.body, { marginBottom: 16 }]}>
-            Each tournament field is intentionally limited. We are selecting competitors who represent the future of the game.
+          <Text style={s.sectionTitle}>Athletes who want pressure, not a leisurely stroll.</Text>
+          <Text style={s.body}>
+            Every field is limited. Applications are reviewed by hand, and we pick competitors who bring an athlete's mindset to the course: fast, focused, and ready to perform when it counts.
           </Text>
-          <View style={s.whoList}>
-            {WHO_LIST.map(item => (
-              <View key={item} style={s.whoItem}>
-                <Text style={s.whoItemText}>{item}</Text>
-              </View>
-            ))}
-          </View>
         </View>
 
         {/* Why */}
@@ -136,7 +145,7 @@ export default function TournamentScreen({ navigation }) {
             ))}
           </View>
           <Text style={[s.body, { marginTop: 16 }]}>
-            Exclusive merchandise. Awards presentation. A competitive atmosphere built for athletes — built for people who believe golf can evolve.
+            Exclusive merchandise. Awards presentation. A competitive atmosphere built for athletes, by people who play golf the athletic way.
           </Text>
         </View>
 
@@ -145,7 +154,7 @@ export default function TournamentScreen({ navigation }) {
           <Text style={s.eyebrow}>APPLY TO COMPETE</Text>
           <Text style={s.sectionTitle}>Interest applications are now open.</Text>
           <Text style={s.body}>
-            Submit your application to be considered for tournaments as they are announced in your area. Field sizes are limited — not all applicants will be accepted. If you believe golf should be played with urgency, intention, and competitive spirit — we want to hear from you.
+            Submit your application to be considered for tournaments as they are announced in your area. Field sizes are limited and not every team will be accepted. Tell us what you played, and why your team belongs in the field.
           </Text>
           <TouchableOpacity
             style={s.applyBtn}
@@ -154,7 +163,7 @@ export default function TournamentScreen({ navigation }) {
           >
             <Text style={s.applyBtnText}>APPLY TO COMPETE {'\u2192'}</Text>
           </TouchableOpacity>
-          <Text style={s.closing}>Welcome to golf on the clock.</Text>
+          <Text style={s.closing}>The athletic way to play golf.</Text>
         </View>
 
       </ScrollView>

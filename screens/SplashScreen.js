@@ -42,7 +42,7 @@ export default function SplashScreen({ onFinish }) {
         <Text style={s.wordmark}>Clocked</Text>
         <View style={s.divider} />
         <Animated.Text style={[s.tagline, { opacity: taglineOpacity }]}>
-          GOLF AS A SPORT.
+          THE ATHLETIC WAY TO PLAY GOLF.
         </Animated.Text>
       </Animated.View>
     </Animated.View>
@@ -80,6 +80,6 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#C9A84C',
-    letterSpacing: 4,
+    letterSpacing: 3,
   },
 });

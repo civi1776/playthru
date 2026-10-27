@@ -16,6 +16,7 @@ import InitialsAvatar from '../components/InitialsAvatar';
 import CourseAvatar from '../components/CourseAvatar';
 import { sendPushToUser } from '../lib/notifications';
 import { scoreTier, COLOR } from '../lib/theme';
+import { useActiveRoundInset } from '../lib/activeRound';
 
 // "Very recent" window for the live pulse indicator — purely presentational,
 // mirrors the freshness cue used on the live-round banner elsewhere in the app.
@@ -154,8 +155,12 @@ function RoundContentCard({ content, navigation }) {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         {content?.course_name ? <CourseAvatar courseName={content.course_name} city={content.city ?? null} size={isHero ? 48 : 44} /> : null}
         <View style={{ flex: 1 }}>
-          <Text style={s.roundCourse} numberOfLines={1}>{content?.course_name || 'Quick Play'}</Text>
-          {parts.length > 0 && <Text style={s.roundDetails}>{parts.join(' \u00B7 ')}</Text>}
+          <Text style={s.roundCourse} numberOfLines={2}>{content?.course_name || 'Quick Play'}</Text>
+          {parts.length > 0 && (
+            <Text style={s.roundDetails} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+              {parts.join(' \u00B7 ')}
+            </Text>
+          )}
           {clockResult && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
               <Ionicons
@@ -469,6 +474,9 @@ const cs = StyleSheet.create({
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function FeedScreen({ navigation }) {
+  // Extra bottom padding while the floating ROUND IN PROGRESS banner is up,
+  // so the last card isn't hidden underneath it.
+  const bannerInset = useActiveRoundInset();
   const { user, profile } = useAuth();
   const uid = user?.id;
 
@@ -626,12 +634,15 @@ export default function FeedScreen({ navigation }) {
       <View style={s.header}>
         <View>
           <Text style={s.wordmark}>CLOCKED</Text>
-          <Text style={s.tagline}>GOLF AS A SPORT.</Text>
+          <Text style={s.tagline}>THE ATHLETIC WAY TO PLAY GOLF.</Text>
         </View>
         <View style={s.headerRight}>
           {/* + menu for secondary actions */}
           <TouchableOpacity onPress={() => setShowPlusMenu(!showPlusMenu)} activeOpacity={0.7} accessibilityLabel="More actions" style={s.headerIcon}>
             <Ionicons name={showPlusMenu ? 'close' : 'add'} size={20} color="#B8A882" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Arcade')} activeOpacity={0.7} accessibilityLabel="Clocked Arcade" style={s.headerIcon}>
+            <Ionicons name="game-controller-outline" size={20} color="#B8A882" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7} accessibilityLabel="Notifications" style={s.headerIcon}>
             <Ionicons name="notifications-outline" size={20} color="#B8A882" />
@@ -679,7 +690,7 @@ export default function FeedScreen({ navigation }) {
             </View>
         }
         ListFooterComponent={loadingMore ? <ActivityIndicator color="#C9A84C" style={{ paddingVertical: 20 }} /> : null}
-        contentContainerStyle={{ paddingBottom: 20, flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: 20 + bannerInset, flexGrow: 1 }}
       />
 
       {/* Comment sheet */}
@@ -703,7 +714,7 @@ const s = StyleSheet.create({
   // Header — compact
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   wordmark:    { fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 5 },
-  tagline:     { fontSize: 9, color: '#C9A84C88', letterSpacing: 2, marginTop: 1 },
+  tagline:     { fontSize: 8, color: '#C9A84C88', letterSpacing: 1.5, marginTop: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   headerIcon:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
 

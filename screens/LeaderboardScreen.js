@@ -207,6 +207,10 @@ const DIVISIONS = ['ALL', 'BEGINNER', 'INTERMEDIATE', 'PRO', 'OPEN'];
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function LeaderboardScreen({ navigation }) {
+  // Rendered inside the tab navigator (as "Ranks") or pushed on the root
+  // stack (as "Leaderboard"). The tab instance's immediate navigator is the
+  // tab navigator; the pushed instance's is the stack.
+  const isTab = navigation.getState()?.type === 'tab';
   const { session, profile } = useAuth();
   const uid = session?.user?.id ?? null;
 
@@ -483,9 +487,15 @@ export default function LeaderboardScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{ width: 40, height: 40, justifyContent: 'center' }} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={20} color="#C9A84C" />
-        </TouchableOpacity>
+        {/* This screen is both the Ranks tab and a pushed stack route. Only
+            the pushed instance has somewhere to go back to. */}
+        {isTab ? (
+          <View style={{ width: 40 }} />
+        ) : (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{ width: 40, height: 40, justifyContent: 'center' }} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={20} color="#C9A84C" />
+          </TouchableOpacity>
+        )}
         <Text style={s.wordmark}>RANKINGS</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -627,7 +637,9 @@ export default function LeaderboardScreen({ navigation }) {
 const s = StyleSheet.create({
   container:     { flex: 1, backgroundColor: COLOR.bg },
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, paddingBottom: SPACING.sm },
-  wordmark:      { fontSize: 24, fontWeight: '300', color: COLOR.cream, fontFamily: 'Georgia' },
+  // Same treatment as the Feed / Profile tab wordmarks — gold, tracked,
+  // sans — so the tabs read as one app instead of one serif outlier.
+  wordmark:      { fontSize: 13, fontWeight: '700', color: COLOR.gold, letterSpacing: 5 },
 
   // Filters
   filterRow:       { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: 6, marginBottom: SPACING.sm },

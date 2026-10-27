@@ -135,6 +135,9 @@ export default function AdminScreen({ navigation }) {
               {tab === 'applications' && (
                 <>
                   <Text style={s.cardLine}>{item.player1_name} & {item.player2_name}</Text>
+                  <Text style={s.cardMeta}>
+                    Sport: {item.player1_sport || '—'} · {item.player2_sport || '—'}
+                  </Text>
                   <Text style={s.cardMeta}>{item.contact_email} · {item.tournament_slug}</Text>
                   {!!item.why_compete && <Text style={s.cardBody} numberOfLines={4}>{item.why_compete}</Text>}
                 </>

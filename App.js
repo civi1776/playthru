@@ -13,6 +13,7 @@ import { setupNotifications, refreshPushToken } from './lib/notifications';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CLOCKED_ROUND_STATE_KEY } from './lib/clockedRoundConstants';
+import { ActiveRoundContext, ACTIVE_ROUND_MAX_AGE_MS } from './lib/activeRound';
 import { COLOR } from './lib/theme';
 
 import HomeScreen             from './screens/HomeScreen';
@@ -47,6 +48,7 @@ import TournamentScreen          from './screens/TournamentScreen';
 import TournamentApplyScreen     from './screens/TournamentApplyScreen';
 import RivalryScreen             from './screens/RivalryScreen';
 import AdminScreen               from './screens/AdminScreen';
+import ArcadeScreen              from './screens/ArcadeScreen';
 
 // ─── Deep link helpers ────────────────────────────────────────────────────────
 function parseUrlParams(url) {
@@ -176,24 +178,35 @@ function PlayButton({ onPress }) {
   );
 }
 
-function BottomNav({ state, navigation }) {
+function BottomNav({ state, navigation, activeRound, onResume, onAbandon }) {
   const tabs = PLAYER_TABS;
+
+  const startNewRound = () => {
+    const root = navigation.getParent();
+    if (root) root.navigate('ClockedSetup');
+    else navigation.navigate('ClockedSetup');
+  };
+
+  // With a round already saved, PLAY must not silently start a fresh setup —
+  // the new round's first autosave would overwrite the old one. Offer the
+  // choice explicitly.
+  const onPlayPress = () => {
+    if (!activeRound) { startNewRound(); return; }
+    const where = `Hole ${activeRound.currentHole ?? 1} · ${activeRound.course?.name ?? 'Quick Play'}`;
+    Alert.alert('Round in progress', where, [
+      { text: 'Resume', onPress: onResume },
+      { text: 'Abandon & start new', style: 'destructive', onPress: async () => { await onAbandon(); startNewRound(); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <View style={nav.container}>
       {tabs.map((tab, i) => {
         const active = state.index === i;
 
         if (tab.isPlay) {
-          return (
-            <PlayButton
-              key={tab.name}
-              onPress={() => {
-                const root = navigation.getParent();
-                if (root) root.navigate('ClockedSetup');
-                else navigation.navigate('ClockedSetup');
-              }}
-            />
-          );
+          return <PlayButton key={tab.name} onPress={onPlayPress} />;
         }
 
         return (
@@ -256,35 +269,75 @@ const nav = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
     zIndex: 999,
   },
-  roundBannerText:   { color: COLOR.gold, fontWeight: '700', fontSize: 12, letterSpacing: 1 },
-  roundBannerAction: { color: COLOR.cream, fontSize: 11, fontWeight: '600' },
+  roundBannerText:        { color: COLOR.gold, fontWeight: '700', fontSize: 11, letterSpacing: 1, marginBottom: 2 },
+  roundBannerSub:         { color: COLOR.cream, fontSize: 12 },
+  roundBannerAbandon:     { paddingVertical: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: '#E85D4A33', borderRadius: 8, marginLeft: 8 },
+  roundBannerAbandonText: { fontSize: 10, color: '#E85D4A', fontWeight: '600', letterSpacing: 0.5 },
+  roundBannerResume:      { paddingVertical: 8, paddingHorizontal: 12, backgroundColor: COLOR.gold, borderRadius: 8, marginLeft: 8 },
+  roundBannerResumeText:  { fontSize: 11, color: COLOR.bg, fontWeight: '700' },
 });
 
 // ─── Main app (tab navigator) ─────────────────────────────────────────────────
 // Rendered as the 'Main' screen in the root stack.
 function MainApp({ navigation }) {
   const [showSplash, setShowSplash] = useState(true);
-  const [hasActiveRound, setHasActiveRound] = useState(false);
+  // The parsed saved round, or null. This is the single source of truth for
+  // "round in progress" across the tabs: the floating banner, the PLAY button
+  // and the tab screens' bottom inset all read from it.
+  const [activeRound, setActiveRound] = useState(null);
 
-  useEffect(() => {
-    const check = () => AsyncStorage.getItem(CLOCKED_ROUND_STATE_KEY).then(v => setHasActiveRound(!!v)).catch(() => {});
-    check();
-    const sub = AppState.addEventListener('change', s => { if (s === 'active') check(); });
-    return () => sub.remove();
+  // Read the saved round, applying the staleness rule here \u2014 the one place it
+  // is applied \u2014 so the banner can never advertise a round that no longer
+  // exists. Re-checked whenever Main regains focus (back from ClockedRound,
+  // where the state is written and cleared) and when the app foregrounds.
+  const checkActiveRound = useCallback(async () => {
+    try {
+      const saved = await AsyncStorage.getItem(CLOCKED_ROUND_STATE_KEY);
+      if (!saved) { setActiveRound(null); return; }
+      const state = JSON.parse(saved);
+      const age = Date.now() - (state?.savedAt ?? 0);
+      if (!state || age > ACTIVE_ROUND_MAX_AGE_MS) {
+        await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
+        setActiveRound(null);
+        return;
+      }
+      setActiveRound(state);
+    } catch {
+      setActiveRound(null);
+    }
   }, []);
 
+  useEffect(() => {
+    checkActiveRound();
+    const appSub = AppState.addEventListener('change', s => { if (s === 'active') checkActiveRound(); });
+    const focusSub = navigation.addListener('focus', checkActiveRound);
+    return () => { appSub.remove(); focusSub(); };
+  }, [navigation, checkActiveRound]);
+
   const resumeActiveRound = () => {
-    AsyncStorage.getItem(CLOCKED_ROUND_STATE_KEY).then(saved => {
-      if (!saved) return;
-      const state = JSON.parse(saved);
-      navigation.navigate('ClockedRound', { resumeState: state });
-    }).catch(() => {});
+    if (!activeRound) return;
+    navigation.navigate('ClockedRound', { resumeState: activeRound });
+  };
+
+  const abandonActiveRound = async () => {
+    await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
+    setActiveRound(null);
+  };
+
+  const confirmAbandon = () => {
+    Alert.alert('Abandon Round?', 'This round will not be saved.', [
+      { text: 'Keep', style: 'cancel' },
+      { text: 'Abandon', style: 'destructive', onPress: abandonActiveRound },
+    ]);
   };
 
   return (
+    <ActiveRoundContext.Provider value={{ activeRound }}>
     <View style={{ flex: 1 }}>
       <Tab.Navigator
-        tabBar={props => <BottomNav {...props} />}
+        tabBar={props => (
+          <BottomNav {...props} activeRound={activeRound} onResume={resumeActiveRound} onAbandon={abandonActiveRound} />
+        )}
         screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
       >
         <Tab.Screen name="Feed"  component={FeedScreen} />
@@ -296,14 +349,25 @@ function MainApp({ navigation }) {
       {/* Floating "round in progress" banner \u2014 anchored low, above the tab
           bar, so it's reachable one-handed instead of pinned to the very
           top of the screen where a thumb can't comfortably reach it. */}
-      {hasActiveRound && (
-        <TouchableOpacity style={nav.roundBanner} onPress={resumeActiveRound} activeOpacity={0.9}>
-          <Text style={nav.roundBannerText}>ROUND IN PROGRESS</Text>
-          <Text style={nav.roundBannerAction}>TAP TO RESUME {'\u2192'}</Text>
-        </TouchableOpacity>
+      {activeRound && (
+        <View style={nav.roundBanner}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={resumeActiveRound} activeOpacity={0.8}>
+            <Text style={nav.roundBannerText}>ROUND IN PROGRESS</Text>
+            <Text style={nav.roundBannerSub} numberOfLines={1}>
+              Hole {activeRound.currentHole ?? 1} {'\u00b7'} {activeRound.course?.name ?? 'Quick Play'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={nav.roundBannerAbandon} onPress={confirmAbandon} activeOpacity={0.7} hitSlop={8}>
+            <Text style={nav.roundBannerAbandonText}>ABANDON</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={nav.roundBannerResume} onPress={resumeActiveRound} activeOpacity={0.8}>
+            <Text style={nav.roundBannerResumeText}>RESUME {'\u2192'}</Text>
+          </TouchableOpacity>
+        </View>
       )}
       {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
     </View>
+    </ActiveRoundContext.Provider>
   );
 }
 
@@ -348,7 +412,6 @@ function AppNavigator() {
   const navRef   = useRef(null);
   const [navReady, setNavReady]             = useState(false);
   const [updateRequired, setUpdateRequired] = useState(false);
-  const [resumeBanner, setResumeBanner]     = useState(null);
   const notificationsSetupRef  = useRef(false);  // only run setupNotifications once per session
 
   useFonts({ Montserrat_700Bold });
@@ -470,26 +533,8 @@ function AppNavigator() {
     });
   }, [navReady, handleNotificationNav]);
 
-  // ── Check for in-progress round to resume ──
-  useEffect(() => {
-    if (!navReady || !session || !profile) return;
-    const checkForActiveRound = async () => {
-      try {
-        const saved = await AsyncStorage.getItem(CLOCKED_ROUND_STATE_KEY);
-        if (!saved) return;
-        const state = JSON.parse(saved);
-        if (!state) return;
-        const age = Date.now() - (state.savedAt ?? 0);
-        if (age > 8 * 60 * 60 * 1000) {
-          await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
-          return;
-        }
-        setResumeBanner(state);
-      } catch (e) { /* silent */ }
-    };
-    const t = setTimeout(checkForActiveRound, 800);
-    return () => clearTimeout(t);
-  }, [navReady, session, profile]);
+  // In-progress round detection lives in MainApp (one banner, one staleness
+  // rule) — see checkActiveRound there.
 
   // Reactively handle all auth state transitions.
   // Guard against resetting to Main on every refreshProfile() call by checking
@@ -595,32 +640,12 @@ function AppNavigator() {
         <RootStack.Screen name="ClockedSetup"   component={ClockedSetupScreen} />
         <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} />
         <RootStack.Screen name="ConfirmRound"  component={ConfirmRoundScreen} />
+        <RootStack.Screen name="Arcade"        component={ArcadeScreen} />
         <RootStack.Screen name="Tournament"       component={TournamentScreen} />
         <RootStack.Screen name="TournamentApply"  component={TournamentApplyScreen} />
       </RootStack.Navigator>
     </NavigationContainer>
 
-    {/* Resume round banner */}
-    {resumeBanner && (
-      <View style={styles.resumeBanner}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.resumeTitle}>ROUND IN PROGRESS</Text>
-          <Text style={styles.resumeSub}>Hole {resumeBanner.currentHole} {'\u00B7'} {resumeBanner.course?.name ?? 'Quick Play'}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={styles.resumeAbandonBtn} onPress={async () => { await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY); setResumeBanner(null); }}>
-            <Text style={styles.resumeAbandonText}>ABANDON</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.resumeBtn} onPress={() => {
-            const s = resumeBanner; setResumeBanner(null);
-            const tryNav = () => { if (navRef.current) navRef.current.navigate('ClockedRound', { resumeState: s }); else setTimeout(tryNav, 100); };
-            tryNav();
-          }}>
-            <Text style={styles.resumeBtnText}>RESUME {'\u2192'}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    )}
     </View>
   );
 }
@@ -638,11 +663,4 @@ const styles = StyleSheet.create({
     flex: 1, backgroundColor: '#090F0A',
     justifyContent: 'center', alignItems: 'center',
   },
-  resumeBanner:     { position: 'absolute', bottom: 90, left: 16, right: 16, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#C9A84C', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 999 },
-  resumeTitle:      { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 1, marginBottom: 2 },
-  resumeSub:        { fontSize: 12, color: '#F5EDD8' },
-  resumeAbandonBtn: { paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#E85D4A33', borderRadius: 8 },
-  resumeAbandonText:{ fontSize: 11, color: '#E85D4A', fontWeight: '600' },
-  resumeBtn:        { paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#C9A84C', borderRadius: 8 },
-  resumeBtnText:    { fontSize: 11, color: '#090F0A', fontWeight: '700' },
 });

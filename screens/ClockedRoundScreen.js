@@ -365,14 +365,22 @@ export default function ClockedRoundScreen({ navigation, route }) {
   const curTimePar  = computeTimePar(curHoleData.yardage, curHoleData.par, playerCount, transport, difficulty, curOfficialSeconds, clockCoeffs);
 
   // ── Persistence ──
+  const buildRoundState = (overrides = {}) => ({
+    roundStartTs, course, holeCount, transport, difficulty, mode,
+    holeDataState, playerDefs, configSnap, currentHole, holeResults,
+    playerStrokes, clockRunning, clockStartedAt, holeFrozenTime, officialTimePars,
+    defaultPar, savedAt: Date.now(), ...overrides,
+  });
+  const persistRound = (overrides) =>
+    AsyncStorage.setItem(CLOCKED_ROUND_STATE_KEY, JSON.stringify(buildRoundState(overrides))).catch(() => {});
+
   useEffect(() => {
-    if (holeResults.length === 0 && !clockRunning) return;
-    AsyncStorage.setItem(CLOCKED_ROUND_STATE_KEY, JSON.stringify({
-      roundStartTs, course, holeCount, transport, difficulty, mode,
-      holeDataState, playerDefs, configSnap, currentHole, holeResults,
-      playerStrokes, clockRunning, clockStartedAt, holeFrozenTime, officialTimePars,
-      defaultPar, savedAt: Date.now(),
-    })).catch(() => {});
+    // Nothing worth saving until the round has actually begun. A frozen hole
+    // counts: holing out on hole 1 (before NEXT HOLE pushes a result) must
+    // persist, or leaving the screen resumes into a still-running clock.
+    const roundHasBegun = holeResults.length > 0 || clockRunning || holeFrozenTime != null;
+    if (!roundHasBegun) return;
+    persistRound();
   }, [currentHole, holeResults, playerStrokes, clockRunning, holeFrozenTime, holeDataState]);
 
   // ── Resume from saved state ──
@@ -800,7 +808,15 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
   // Pause round — navigate away without losing state
   const handlePause = () => {
-    if (clockRunning) stopClock({ verdict: false });
+    if (clockRunning) {
+      stopClock({ verdict: false });
+      // The setState calls inside stopClock won't commit before we leave the
+      // screen, so the persistence effect never sees the paused values. Write
+      // the paused snapshot explicitly or resume comes back with the clock
+      // still running and penalties piling up.
+      const pausedElapsed = clockStartedAt ? Math.max(0, Math.floor((Date.now() - clockStartedAt) / 1000)) : 0;
+      persistRound({ clockRunning: false, holeFrozenTime: pausedElapsed });
+    }
     navigation.navigate('Main');
   };
 
@@ -1075,7 +1091,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
             >
               {!clockRunning ? (
                 <>
-                  <Text style={{ fontSize: 20 }}>{'\u25B6'}</Text>
+                  <Ionicons name="play" size={20} color={GREEN} />
                   <View>
                     <Text style={st.holedOutLabel}>START HOLE</Text>
                     <Text style={st.holedOutSub}>Tap when group tees off</Text>
@@ -1083,7 +1099,9 @@ export default function ClockedRoundScreen({ navigation, route }) {
                 </>
               ) : (
                 <>
-                  <Text style={{ fontSize: 20 }}>{'\u26F3'}</Text>
+                  {/* Ionicons, not the U+26F3 emoji \u2014 that glyph is missing from
+                      the system font and rendered as a "?" box. */}
+                  <Ionicons name="flag" size={20} color={BG} />
                   <View>
                     <Text style={[st.holedOutLabel, { color: BG }]}>HOLED OUT</Text>
                     <Text style={[st.holedOutSub, { color: BG + '88' }]}>Tap when last putt drops</Text>
