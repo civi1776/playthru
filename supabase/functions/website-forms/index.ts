@@ -97,7 +97,12 @@ async function notify(subject: string, replyTo: string, html: string) {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
       body: JSON.stringify({ from: NOTIFY_FROM, to: [NOTIFY_TO], reply_to: replyTo, subject, html }),
     });
-    if (!res.ok) console.error('website-forms: Resend responded', res.status);
+    if (!res.ok) {
+      // Log Resend's reason (domain not verified, key restricted, etc.) so it
+      // can be read in the function logs. Never includes the API key.
+      const detail = (await res.text().catch(() => '')).split(key).join('[key]').slice(0, 300);
+      console.error('website-forms: Resend responded', res.status, detail);
+    }
     return res.ok;
   } catch (e) {
     console.error('website-forms: Resend error', e);
