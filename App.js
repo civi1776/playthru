@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, AppState, Animated, AccessibilityInfo, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Montserrat_700Bold } from '@expo-google-fonts/montserrat';
@@ -105,20 +106,21 @@ const Tab       = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
 
 // ─── Tab bar ─────────────────────────────────────────────────────────────────
+// Five slots: PLAY in the middle, two tabs either side. Rules lives in the
+// feed header (book icon) and in the round/setup screens.
 const PLAYER_TABS = [
-  { name: 'Feed',  icon: 'flash-outline',  label: 'FEED' },
-  { name: 'Rules', icon: 'book-outline',   label: 'RULES' },
-  { name: 'Play',  icon: 'timer-outline',  label: 'PLAY', isPlay: true },
-  { name: 'Arcade', icon: 'game-controller-outline', label: 'ARCADE' },
-  { name: 'Ranks', icon: 'trophy-outline', label: 'RANKS' },
-  { name: 'You',   icon: 'person-outline', label: 'YOU' },
+  { name: 'Feed',   icon: 'flash-outline',           iconActive: 'flash',           label: 'FEED' },
+  { name: 'Arcade', icon: 'game-controller-outline', iconActive: 'game-controller', label: 'ARCADE' },
+  { name: 'Play',   icon: 'timer-outline',           label: 'PLAY', isPlay: true },
+  { name: 'Ranks',  icon: 'trophy-outline',          iconActive: 'trophy',          label: 'RANKS' },
+  { name: 'You',    icon: 'person-outline',          iconActive: 'person',          label: 'YOU' },
 ];
 // ─── Play button glow colors ─────────────────────────────────────────────────
 const PLAY_GOLD       = '#F0CB5B'; // brighter, more saturated than #C9A84C
 const PLAY_GOLD_TOP   = '#F7DC82'; // lighter highlight for gradient top
 const PLAY_GOLD_BOT   = '#D4A832'; // richer shadow for gradient bottom
-const TAB_ACTIVE      = '#B8A24A'; // active tabs: gold but a notch below Play
-const TAB_INACTIVE    = 'rgba(160,152,130,0.35)'; // greyer than before
+const TAB_ACTIVE      = '#E2C66E'; // active tabs: gold, a notch below the Play button
+const TAB_INACTIVE    = 'rgba(184,168,130,0.42)';
 
 function PlayButton({ onPress }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -159,14 +161,14 @@ function PlayButton({ onPress }) {
 
       {/* Gradient circle */}
       <View style={nav.playCircle}>
-        <Svg width={52} height={52} style={nav.gradientSvg}>
+        <Svg width={56} height={56} style={nav.gradientSvg}>
           <Defs>
             <LinearGradient id="playGrad" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={PLAY_GOLD_TOP} />
               <Stop offset="1" stopColor={PLAY_GOLD_BOT} />
             </LinearGradient>
           </Defs>
-          <Circle cx={26} cy={26} r={25} fill="url(#playGrad)" />
+          <Circle cx={28} cy={28} r={27} fill="url(#playGrad)" />
         </Svg>
         <View style={nav.playIconWrap}>
           <Ionicons name="timer-outline" size={26} color="#090F0A" />
@@ -180,6 +182,7 @@ function PlayButton({ onPress }) {
 
 function BottomNav({ state, navigation, activeRound, onResume, onAbandon }) {
   const tabs = PLAYER_TABS;
+  const insets = useSafeAreaInsets();
 
   const startNewRound = () => {
     const root = navigation.getParent();
@@ -201,7 +204,7 @@ function BottomNav({ state, navigation, activeRound, onResume, onAbandon }) {
   };
 
   return (
-    <View style={nav.container}>
+    <View style={[nav.container, { paddingBottom: Math.max(insets.bottom, 10) }]}>
       {tabs.map((tab, i) => {
         const active = state.index === i;
 
@@ -219,8 +222,10 @@ function BottomNav({ state, navigation, activeRound, onResume, onAbandon }) {
             accessibilityState={{ selected: active }}
             accessibilityLabel={tab.label}
           >
-            <Ionicons name={tab.icon} size={24}
-              color={active ? TAB_ACTIVE : TAB_INACTIVE} />
+            <View style={[nav.iconWrap, active && nav.iconWrapActive]}>
+              <Ionicons name={active ? (tab.iconActive ?? tab.icon) : tab.icon} size={22}
+                color={active ? TAB_ACTIVE : TAB_INACTIVE} />
+            </View>
             <Text style={[nav.label, { color: active ? TAB_ACTIVE : TAB_INACTIVE }]}>
               {tab.label}
             </Text>
@@ -233,35 +238,37 @@ function BottomNav({ state, navigation, activeRound, onResume, onAbandon }) {
 
 const nav = StyleSheet.create({
   container: {
-    width: '100%', height: 72, backgroundColor: '#090D0A',
-    borderTopWidth: 1, borderTopColor: '#C9A84C33',
-    flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center',
+    width: '100%', backgroundColor: '#090D0A', paddingTop: 8,
+    borderTopWidth: 1, borderTopColor: '#C9A84C2E',
+    flexDirection: 'row', alignItems: 'flex-end',
   },
-  item:  { alignItems: 'center', justifyContent: 'center', flex: 1, paddingTop: 4 },
-  label: { fontSize: 9, fontFamily: 'Montserrat_700Bold', letterSpacing: 1.5, marginTop: 3 },
+  item:  { alignItems: 'center', justifyContent: 'flex-end', flex: 1, paddingBottom: 2 },
+  iconWrap: { width: 44, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  iconWrapActive: { backgroundColor: 'rgba(226,198,110,0.10)' },
+  label: { fontSize: 9, fontFamily: 'Montserrat_700Bold', letterSpacing: 1.4, marginTop: 4 },
 
-  // Play button
-  playItem: { alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: -18 },
+  // Play button — raised out of the bar, same label baseline as the tabs
+  playItem: { alignItems: 'center', justifyContent: 'flex-end', flex: 1, paddingBottom: 2 },
   glowRing: {
-    position: 'absolute', top: -6, width: 68, height: 68, borderRadius: 34,
+    position: 'absolute', top: -16, width: 72, height: 72, borderRadius: 36,
     backgroundColor: PLAY_GOLD,
   },
   playCircle: {
-    width: 52, height: 52, borderRadius: 26, overflow: 'hidden',
+    width: 56, height: 56, borderRadius: 28, overflow: 'hidden', marginTop: -24,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: PLAY_GOLD, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.55, shadowRadius: 18, elevation: 10,
-    borderWidth: 2, borderColor: '#090D0A',
+    shadowColor: PLAY_GOLD, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5, shadowRadius: 16, elevation: 10,
+    borderWidth: 3, borderColor: '#090D0A',
   },
   gradientSvg: { position: 'absolute', top: 0, left: 0 },
-  playIconWrap: { position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 52, height: 52 },
-  playLabel: { fontSize: 9, fontFamily: 'Montserrat_700Bold', letterSpacing: 1.5, marginTop: 3, color: PLAY_GOLD },
+  playIconWrap: { position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 56, height: 56 },
+  playLabel: { fontSize: 9, fontFamily: 'Montserrat_700Bold', letterSpacing: 1.4, marginTop: 4, color: PLAY_GOLD },
 
   // Active round banner — floating card anchored above the tab bar (72px
   // tall) instead of docked to the top of the screen, so it sits in the
   // easy-to-reach lower third of the display on any phone size.
   roundBanner: {
-    position: 'absolute', left: 16, right: 16, bottom: 90,
+    position: 'absolute', left: 16, right: 16, bottom: 104,
     backgroundColor: COLOR.surface, borderWidth: 1, borderColor: COLOR.gold,
     borderRadius: 16, paddingVertical: 12, paddingHorizontal: 18,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -341,9 +348,8 @@ function MainApp({ navigation }) {
         screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
       >
         <Tab.Screen name="Feed"  component={FeedScreen} />
-        <Tab.Screen name="Rules" component={RulesScreen} />
-        <Tab.Screen name="Play"  component={FeedScreen} />
         <Tab.Screen name="Arcade" component={ArcadeHomeScreen} />
+        <Tab.Screen name="Play"  component={FeedScreen} />
         <Tab.Screen name="Ranks" component={LeaderboardScreen} />
         <Tab.Screen name="You"   component={ProfileScreen} />
       </Tab.Navigator>
