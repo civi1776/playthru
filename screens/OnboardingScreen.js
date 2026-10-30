@@ -3,8 +3,8 @@
 // ring that fills as you move through it. No typed forms where a tap will
 // do. By the end the player knows what Clocked is, that the goal is global
 // and achievable, has been welcomed into the athletic side of golf, has
-// picked a home course and a league, has seen the national rules, and has
-// been offered a shot at the Invitational.
+// put a face on their profile, picked a home course and a league, has seen
+// the national rules, and has been offered a shot at the first event.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -19,11 +19,13 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { searchCourses } from '../lib/courses';
 import CountdownRing from '../components/CountdownRing';
+import InitialsAvatar from '../components/InitialsAvatar';
+import { pickAndUploadAvatar } from '../lib/avatarUpload';
 import { COLOR } from '../lib/theme';
 
 const { bg: BG, surface: CARD, gold: GOLD, goldBright: GOLD_BRIGHT, cream: CREAM, muted: MUTED, dim: DIM, green: GREEN, red: RED_WARN, border: BORDER } = COLOR;
 
-const TOTAL_STEPS = 9;
+const TOTAL_STEPS = 10;
 
 const DIFFICULTIES = [
   { key: 'beginner',     label: 'BEGINNER',     pace: '~4:30', color: GREEN,  desc: 'Learning the clock. Generous time pars.' },
@@ -32,8 +34,9 @@ const DIFFICULTIES = [
 ];
 
 export default function OnboardingScreen({ navigation }) {
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? null);
   const [homeCourse, setHomeCourse] = useState(null);
   const [difficulty, setDifficulty] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -101,11 +104,12 @@ export default function OnboardingScreen({ navigation }) {
         {step === 1 && <StepFix onNext={next} />}
         {step === 2 && <StepVision onNext={next} />}
         {step === 3 && <StepWelcome onNext={next} />}
-        {step === 4 && <StepHomeCourse selected={homeCourse} onSelect={saveHomeCourse} onSkip={next} />}
-        {step === 5 && <StepDifficulty selected={difficulty} onSelect={saveDifficulty} />}
-        {step === 6 && <StepRules onNext={next} />}
-        {step === 7 && <StepInvitation onApply={goApply} onLater={next} saving={saving} />}
-        {step === 8 && <StepWelcomeFinal onEnter={goToMain} />}
+        {step === 4 && <StepPhoto profile={profile} avatarUrl={avatarUrl} onUploaded={(url) => { setAvatarUrl(url); refreshProfile?.(); }} onNext={next} />}
+        {step === 5 && <StepHomeCourse selected={homeCourse} onSelect={saveHomeCourse} onSkip={next} />}
+        {step === 6 && <StepDifficulty selected={difficulty} onSelect={saveDifficulty} />}
+        {step === 7 && <StepRules onNext={next} />}
+        {step === 8 && <StepInvitation onApply={goApply} onLater={next} saving={saving} />}
+        {step === 9 && <StepWelcomeFinal onEnter={goToMain} />}
       </Animated.View>
     </SafeAreaView>
   );
@@ -198,7 +202,60 @@ function StepWelcome({ onNext }) {
   );
 }
 
-// ─── Step 4 — Home course ────────────────────────────────────────────────────
+// ─── Step 4 — Profile photo ──────────────────────────────────────────────────
+// Leaderboards, rivalries and the feed all show the player's face; asking for
+// it here means the first thing a new player posts already looks like them.
+function StepPhoto({ profile, avatarUrl, onUploaded, onNext }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const pick = async () => {
+    setError(null);
+    setUploading(true);
+    try {
+      const res = await pickAndUploadAvatar();
+      if (!res.cancelled) onUploaded(res.url);
+    } catch (e) {
+      setError(e?.message ?? 'Could not upload that photo.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <View style={st.page}>
+      <ScrollView contentContainerStyle={st.pageScroll} showsVerticalScrollIndicator={false}>
+        <Text style={st.eyebrow}>SHOW YOUR FACE</Text>
+        <Text style={st.headline}>Put a face on the board.</Text>
+        <Text style={st.line}>Your photo shows on leaderboards, rivalries and the feed. Athletes don't hide behind initials.</Text>
+        <TouchableOpacity style={st.photoWrap} onPress={pick} disabled={uploading} activeOpacity={0.85} accessibilityLabel={avatarUrl ? 'Change profile photo' : 'Add profile photo'}>
+          <InitialsAvatar name={profile?.full_name} username={profile?.username} avatarUrl={avatarUrl} size={128} />
+          <View style={st.photoBadge}>
+            {uploading ? <ActivityIndicator size="small" color={BG} /> : <Ionicons name="camera" size={18} color={BG} />}
+          </View>
+        </TouchableOpacity>
+        <Text style={st.photoHint}>{uploading ? 'UPLOADING…' : avatarUrl ? 'TAP TO CHANGE' : 'TAP TO ADD A PHOTO'}</Text>
+        {!!error && <Text style={st.photoError}>{error}</Text>}
+      </ScrollView>
+      {avatarUrl ? (
+        <TouchableOpacity style={[st.ctaBtn, { backgroundColor: GOLD }]} onPress={onNext} activeOpacity={0.85} disabled={uploading}>
+          <Text style={st.ctaText}>LOOKS GOOD →</Text>
+        </TouchableOpacity>
+      ) : (
+        <>
+          <TouchableOpacity style={[st.ctaBtn, { backgroundColor: GOLD }]} onPress={pick} activeOpacity={0.85} disabled={uploading}>
+            <Text style={st.ctaText}>{uploading ? 'UPLOADING…' : 'ADD A PHOTO'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={st.skipInline} onPress={onNext} activeOpacity={0.7} disabled={uploading}>
+            <Text style={st.skipInlineText}>I'LL ADD ONE LATER</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
+  );
+}
+
+// ─── Step 5 — Home course ────────────────────────────────────────────────────
 function StepHomeCourse({ selected, onSelect, onSkip }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -248,7 +305,7 @@ function StepHomeCourse({ selected, onSelect, onSkip }) {
   );
 }
 
-// ─── Step 5 — Choose your league ─────────────────────────────────────────────
+// ─── Step 6 — Choose your league ─────────────────────────────────────────────
 function StepDifficulty({ selected, onSelect }) {
   return (
     <View style={st.page}>
@@ -305,7 +362,7 @@ function RuleRow({ label, value }) {
   );
 }
 
-// ─── Step 7 — The Invitation ─────────────────────────────────────────────────
+// ─── Step 8 — The Invitation ─────────────────────────────────────────────────
 function StepInvitation({ onApply, onLater, saving }) {
   return (
     <View style={st.page}>
@@ -392,6 +449,11 @@ const st = StyleSheet.create({
   laterText:  { fontSize: 11, fontWeight: '700', color: DIM, letterSpacing: 1.5 },
 
   finalRingWrap: { alignItems: 'center', marginBottom: 8 },
+
+  photoWrap:  { alignSelf: 'center', marginTop: 32, position: 'relative' },
+  photoBadge: { position: 'absolute', bottom: 2, right: 2, width: 36, height: 36, borderRadius: 18, backgroundColor: GOLD, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: BG },
+  photoHint:  { alignSelf: 'center', marginTop: 14, fontSize: 10, fontWeight: '700', color: GOLD, letterSpacing: 2 },
+  photoError: { alignSelf: 'center', marginTop: 10, fontSize: 12, color: RED_WARN, textAlign: 'center' },
 
   ctaBtn:   { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
   ctaText:  { fontSize: 13, fontWeight: '700', color: BG, letterSpacing: 1.5 },

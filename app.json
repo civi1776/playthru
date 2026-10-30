@@ -72,7 +72,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Clocked to save your Clocked Score card to your photos.",
+          "photosPermission": "Clocked uses your photo library to set your profile picture and to save your Clocked Score card.",
           "savePhotosPermission": "Allow Clocked to save your Clocked Score card to your photos."
         }
       ],

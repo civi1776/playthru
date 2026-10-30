@@ -560,7 +560,11 @@ function AppNavigator() {
     }
 
     if (session && profile) {
-      if (topRoute !== 'Main' && topRoute !== 'Onboarding') {
+      // Only route into the app when we're coming from the signed-out flow.
+      // refreshProfile() (avatar upload, profile save) must not yank the
+      // user off EditProfile / Settings / ArcadeGame back to the feed.
+      const AUTH_ROUTES = ['Welcome', 'SignUp', 'SignIn', 'PreviewMode', 'ForgotPassword', 'ResetPassword', 'Underage'];
+      if (!topRoute || AUTH_ROUTES.includes(topRoute)) {
         // Check if onboarding is needed
         AsyncStorage.getItem('onboarding_complete').then(val => {
           if (!val) {

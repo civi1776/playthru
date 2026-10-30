@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { pickAndUploadAvatar as uploadAvatar } from '../lib/avatarUpload';
 import { supabase, supabaseUrl } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import InitialsAvatar from '../components/InitialsAvatar';
@@ -43,72 +43,14 @@ export default function EditProfileScreen({ navigation }) {
   const usernameTimer = useRef(null);
 
   const pickAndUploadAvatar = async () => {
+    setUploading(true);
     try {
-      // 1. Get authoritative uid fresh — not from context (may be stale)
-      const { data: { user: authUser }, error: authErr } = await supabase.auth.getUser();
-      if (authErr || !authUser) {
-        Alert.alert('Session expired', 'Please sign in again to upload a photo.');
-        return;
-      }
-
-      // Request permission
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Allow photo library access to set your profile picture.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
-        base64: true,
-      });
-
-      if (result.canceled || !result.assets?.[0]?.uri) return;
-
-      setUploading(true);
-      const asset = result.assets[0];
-
-      // 2. Build path from authUser.id ONLY
-      const ext = asset.uri.split('.').pop()?.toLowerCase() ?? 'jpg';
-      const contentType = asset.mimeType ?? `image/${ext === 'png' ? 'png' : 'jpeg'}`;
-      const filePath = `${authUser.id}/avatar.${ext}`;
-
-
-      // Decode base64 to binary
-      const base64Data = asset.base64;
-      if (!base64Data) throw new Error('No image data returned from picker');
-
-      const binaryStr = atob(base64Data);
-      const bytes = new Uint8Array(binaryStr.length);
-      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-
-      // 4. Upload with explicit contentType + upsert
-      const { error: upErr } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, bytes, { contentType, upsert: true });
-
-      if (upErr) {
-        Alert.alert('Upload failed', upErr.message);
-        return;
-      }
-
-      // 5. Get public URL, cache-bust (same file path every upload, so
-      //    without this RN's Image cache would keep showing the old photo)
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = urlData?.publicUrl ? `${urlData.publicUrl}?t=${Date.now()}` : null;
-      if (!publicUrl) {
-        Alert.alert('Error', 'Could not get image URL.');
-        return;
-      }
-
-      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', authUser.id);
-      setAvatarUrl(publicUrl);
+      const res = await uploadAvatar();
+      if (res.cancelled) return;
+      setAvatarUrl(res.url);
       await refreshProfile();
     } catch (e) {
-      Alert.alert('Error', 'Could not upload photo.');
+      Alert.alert('Could not update photo', e?.message ?? 'Please try again.');
     } finally {
       setUploading(false);
     }
