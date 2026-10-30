@@ -1,5 +1,6 @@
 // ─── AdminScreen — review queue for tournament applications, sponsor ────────
-// inquiries, and course certification requests. Gated by
+// inquiries, course partnership requests, and the clocked.golf website forms
+// (tournament interest list + contact inbox). Gated by
 // profiles.account_type === 'admin' (both here and via RLS on the tables
 // themselves — this screen is a convenience, not the security boundary).
 
@@ -15,12 +16,14 @@ const { bg: BG, surface: CARD, gold: GOLD, cream: CREAM, muted: MUTED, dim: DIM,
 
 const TABS = [
   { key: 'applications', label: 'APPLICATIONS', table: 'tournament_applications' },
-  { key: 'sponsors',     label: 'SPONSORS',     table: 'sponsor_inquiries' },
+  { key: 'interest',     label: 'INTEREST',     table: 'website_inquiries', kind: 'tournament_interest' },
   { key: 'courses',      label: 'COURSES',      table: 'course_certification_inquiries' },
+  { key: 'sponsors',     label: 'SPONSORS',     table: 'sponsor_inquiries' },
+  { key: 'inbox',        label: 'INBOX',        table: 'website_inquiries', kind: 'contact' },
 ];
 
 function statusColor(status) {
-  if (['accepted', 'certified', 'contacted'].includes(status)) return GREEN;
+  if (['accepted', 'certified', 'contacted', 'invited'].includes(status)) return GREEN;
   if (['rejected', 'declined', 'closed'].includes(status)) return RED_WARN;
   if (status === 'waitlisted') return GOLD;
   return MUTED; // pending
@@ -37,15 +40,17 @@ export default function AdminScreen({ navigation }) {
   const activeTab = TABS.find(t => t.key === tab);
 
   const load = useCallback(async () => {
-    const { data, error } = await supabase
+    let q = supabase
       .from(activeTab.table)
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100);
+    if (activeTab.kind) q = q.eq('kind', activeTab.kind);
+    const { data, error } = await q;
     if (!error) setItems(data ?? []);
     setLoading(false);
     setRefreshing(false);
-  }, [activeTab.table]);
+  }, [activeTab.table, activeTab.kind]);
 
   useEffect(() => { setLoading(true); load(); }, [tab]);
 
@@ -106,13 +111,13 @@ export default function AdminScreen({ navigation }) {
         <View style={s.headerBtn} />
       </View>
 
-      <View style={s.tabBar}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll} contentContainerStyle={s.tabBar}>
         {TABS.map(t => (
           <TouchableOpacity key={t.key} style={[s.tab, tab === t.key && s.tabActive]} onPress={() => setTab(t.key)} activeOpacity={0.8}>
             <Text style={[s.tabText, tab === t.key && s.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {loading ? (
         <View style={s.center}><ActivityIndicator color={GOLD} /></View>
@@ -128,7 +133,10 @@ export default function AdminScreen({ navigation }) {
             <View key={item.id} style={s.card}>
               <View style={s.cardHeaderRow}>
                 <Text style={s.cardTitle} numberOfLines={1}>
-                  {tab === 'applications' ? item.team_name : tab === 'sponsors' ? item.company : item.course_name}
+                  {tab === 'applications' ? item.team_name
+                    : tab === 'sponsors' ? item.company
+                    : tab === 'courses' ? item.course_name
+                    : `${item.first_name ?? ''} ${item.last_name ?? ''}`.trim() || item.email}
                 </Text>
                 <View style={[s.statusPill, { borderColor: statusColor(item.status) }]}>
                   <Text style={[s.statusPillText, { color: statusColor(item.status) }]}>{item.status?.toUpperCase()}</Text>
@@ -150,6 +158,20 @@ export default function AdminScreen({ navigation }) {
                   <Text style={s.cardLine}>{item.full_name}{item.tier ? ` · ${item.tier}` : ''}</Text>
                   <Text style={s.cardMeta}>{item.email}{item.phone ? ` · ${item.phone}` : ''}</Text>
                   {!!item.message && <Text style={s.cardBody} numberOfLines={4}>{item.message}</Text>}
+                </>
+              )}
+              {tab === 'interest' && (
+                <>
+                  <Text style={s.cardLine}>{item.location || '—'}{item.handicap ? ` · HCP ${item.handicap}` : ''}</Text>
+                  <Text style={s.cardMeta}>{item.email}{item.phone ? ` · ${item.phone}` : ''}{item.home_course ? ` · ${item.home_course}` : ''}</Text>
+                  {!!item.message && <Text style={s.cardBody} numberOfLines={4}>{item.message}</Text>}
+                </>
+              )}
+              {tab === 'inbox' && (
+                <>
+                  <Text style={s.cardLine}>{item.inquiry_type || 'Message'}</Text>
+                  <Text style={s.cardMeta}>{item.email}</Text>
+                  {!!item.message && <Text style={s.cardBody} numberOfLines={6}>{item.message}</Text>}
                 </>
               )}
               {tab === 'courses' && (
@@ -177,6 +199,19 @@ export default function AdminScreen({ navigation }) {
                   {tab === 'sponsors' && (
                     <>
                       <ActionBtn label="CONTACTED" color={GREEN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'contacted')} />
+                      <ActionBtn label="CLOSE" color={RED_WARN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'closed')} />
+                    </>
+                  )}
+                  {tab === 'interest' && (
+                    <>
+                      <ActionBtn label="INVITED" color={GREEN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'invited')} />
+                      <ActionBtn label="WAITLIST" color={GOLD} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'waitlisted')} />
+                      <ActionBtn label="CLOSE" color={RED_WARN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'closed')} />
+                    </>
+                  )}
+                  {tab === 'inbox' && (
+                    <>
+                      <ActionBtn label="REPLIED" color={GREEN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'contacted')} />
                       <ActionBtn label="CLOSE" color={RED_WARN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'closed')} />
                     </>
                   )}
@@ -219,8 +254,9 @@ const s = StyleSheet.create({
   headerBtn:   { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 12, fontWeight: '700', color: GOLD, letterSpacing: 4 },
 
-  tabBar:      { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 },
-  tab:         { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  tabScroll:   { flexGrow: 0, marginBottom: 8 },
+  tabBar:      { flexDirection: 'row', paddingHorizontal: 16, gap: 8 },
+  tab:         { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   tabActive:   { backgroundColor: '#1E4825', borderColor: GOLD },
   tabText:     { fontSize: 10, fontWeight: '700', color: DIM, letterSpacing: 1 },
   tabTextActive: { color: GOLD },

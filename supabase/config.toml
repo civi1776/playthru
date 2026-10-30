@@ -26,3 +26,7 @@ verify_jwt = true           # the function additionally requires a real user ses
 [functions.tournament-apply]
 enabled = true
 verify_jwt = false          # website form posts here without a session
+
+[functions.website-forms]
+enabled = true
+verify_jwt = false          # clocked.golf forms post here without a session; the function requires the anon key itself
