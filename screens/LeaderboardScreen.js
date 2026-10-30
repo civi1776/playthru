@@ -156,11 +156,11 @@ function TournamentEmptyState({ navigation }) {
       <Ionicons name="ribbon-outline" size={56} color="rgba(201,168,76,0.2)" style={{ marginBottom: 18 }} />
       <Text style={s.emptyTitle}>No tournaments completed yet.</Text>
       <Text style={s.emptyText}>
-        This is where competition rankings will live once tournaments run. Tournament Series applications are open — be the first on the board.
+        This is where tournament results will live once the first Clocked event is played. It's coming to South Florida — request an invitation and be among the first on the board.
       </Text>
       <TouchableOpacity style={s.ctaBtn} onPress={() => navigation.navigate('Tournament')} activeOpacity={0.85}>
         <Ionicons name="trophy-outline" size={16} color="#090F0A" style={{ marginRight: 6 }} />
-        <Text style={s.ctaBtnText}>VIEW TOURNAMENT SERIES</Text>
+        <Text style={s.ctaBtnText}>ABOUT THE FIRST EVENT</Text>
       </TouchableOpacity>
     </View>
   );

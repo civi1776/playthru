@@ -7,7 +7,7 @@ export default function WelcomeScreen({ navigation }) {
       {/* Upper third — wordmark */}
       <View style={s.upper}>
         <Text style={s.wordmark}>CLOCKED</Text>
-        <Text style={s.motto}>THE ATHLETIC WAY TO PLAY GOLF.</Text>
+        <Text style={s.motto}>THE WAY TO PLAY GOLF FOR ATHLETES.</Text>
       </View>
 
       {/* Center block — hero copy */}

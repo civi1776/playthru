@@ -42,7 +42,7 @@ export default function SplashScreen({ onFinish }) {
         <Text style={s.wordmark}>Clocked</Text>
         <View style={s.divider} />
         <Animated.Text style={[s.tagline, { opacity: taglineOpacity }]}>
-          THE ATHLETIC WAY TO PLAY GOLF.
+          THE WAY TO PLAY GOLF FOR ATHLETES.
         </Animated.Text>
       </Animated.View>
     </Animated.View>

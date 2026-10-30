@@ -310,13 +310,13 @@ function StepInvitation({ onApply, onLater, saving }) {
   return (
     <View style={st.page}>
       <ScrollView contentContainerStyle={st.pageScroll} showsVerticalScrollIndicator={false}>
-        <Text style={st.eyebrow}>CLOCKED GOLF TOURNAMENT SERIES</Text>
-        <Text style={st.headline}>Ready to compete for real?</Text>
-        <Text style={st.line}>Nationwide tournaments are coming. Interest applications are open now — field sizes are limited.</Text>
+        <Text style={st.eyebrow}>THE FIRST CLOCKED EVENT</Text>
+        <Text style={st.headline}>Want in on the first one?</Text>
+        <Text style={st.line}>The first Clocked tournament is coming to South Florida. Date and venue are still being set. Request an invitation now and you'll hear first — it expresses interest and doesn't guarantee a spot.</Text>
       </ScrollView>
       <View style={{ gap: 10 }}>
         <TouchableOpacity style={[st.ctaBtn, { backgroundColor: GOLD }]} onPress={onApply} disabled={saving} activeOpacity={0.85}>
-          <Text style={st.ctaText}>APPLY TO COMPETE →</Text>
+          <Text style={st.ctaText}>REQUEST AN INVITATION →</Text>
         </TouchableOpacity>
         <TouchableOpacity style={st.laterBtn} onPress={onLater} activeOpacity={0.7}>
           <Text style={st.laterText}>MAYBE LATER</Text>

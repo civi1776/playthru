@@ -602,9 +602,9 @@ export default function FeedScreen({ navigation }) {
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <PulseDot color={COLOR.green} size={5} />
-            <Text style={s.tourneyBannerEyebrow}>CLOCKED GOLF TOURNAMENT SERIES</Text>
+            <Text style={s.tourneyBannerEyebrow}>THE FIRST CLOCKED EVENT</Text>
           </View>
-          <Text style={s.tourneyBannerTitle}>Interest applications are open — apply to compete</Text>
+          <Text style={s.tourneyBannerTitle}>Coming to South Florida — request an invitation</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={COLOR.green} />
       </TouchableOpacity>
@@ -626,7 +626,7 @@ export default function FeedScreen({ navigation }) {
       <View style={s.header}>
         <View>
           <Text style={s.wordmark}>CLOCKED</Text>
-          <Text style={s.tagline}>THE ATHLETIC WAY TO PLAY GOLF.</Text>
+          <Text style={s.tagline}>THE WAY TO PLAY GOLF FOR ATHLETES.</Text>
         </View>
         <View style={s.headerRight}>
           {/* + menu for secondary actions */}

@@ -1,6 +1,6 @@
-// ─── Tournament — Clocked Golf Tournament Series info page ───────────────────
-// In-app landing page for the national tournament series. CTA leads to
-// TournamentApplyScreen where users submit an interest application.
+// ─── Tournament — the first Clocked event (South Florida) ───────────────────
+// In-app landing page. Mirrors clocked.golf/tournaments: no date, venue or
+// field size is published until confirmed. CTA leads to TournamentApplyScreen.
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,16 +16,21 @@ const WHO_LIST = [
 ];
 
 const FORMAT_ITEMS = [
-  { label: 'TEAMS', value: 'Two-player teams competing together' },
-  { label: 'HOLES', value: 'Nine holes. Shotgun start.' },
-  { label: 'SHOT CLOCK', value: 'Visible on every hole. Real consequences for slow play.' },
-  { label: 'SCORING', value: 'Live scoring tracked through Clocked Golf.', highlight: true },
+  { label: 'FORMAT', value: 'Clocked Golf. A time par on every hole, points for every score.' },
+  { label: 'TEAMS', value: 'Two-player teams. Apply together.' },
+  { label: 'SHOT CLOCK', value: 'Runs the whole round. Over time par costs points.' },
+  { label: 'SCORING', value: 'Scored in the Clocked Golf app, the same way every round is.', highlight: true },
 ];
 
-const EXPERIENCE_ITEMS = [
-  { value: 'Premium', label: 'HAND-PICKED VENUES, CITY BY CITY' },
-  { value: 'Curated', label: 'FIELD OF ATHLETES AND COMPETITORS' },
-  { value: 'Covered', label: 'PROFESSIONAL CONTENT AND LIVE COVERAGE' },
+const CONFIRMED_ITEMS = [
+  { value: 'South Florida', label: 'REGION' },
+  { value: 'Clocked Golf', label: 'FORMAT' },
+  { value: 'Athletes', label: 'BUILT FOR' },
+];
+const TBA_ITEMS = [
+  { value: 'Date', label: 'TO BE ANNOUNCED' },
+  { value: 'Venue', label: 'TO BE ANNOUNCED' },
+  { value: 'Field size', label: 'TO BE ANNOUNCED' },
 ];
 
 export default function TournamentScreen({ navigation }) {
@@ -40,29 +45,29 @@ export default function TournamentScreen({ navigation }) {
 
         {/* Hero */}
         <View style={s.hero}>
-          <Text style={s.overline}>NATIONWIDE {'\u00B7'} THE TOURNAMENT FOR ATHLETES</Text>
-          <Text style={s.heroTitle}>The Clocked Golf</Text>
-          <Text style={s.heroSub}>Tournament Series</Text>
+          <Text style={s.overline}>SOUTH FLORIDA {'\u00B7'} THE TOURNAMENT FOR ATHLETES</Text>
+          <Text style={s.heroTitle}>The first</Text>
+          <Text style={s.heroSub}>Clocked event.</Text>
           <View style={s.heroDivider} />
           <Text style={s.heroStatement}>
-            The tournament for athletes.{' '}
+            A different style of golf competition is coming to South Florida.{' '}
             <Text style={s.heroStatementStrong}>If you've competed in another sport, this is your golf tournament.</Text>
           </Text>
 
           <View style={s.metaRow}>
             <View style={s.metaItem}>
-              <Text style={s.metaLabel}>SERIES</Text>
-              <Text style={s.metaValue}>Multiple cities. 2026 and beyond.</Text>
+              <Text style={s.metaLabel}>WHEN & WHERE</Text>
+              <Text style={s.metaValue}>Date and venue to be announced.</Text>
             </View>
           </View>
           <View style={s.metaRow}>
             <View style={s.metaItem}>
               <Text style={s.metaLabel}>FORMAT</Text>
-              <Text style={s.metaValue}>Two-Player Teams {'\u00B7'} 9 Holes</Text>
+              <Text style={s.metaValue}>Clocked Golf {'\u00B7'} Two-Player Teams</Text>
             </View>
             <View style={s.metaItem}>
               <Text style={s.metaLabel}>FIELD</Text>
-              <Text style={s.metaValue}>By Application Only</Text>
+              <Text style={s.metaValue}>By Invitation</Text>
             </View>
           </View>
         </View>
@@ -73,8 +78,8 @@ export default function TournamentScreen({ navigation }) {
           <Text style={s.declarationLine}>You've competed before.</Text>
           <Text style={[s.declarationLine, s.accent]}>Now compete in golf.</Text>
           <Text style={s.body}>
-            The Clocked Golf Tournament Series is a national circuit for people who treat golf like a sport. Two-player teams. Nine holes. A visible shot clock on every hole. Live scoring. Real consequences for slow play.{'\n\n'}
-            No four-hour strolls. You play fast, you play under pressure, and your score counts.
+            A Clocked tournament is played the Clocked way: a time par on every hole, points for every score, and a running clock that never stops. Two-player teams. Real consequences for slow play.{'\n\n'}
+            It rewards players who are ready, decisive, and sharp under pressure. Athletes, in other words.
           </Text>
         </View>
 
@@ -116,54 +121,63 @@ export default function TournamentScreen({ navigation }) {
           <Text style={s.eyebrow}>WHO WE'RE LOOKING FOR</Text>
           <Text style={s.sectionTitle}>Athletes who want pressure, not a leisurely stroll.</Text>
           <Text style={s.body}>
-            Every field is limited. Applications are reviewed by hand, and we pick competitors who bring an athlete's mindset to the course: fast, focused, and ready to perform when it counts.
+            The field will be limited and invitations go out from this list. We read every request and pick competitors who bring an athlete's mindset to the course: fast, focused, and ready to perform when it counts.
           </Text>
         </View>
 
         {/* Why */}
         <View style={s.section}>
           <Text style={s.eyebrow}>WHY COMPETE</Text>
-          <Text style={s.sectionTitle}>Be a founding member of the competitive circuit.</Text>
+          <Text style={s.sectionTitle}>Be in the first field.</Text>
           <View style={s.pullQuote}>
-            <Text style={s.pullQuoteText}>"Early applicants get first consideration as tournaments are announced city by city."</Text>
+            <Text style={s.pullQuoteText}>"Invitations to the first event go out from this list first."</Text>
           </View>
           <Text style={s.body}>
-            This is the beginning of something new. The players who step up now become the founding competitors of the Clocked Golf circuit — the first names on the first leaderboards, in the first cities.
+            This is the beginning of something new. The players who step up now are the first names on the first Clocked leaderboard.
           </Text>
         </View>
 
         {/* Experience */}
         <View style={s.section}>
-          <Text style={s.eyebrow}>THE EXPERIENCE</Text>
-          <Text style={s.sectionTitle}>Unlike anything currently offered in golf.</Text>
+          <Text style={s.eyebrow}>WHERE THINGS STAND</Text>
+          <Text style={s.sectionTitle}>Confirmed so far.</Text>
           <View style={s.expGrid}>
-            {EXPERIENCE_ITEMS.map(item => (
+            {CONFIRMED_ITEMS.map(item => (
               <View key={item.label} style={s.expItem}>
                 <Text style={s.expItemValue}>{item.value}</Text>
                 <Text style={s.expItemLabel}>{item.label}</Text>
               </View>
             ))}
           </View>
+          <Text style={[s.eyebrow, { marginTop: 20 }]}>NOT YET ANNOUNCED</Text>
+          <View style={s.expGrid}>
+            {TBA_ITEMS.map(item => (
+              <View key={item.value} style={s.expItem}>
+                <Text style={s.expItemValue}>{item.value}</Text>
+                <Text style={s.expItemLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
           <Text style={[s.body, { marginTop: 16 }]}>
-            Exclusive merchandise. Awards presentation. A competitive atmosphere built for athletes, by people who play golf the athletic way.
+            We'll publish the date, venue, field size, and entry details as they're confirmed. Nothing is open for registration yet; requesting an invitation expresses interest and doesn't guarantee a spot.
           </Text>
         </View>
 
         {/* Apply CTA */}
         <View style={s.applySection}>
-          <Text style={s.eyebrow}>APPLY TO COMPETE</Text>
-          <Text style={s.sectionTitle}>Interest applications are now open.</Text>
+          <Text style={s.eyebrow}>REQUEST AN INVITATION</Text>
+          <Text style={s.sectionTitle}>Sign up to be considered for the first tournament.</Text>
           <Text style={s.body}>
-            Submit your application to be considered for tournaments as they are announced in your area. Field sizes are limited and not every team will be accepted. Tell us what you played, and why your team belongs in the field.
+            Tell us what you played and why your team belongs in the field. We'll share details as they become available, and the first invitations go out from this list.
           </Text>
           <TouchableOpacity
             style={s.applyBtn}
             onPress={() => navigation.navigate('TournamentApply')}
             activeOpacity={0.85}
           >
-            <Text style={s.applyBtnText}>APPLY TO COMPETE {'\u2192'}</Text>
+            <Text style={s.applyBtnText}>REQUEST AN INVITATION {'\u2192'}</Text>
           </TouchableOpacity>
-          <Text style={s.closing}>The athletic way to play golf.</Text>
+          <Text style={s.closing}>The game is yours. The clock is running.</Text>
         </View>
 
       </ScrollView>

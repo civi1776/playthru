@@ -841,8 +841,8 @@ export default function ProfileScreen({ navigation }) {
             activeOpacity={0.8}
           >
             <View style={{ flex: 1 }}>
-              <Text style={s.promoTitle}>Ready to compete?</Text>
-              <Text style={s.promoSub}>Apply for the Clocked Golf tournament series.</Text>
+              <Text style={s.promoTitle}>The first Clocked event is coming.</Text>
+              <Text style={s.promoSub}>South Florida. Request an invitation to compete.</Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={COLOR.gold} />
           </TouchableOpacity>

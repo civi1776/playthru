@@ -1,5 +1,6 @@
-// ─── Tournament Apply — Shot Clock Invitational application form ────────────
-// Mirrors the fields on the website's /invitational.html apply form. Player 1
+// ─── Tournament Apply — team invitation request for the first Clocked event ──
+// Two-player team application (the website's /tournaments page collects
+// individual interest via the website-forms function; both land in admin review). Player 1
 // is always the signed-in user (name/handicap prefilled from their profile,
 // editable) since applying in-app requires an account. Submits to the shared
 // tournament-apply edge function — the same backend the website form posts
@@ -90,11 +91,11 @@ export default function TournamentApplyScreen({ navigation }) {
       <SafeAreaView style={s.container}>
         <View style={s.successWrap}>
           <Ionicons name="checkmark-circle" size={48} color={COLOR.green} style={{ marginBottom: 20 }} />
-          <Text style={s.successTitle}>Application Received.</Text>
+          <Text style={s.successTitle}>You're on the list.</Text>
           <Text style={s.successBody}>
-            Thank you for applying to the Clocked Golf tournament series. We review every application personally and will be in touch as tournaments are announced in your area. Selected teams will receive full entry details and next steps.
+            Your request has been received. We'll share the date, venue, and format for the first Clocked event in South Florida as they're set, and invitations go out from this list first. Requesting an invitation expresses interest and doesn't guarantee a spot.
           </Text>
-          <Text style={s.successClosing}>The athletic way to play golf.</Text>
+          <Text style={s.successClosing}>The game is yours. The clock is running.</Text>
           <TouchableOpacity style={s.doneBtn} onPress={() => navigation.navigate('Main')} activeOpacity={0.85}>
             <Text style={s.doneBtnText}>DONE</Text>
           </TouchableOpacity>
@@ -113,9 +114,9 @@ export default function TournamentApplyScreen({ navigation }) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          <Text style={s.eyebrow}>APPLY TO COMPETE</Text>
-          <Text style={s.title}>The Clocked Golf Tournament Series</Text>
-          <Text style={s.subtitle}>This series is for athletes. Tell us what you played, tell us about your game, and we'll reach out as tournaments are announced in your area.</Text>
+          <Text style={s.eyebrow}>REQUEST AN INVITATION</Text>
+          <Text style={s.title}>The first Clocked event.</Text>
+          <Text style={s.subtitle}>South Florida. Date and venue to be announced. Clocked tournaments are for athletes: tell us what you played, tell us about your game, and we'll reach out as details are set.</Text>
 
           <Field label="TEAM NAME">
             <TextInput style={s.input} value={teamName} onChangeText={setTeamName} placeholder="Your team name" placeholderTextColor="#3A5C3C" />
