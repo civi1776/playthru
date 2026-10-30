@@ -47,6 +47,7 @@ import TournamentApplyScreen     from './screens/TournamentApplyScreen';
 import RivalryScreen             from './screens/RivalryScreen';
 import AdminScreen               from './screens/AdminScreen';
 import ArcadeScreen              from './screens/ArcadeScreen';
+import ArcadeHomeScreen          from './screens/ArcadeHomeScreen';
 
 // ─── Deep link helpers ────────────────────────────────────────────────────────
 function parseUrlParams(url) {
@@ -108,6 +109,7 @@ const PLAYER_TABS = [
   { name: 'Feed',  icon: 'flash-outline',  label: 'FEED' },
   { name: 'Rules', icon: 'book-outline',   label: 'RULES' },
   { name: 'Play',  icon: 'timer-outline',  label: 'PLAY', isPlay: true },
+  { name: 'Arcade', icon: 'game-controller-outline', label: 'ARCADE' },
   { name: 'Ranks', icon: 'trophy-outline', label: 'RANKS' },
   { name: 'You',   icon: 'person-outline', label: 'YOU' },
 ];
@@ -341,6 +343,7 @@ function MainApp({ navigation }) {
         <Tab.Screen name="Feed"  component={FeedScreen} />
         <Tab.Screen name="Rules" component={RulesScreen} />
         <Tab.Screen name="Play"  component={FeedScreen} />
+        <Tab.Screen name="Arcade" component={ArcadeHomeScreen} />
         <Tab.Screen name="Ranks" component={LeaderboardScreen} />
         <Tab.Screen name="You"   component={ProfileScreen} />
       </Tab.Navigator>
@@ -630,7 +633,7 @@ function AppNavigator() {
         <RootStack.Screen name="ClockedSetup"   component={ClockedSetupScreen} />
         <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} />
         <RootStack.Screen name="ConfirmRound"  component={ConfirmRoundScreen} />
-        <RootStack.Screen name="Arcade"        component={ArcadeScreen} />
+        <RootStack.Screen name="ArcadeGame"    component={ArcadeScreen} />
         <RootStack.Screen name="Tournament"       component={TournamentScreen} />
         <RootStack.Screen name="TournamentApply"  component={TournamentApplyScreen} />
       </RootStack.Navigator>

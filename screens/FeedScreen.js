@@ -633,9 +633,6 @@ export default function FeedScreen({ navigation }) {
           <TouchableOpacity onPress={() => setShowPlusMenu(!showPlusMenu)} activeOpacity={0.7} accessibilityLabel="More actions" style={s.headerIcon}>
             <Ionicons name={showPlusMenu ? 'close' : 'add'} size={20} color="#B8A882" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('Arcade')} activeOpacity={0.7} accessibilityLabel="Clocked Arcade" style={s.headerIcon}>
-            <Ionicons name="game-controller-outline" size={20} color="#B8A882" />
-          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7} accessibilityLabel="Notifications" style={s.headerIcon}>
             <Ionicons name="notifications-outline" size={20} color="#B8A882" />
           </TouchableOpacity>

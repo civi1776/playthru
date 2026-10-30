@@ -322,7 +322,7 @@ export default function ClockedSetupScreen({ navigation }) {
             {/* Not at a course — play the arcade on the same rules */}
             <TouchableOpacity
               style={s.arcadeCard}
-              onPress={() => navigation.navigate('Arcade')}
+              onPress={() => navigation.navigate('Main', { screen: 'Arcade' })}
               activeOpacity={0.8}
               accessibilityLabel="Play Clocked Arcade"
             >

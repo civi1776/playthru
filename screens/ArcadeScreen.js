@@ -18,13 +18,17 @@ import { useAuth } from '../context/AuthContext';
 import { COLOR, TYPE, SPACING, RADIUS, CARD, scoreTier } from '../lib/theme';
 import { formatSeconds, formatSecondsLong } from '../lib/clockedSport';
 import {
-  createGame, tick, setAim, releaseAim, lockPower, drainEvents,
+  createGame, tick, setAim, releaseAim, lockPower, drainEvents, requestTurbo, swingPose,
   holeElapsed, roundElapsed, runningPoints, currentDispersion, hintFor, VERDICT_HOLD_MS,
 } from '../lib/arcade/engine';
+import { turboState, cartMph } from '../lib/arcade/physics';
 import { randomSeed, dist } from '../lib/arcade/course';
+import { DEFAULT_AVATAR, loadAvatar } from '../lib/arcade/avatar';
 import HoleMap, { cameraTargetFor, lerpCamera, screenToWorld } from '../components/arcade/HoleMap';
 import Joystick from '../components/arcade/Joystick';
 import PowerMeter from '../components/arcade/PowerMeter';
+import TurboButton from '../components/arcade/TurboButton';
+import { SwingStage } from '../components/arcade/Golfer';
 import ArcadeHUD, { VerdictOverlay } from '../components/arcade/ArcadeHUD';
 import InitialsAvatar from '../components/InitialsAvatar';
 
@@ -34,14 +38,22 @@ const DIFFICULTIES = [
   { key: 'pro',          label: 'PRO',      sub: 'Tour pace',    color: COLOR.red },
 ];
 
-export default function ArcadeScreen({ navigation }) {
+// Launched from the Arcade tab (ArcadeHomeScreen) with
+// { autostart: true, difficulty, avatar }; the legacy start screen below is
+// kept for any older entry point that arrives without params.
+export default function ArcadeScreen({ navigation, route }) {
   const { profile } = useAuth();
-  const [mode, setMode] = useState('start');   // 'start' | 'play' | 'summary'
-  const [difficulty, setDifficulty] = useState(() => profile?.preferred_difficulty ?? 'intermediate');
+  const autostart = !!route?.params?.autostart;
+  const [mode, setMode] = useState(autostart ? 'play' : 'start');   // 'start' | 'play' | 'summary'
+  const [difficulty, setDifficulty] = useState(() => route?.params?.difficulty ?? profile?.preferred_difficulty ?? 'intermediate');
+  const [avatar, setAvatar] = useState(() => route?.params?.avatar ?? DEFAULT_AVATAR);
   const [seed, setSeed] = useState(() => randomSeed());
   const [summary, setSummary] = useState(null);
 
+  useEffect(() => { if (!route?.params?.avatar) loadAvatar().then(setAvatar); }, [route?.params?.avatar]);
+
   const startGame = () => { setSeed(randomSeed()); setSummary(null); setMode('play'); };
+  const leave = () => { if (autostart) navigation.goBack(); else setMode('start'); };
 
   if (mode === 'play') {
     return (
@@ -49,13 +61,14 @@ export default function ArcadeScreen({ navigation }) {
         key={seed}
         seed={seed}
         difficulty={difficulty}
-        onQuit={() => setMode('start')}
+        avatar={avatar}
+        onQuit={leave}
         onDone={(s) => { setSummary(s); setMode('summary'); }}
       />
     );
   }
   if (mode === 'summary' && summary) {
-    return <Summary summary={summary} onPlayAgain={startGame} onBack={() => setMode('start')} />;
+    return <Summary summary={summary} onPlayAgain={startGame} onBack={leave} />;
   }
   return (
     <Start
@@ -179,7 +192,7 @@ function HowRow({ icon, text }) {
 }
 
 // ─── Game ────────────────────────────────────────────────────────────────────
-function Game({ seed, difficulty, onDone, onQuit }) {
+function Game({ seed, difficulty, avatar, onDone, onQuit }) {
   const gameRef = useRef(null);
   if (!gameRef.current) gameRef.current = createGame({ seed, difficulty });
   const g = gameRef.current;
@@ -224,7 +237,16 @@ function Game({ seed, difficulty, onDone, onQuit }) {
     for (const ev of events) {
       switch (ev.type) {
         case 'swing':
-          Haptics.impactAsync(ev.isPutt ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          Haptics.selectionAsync().catch(() => {});
+          break;
+        case 'impact':
+          Haptics.impactAsync(ev.isPutt ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+          break;
+        case 'bump':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+          break;
+        case 'turbo':
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           break;
         case 'tree':
         case 'water':
@@ -326,6 +348,10 @@ function Game({ seed, difficulty, onDone, onQuit }) {
   const toPin = Math.round(dist(g.ball, g.hole.pin));
   const toBall = Math.round(dist(g.cart, g.ball));
   const isAiming = g.phase === 'aim' || g.phase === 'putt';
+  const pose = swingPose(g, now);
+  const turbo = turboState(g.cart, now);
+  const mph = cartMph(g.cart);
+  const showStage = isAiming || g.phase === 'power' || g.phase === 'flight';
 
   return (
     <SafeAreaView style={st.screen} edges={['top', 'bottom']}>
@@ -363,6 +389,9 @@ function Game({ seed, difficulty, onDone, onQuit }) {
             height={mapSize.height}
             dispersionDeg={dispersion}
             powerValue={g.power.value}
+            avatar={avatar}
+            swingPose={pose}
+            now={now}
           />
         )}
         {g.phase === 'transition' && (
@@ -379,26 +408,38 @@ function Game({ seed, difficulty, onDone, onQuit }) {
         {g.phase === 'drive' || g.phase === 'transition' ? (
           <View style={st.driveRow}>
             <Joystick onChange={(v) => { joyRef.current = v; }} disabled={g.phase !== 'drive'} />
-            <View style={{ flex: 1, marginLeft: 16 }}>
+            <View style={{ flex: 1, marginHorizontal: 14 }}>
               <Text style={st.hint}>{hintFor(g)}</Text>
-              <Text style={st.readout}><Text style={st.readoutNum}>{toBall}</Text> YDS TO {g.strokes === 0 ? 'TEE' : 'BALL'}</Text>
-              <Text style={st.subHint}>Rough and sand slow the cart. The green is off-limits — park and walk.</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 16, marginTop: 6 }}>
+                <Text style={st.readout}><Text style={[st.readoutNum, { color: turbo.active ? COLOR.goldBright : COLOR.cream }]}>{mph}</Text> MPH</Text>
+                <Text style={st.readout}><Text style={st.readoutNum}>{toBall}</Text> YDS</Text>
+              </View>
+              <Text style={st.subHint}>Steer with the stick. Rough and sand slide. Green's off-limits — park and walk.</Text>
             </View>
+            <TurboButton
+              charge={turbo.charge} active={turbo.active} ready={turbo.ready}
+              disabled={g.phase !== 'drive'}
+              onPress={() => requestTurbo(gameRef.current, Date.now())}
+            />
           </View>
-        ) : g.phase === 'power' ? (
-          <View>
-            <PowerMeter value={g.power.value} club={g.club} />
-            <Text style={[st.hint, { marginTop: 10, textAlign: 'center' }]}>{hintFor(g)}</Text>
-          </View>
-        ) : isAiming ? (
-          <View>
-            <View style={st.aimRow}>
-              <Readout label="TO PIN" value={`${toPin}`} unit="YDS" />
-              <Readout label="LIE" value={g.lie.toUpperCase()} />
-              <Readout label="CLUB" value={g.club.name} />
-              <Readout label="CONE" value={`${dispersion.toFixed(1)}°`} color={dispersion > 7 ? COLOR.red : dispersion > 4 ? COLOR.amber : COLOR.green} />
+        ) : showStage ? (
+          <View style={st.stageRow}>
+            <View style={st.stageBox}>
+              <SwingStage avatar={avatar} pose={pose} isPutt={g.isPutt} club={g.club.name} width={150} height={112} idleT={now / 1000} />
             </View>
-            <Text style={[st.hint, { marginTop: 10, textAlign: 'center' }]}>{hintFor(g)}</Text>
+            <View style={{ flex: 1, marginLeft: 12, justifyContent: 'center' }}>
+              {g.phase === 'power' ? (
+                <PowerMeter value={g.power.value} club={g.club} />
+              ) : (
+                <View style={st.aimRow}>
+                  <Readout label="TO PIN" value={`${toPin}`} unit="YDS" />
+                  <Readout label="LIE" value={g.lie.toUpperCase()} />
+                  <Readout label="CLUB" value={g.club.name} />
+                  <Readout label="CONE" value={`${dispersion.toFixed(1)}°`} color={dispersion > 7 ? COLOR.red : dispersion > 4 ? COLOR.amber : COLOR.green} />
+                </View>
+              )}
+              <Text style={[st.hint, { marginTop: 10 }]}>{hintFor(g)}</Text>
+            </View>
           </View>
         ) : (
           <Text style={[st.hint, { textAlign: 'center' }]}>{hintFor(g)}</Text>
@@ -412,7 +453,7 @@ function Readout({ label, value, unit, color = COLOR.cream }) {
   return (
     <View style={{ alignItems: 'center', flex: 1 }}>
       <Text style={st.statLabel}>{label}</Text>
-      <Text style={[st.readoutNum, { color }]}>{value}{unit ? <Text style={st.readoutUnit}> {unit}</Text> : null}</Text>
+      <Text style={[st.readoutNum, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{value}{unit ? <Text style={st.readoutUnit}> {unit}</Text> : null}</Text>
     </View>
   );
 }
@@ -571,14 +612,16 @@ const st = StyleSheet.create({
   gameWordmark: { ...TYPE.labelOn, fontSize: 9, letterSpacing: 2.5 },
   roundClock: { ...TYPE.statNumber, color: COLOR.muted, fontSize: 14, width: 56, textAlign: 'right', paddingRight: 8 },
   mapWrap: { flex: 1, backgroundColor: '#0B1F11', overflow: 'hidden' },
-  controls: { height: 164, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 6, backgroundColor: COLOR.surface, borderTopWidth: 1, borderTopColor: COLOR.border, justifyContent: 'center' },
+  controls: { height: 168, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6, backgroundColor: COLOR.surface, borderTopWidth: 1, borderTopColor: COLOR.border, justifyContent: 'center' },
   driveRow: { flexDirection: 'row', alignItems: 'center' },
+  stageRow: { flexDirection: 'row', alignItems: 'center' },
+  stageBox: { width: 150, height: 112, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: '#0B1F11', borderWidth: 1, borderColor: COLOR.border },
   hint: { ...TYPE.label, color: COLOR.gold, fontSize: 9, letterSpacing: 2, lineHeight: 14 },
   subHint: { color: COLOR.dim, fontSize: 10, marginTop: 6, lineHeight: 14 },
   readout: { color: COLOR.muted, fontSize: 10, letterSpacing: 1.5, marginTop: 8 },
-  readoutNum: { ...TYPE.statNumber, color: COLOR.cream, fontSize: 22 },
+  readoutNum: { ...TYPE.statNumber, color: COLOR.cream, fontSize: 20 },
   readoutUnit: { fontSize: 10, color: COLOR.dim, letterSpacing: 1 },
-  aimRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  aimRow: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 8 },
   statLabel: { ...TYPE.label },
 
   transitionCard: {

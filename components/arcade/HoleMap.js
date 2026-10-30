@@ -7,7 +7,9 @@
 import { memo, useMemo } from 'react';
 import Svg, { G, Rect, Path, Circle, Ellipse, Line, Polygon } from 'react-native-svg';
 import { COLOR } from '../../lib/theme';
-import { ballHeight, LIE_POWER_MULT } from '../../lib/arcade/physics';
+import { ballHeight, LIE_POWER_MULT, turboState } from '../../lib/arcade/physics';
+import { avatarColors } from '../../lib/arcade/avatar';
+import { TopGolfer } from './Golfer';
 
 // Midnight Fairway palette for the course itself.
 export const MAP = {
@@ -75,9 +77,14 @@ export function cameraTargetFor(g, aspect, current) {
       if (g.flight?.isPutt) t.h = Math.max(44, hole.greenRadius * 4.2);
       break;
     }
-    case 'drive':
-      t = frameTwo(g.cart, g.ball, aspect, 120, 56);
+    case 'drive': {
+      // Look ahead of the cart in the direction of travel and pull back a
+      // touch as speed builds so fast driving still reads.
+      const spd = Math.hypot(g.cart.vx ?? 0, g.cart.vy ?? 0);
+      const ahead = { x: g.cart.x + (g.cart.vx ?? 0) * 0.45, y: g.cart.y + (g.cart.vy ?? 0) * 0.45 };
+      t = frameTwo(ahead, g.ball, aspect, 112 + spd * 1.4, 56);
       break;
+    }
     case 'walk': {
       const target = g.walkTarget === 'cart' ? g.cart : g.ball;
       t = frameTwo(g.golfer ?? target, target, aspect, 60, 30);
@@ -165,15 +172,66 @@ const CourseLayer = memo(function CourseLayer({ hole }) {
 });
 
 // ─── Dynamic layer ───────────────────────────────────────────────────────────
-function Cart({ cart, ry, s }) {
-  const deg = -(cart.heading * 180 / Math.PI) + 90; // world heading → render rotation
-  const w = 4.6 * s, l = 6.4 * s;
+function Tracks({ trail, ry, s }) {
+  if (!trail || trail.length < 2) return null;
+  const off = 1.5 * s;
+  let l = '', r = '';
+  trail.forEach((p, i) => {
+    const px = -Math.sin(p.h) * off, py = Math.cos(p.h) * off;   // world-left offset
+    const L = `${(p.x + px).toFixed(2)} ${ry(p.y + py).toFixed(2)}`;
+    const R = `${(p.x - px).toFixed(2)} ${ry(p.y - py).toFixed(2)}`;
+    l += (i === 0 ? 'M' : 'L') + L + ' ';
+    r += (i === 0 ? 'M' : 'L') + R + ' ';
+  });
+  return (
+    <G opacity={0.35}>
+      <Path d={l} stroke="#06120A" strokeWidth={0.55 * s} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={r} stroke="#06120A" strokeWidth={0.55 * s} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </G>
+  );
+}
+
+function Cart({ cart, ry, s, driver, avatar, now }) {
+  const deg = -(cart.heading * 180 / Math.PI) + 90; // world heading → render rotation (nose up = +y)
+  const w = 4.8 * s, l = 6.8 * s;
+  const turbo = turboState(cart, now).active;
+  const c = avatarColors(avatar);
+  const flicker = 0.75 + 0.25 * Math.sin(now / 40);
   return (
     <G transform={`translate(${cart.x}, ${ry(cart.y)}) rotate(${deg})`}>
-      <Rect x={-w / 2 + 0.4} y={-l / 2 + 0.6} width={w} height={l} rx={1} fill="#00000055" />
-      <Rect x={-w / 2} y={-l / 2} width={w} height={l} rx={1} fill={MAP.cart} />
-      <Rect x={-w / 2 + 0.7} y={-l / 2 + 0.8} width={w - 1.4} height={l * 0.5} rx={0.6} fill={MAP.cartTop} />
-      <Rect x={-w / 2 + 0.7} y={l / 2 - 1.6} width={w - 1.4} height={0.8} rx={0.3} fill={MAP.cartTop} opacity={0.6} />
+      {/* turbo flames out the back */}
+      {turbo && (
+        <G opacity={flicker}>
+          <Polygon points={`${-w * 0.28},${l / 2} ${w * 0.28},${l / 2} 0,${l / 2 + 4.2 * s}`} fill={COLOR.goldBright} />
+          <Polygon points={`${-w * 0.14},${l / 2} ${w * 0.14},${l / 2} 0,${l / 2 + 2.6 * s}`} fill="#FFFFFF" opacity={0.8} />
+        </G>
+      )}
+      {/* shadow */}
+      <Rect x={-w / 2 + 0.5} y={-l / 2 + 0.7} width={w} height={l} rx={1.2} fill="#00000055" />
+      {/* wheels */}
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sy], i) => (
+        <Rect key={i} x={sx * (w / 2) - 0.55 * s} y={sy * (l / 2 - 1.4 * s) - 0.9 * s} width={1.1 * s} height={1.8 * s} rx={0.3 * s} fill="#111" />
+      ))}
+      {/* body */}
+      <Rect x={-w / 2} y={-l / 2} width={w} height={l} rx={1.1 * s} fill={MAP.cart} />
+      {/* rear bag well */}
+      <Rect x={-w / 2 + 0.6 * s} y={l / 2 - 2.0 * s} width={w - 1.2 * s} height={1.4 * s} rx={0.4 * s} fill={MAP.cartTop} opacity={0.75} />
+      {/* seat */}
+      <Rect x={-w / 2 + 0.6 * s} y={-0.3 * s} width={w - 1.2 * s} height={2.0 * s} rx={0.5 * s} fill={MAP.cartTop} />
+      {/* driver */}
+      {driver && (
+        <G>
+          <Ellipse cx={-0.4 * s} cy={0.7 * s} rx={1.2 * s} ry={0.7 * s} fill={c.shirt} />
+          <Circle cx={-0.4 * s} cy={0.6 * s} r={0.62 * s} fill={c.hatStyle === 'none' ? c.skin : c.hat} />
+        </G>
+      )}
+      {/* roof — translucent so the driver shows */}
+      <Rect x={-w / 2 + 0.3 * s} y={-l / 2 + 1.0 * s} width={w - 0.6 * s} height={l * 0.55} rx={0.8 * s} fill="#F5EDD8" opacity={0.22} />
+      <Rect x={-w / 2 + 0.3 * s} y={-l / 2 + 1.0 * s} width={w - 0.6 * s} height={l * 0.55} rx={0.8 * s} fill="none" stroke="#F5EDD8" strokeWidth={0.18 * s} opacity={0.5} />
+      {/* windshield + headlights */}
+      <Line x1={-w / 2 + 0.6 * s} y1={-l / 2 + 1.1 * s} x2={w / 2 - 0.6 * s} y2={-l / 2 + 1.1 * s} stroke="#9FD9FF" strokeWidth={0.35 * s} opacity={0.8} />
+      <Circle cx={-w / 2 + 0.9 * s} cy={-l / 2 + 0.3 * s} r={0.35 * s} fill="#FFF6C8" />
+      <Circle cx={w / 2 - 0.9 * s} cy={-l / 2 + 0.3 * s} r={0.35 * s} fill="#FFF6C8" />
     </G>
   );
 }
@@ -194,7 +252,7 @@ function AimGuide({ ball, angle, lengthYd, dispersionDeg, ry }) {
   );
 }
 
-export default function HoleMap({ game, camera, width, height, dispersionDeg, powerValue }) {
+export default function HoleMap({ game, camera, width, height, dispersionDeg, powerValue, avatar, swingPose = 0, now = Date.now() }) {
   const hole = game.hole;
   const H = hole.height;
   const ry = (y) => H - y;
@@ -223,14 +281,19 @@ export default function HoleMap({ game, camera, width, height, dispersionDeg, po
       {showAim && (
         <AimGuide ball={game.ball} angle={game.aimAngle} lengthYd={aimLen} dispersionDeg={dispersionDeg ?? 2} ry={ry} />
       )}
-      {/* Cart (hidden on the final summary) */}
-      <Cart cart={game.cart} ry={ry} s={s} />
-      {/* Golfer on foot */}
-      {game.golfer && (
-        <G>
-          <Circle cx={game.golfer.x + 0.4} cy={ry(game.golfer.y) + 0.5} r={1.5 * s} fill="#00000055" />
-          <Circle cx={game.golfer.x} cy={ry(game.golfer.y)} r={1.5 * s} fill={MAP.golfer} stroke={MAP.cartTop} strokeWidth={0.35} />
-        </G>
+      <Tracks trail={game.cart.trail} ry={ry} s={s} />
+      <Cart cart={game.cart} ry={ry} s={s} driver={game.phase === 'drive' || game.phase === 'transition'} avatar={avatar} now={now} />
+      {/* Golfer: at the ball while swinging, on foot around the green */}
+      {(game.phase === 'aim' || game.phase === 'putt' || game.phase === 'power' || game.phase === 'flight') && (
+        <TopGolfer ball={game.ball} aim={game.aimAngle} pose={swingPose} avatar={avatar} s={s} ry={ry} />
+      )}
+      {game.golfer && game.phase === 'walk' && (
+        <TopGolfer
+          ball={game.walkTarget === 'cart' ? game.cart : game.ball}
+          pos={game.golfer}
+          aim={Math.atan2((game.walkTarget === 'cart' ? game.cart.y : game.ball.y) - game.golfer.y, (game.walkTarget === 'cart' ? game.cart.x : game.ball.x) - game.golfer.x)}
+          avatar={avatar} s={s} ry={ry} walking walkT={now / 1000}
+        />
       )}
       {/* Ball: shadow stays on the ground, ball lifts & grows with height */}
       {game.phase !== 'verdict' && game.phase !== 'transition' && (
