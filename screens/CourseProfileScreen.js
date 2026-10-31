@@ -161,7 +161,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     if (initialCourse.id != null) {
       const { data } = await supabase
         .from('courses')
-        .select('id, name, city, state, par, total_rounds, avg_time, description, website, clocked_certified, certified_at')
+        .select('id, name, city, state, latitude, longitude, par, total_rounds, avg_time, description, website, clocked_certified, certified_at')
         .eq('id', initialCourse.id)
         .maybeSingle();
       course = data;
@@ -169,7 +169,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     if (!course && initialCourse.name) {
       const { data } = await supabase
         .from('courses')
-        .select('id, name, city, state, par, total_rounds, avg_time, description, website, clocked_certified, certified_at')
+        .select('id, name, city, state, latitude, longitude, par, total_rounds, avg_time, description, website, clocked_certified, certified_at')
         .eq('name', initialCourse.name)
         .maybeSingle();
       course = data;
@@ -351,13 +351,16 @@ export default function CourseProfileScreen({ navigation, route }) {
 
           {/* Hero */}
           <View style={s.hero}>
-            <View style={{ marginBottom: 12 }}>
-              <CourseAvatar
-                courseName={courseData?.name ?? initialCourse.name}
-                city={courseData?.city ?? initialCourse.city}
-                size={52}
-              />
-            </View>
+            <CourseAvatar
+              courseName={courseData?.name ?? initialCourse.name}
+              city={courseData?.city ?? initialCourse.city}
+              latitude={courseData?.latitude ?? initialCourse.latitude}
+              longitude={courseData?.longitude ?? initialCourse.longitude}
+              width={340}
+              height={170}
+              radius={14}
+              style={{ alignSelf: 'center', width: '100%', marginBottom: 14 }}
+            />
             <Text style={s.courseName}>{initialCourse.name}</Text>
             {!!location && <Text style={s.courseLocation}>{location}</Text>}
             {isCertified && (
