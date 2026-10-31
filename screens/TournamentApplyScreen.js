@@ -196,7 +196,7 @@ const s = StyleSheet.create({
   scroll:       { paddingHorizontal: SPACING.lg, paddingBottom: 60 },
 
   eyebrow:      { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 3, marginBottom: 10 },
-  title:        { fontSize: 26, fontFamily: 'Georgia', fontWeight: '300', color: COLOR.cream, marginBottom: 8 },
+  title:        { fontSize: 26, fontWeight: '300', color: COLOR.cream, marginBottom: 8 },
   subtitle:     { fontSize: 14, color: COLOR.muted, lineHeight: 20, marginBottom: 28 },
 
   groupHeader:  { fontSize: 11, fontWeight: '700', color: COLOR.dim, letterSpacing: 1.5, marginTop: 8, marginBottom: 14 },
@@ -214,7 +214,7 @@ const s = StyleSheet.create({
   submitBtnText:     { fontSize: 12, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
 
   successWrap:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  successTitle:    { fontSize: 26, fontFamily: 'Georgia', fontWeight: '300', color: COLOR.gold, marginBottom: 16, textAlign: 'center' },
+  successTitle:    { fontSize: 26, fontWeight: '300', color: COLOR.gold, marginBottom: 16, textAlign: 'center' },
   successBody:     { fontSize: 15, color: COLOR.muted, lineHeight: 24, textAlign: 'center', marginBottom: 32 },
   successClosing:  { fontSize: 17, color: COLOR.cream, fontStyle: 'italic', textAlign: 'center', marginBottom: 40 },
   doneBtn:         { borderWidth: 1, borderColor: COLOR.gold, borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, paddingHorizontal: 40 },

@@ -193,8 +193,8 @@ const s = StyleSheet.create({
 
   hero:             { paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: COLOR.border, marginBottom: 28 },
   overline:         { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 3, marginBottom: 20 },
-  heroTitle:        { fontSize: 40, fontFamily: 'Georgia', fontWeight: '300', color: COLOR.cream, lineHeight: 44 },
-  heroSub:          { fontSize: 20, fontStyle: 'italic', fontWeight: '300', color: COLOR.gold, marginBottom: 20, fontFamily: 'Georgia' },
+  heroTitle:        { fontSize: 40, fontWeight: '300', color: COLOR.cream, lineHeight: 44 },
+  heroSub:          { fontSize: 20, fontStyle: 'italic', fontWeight: '300', color: COLOR.gold, marginBottom: 20 },
   heroDivider:      { width: 40, height: 1, backgroundColor: COLOR.gold + '66', marginBottom: 20 },
   heroStatement:    { fontSize: 16, color: COLOR.muted, lineHeight: 26, marginBottom: 24 },
   heroStatementStrong: { color: COLOR.cream },
@@ -205,8 +205,8 @@ const s = StyleSheet.create({
 
   section:          { marginBottom: 32 },
   eyebrow:          { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 3, marginBottom: 14 },
-  sectionTitle:     { fontSize: 21, fontFamily: 'Georgia', fontWeight: '300', color: COLOR.cream, lineHeight: 27, marginBottom: 14 },
-  declarationLine:  { fontSize: 19, fontFamily: 'Georgia', fontWeight: '300', color: COLOR.cream, lineHeight: 25, marginBottom: 2 },
+  sectionTitle:     { fontSize: 21, fontWeight: '300', color: COLOR.cream, lineHeight: 27, marginBottom: 14 },
+  declarationLine:  { fontSize: 19, fontWeight: '300', color: COLOR.cream, lineHeight: 25, marginBottom: 2 },
   accent:           { color: COLOR.gold, fontStyle: 'italic' },
   body:             { fontSize: 14, color: COLOR.muted, lineHeight: 23 },
 
@@ -225,7 +225,7 @@ const s = StyleSheet.create({
 
   expGrid:          { flexDirection: 'row', gap: 8 },
   expItem:          { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, padding: SPACING.md, alignItems: 'center' },
-  expItemValue:     { fontSize: 16, fontWeight: '300', color: COLOR.gold, marginBottom: 8, fontFamily: 'Georgia' },
+  expItemValue:     { fontSize: 16, fontWeight: '300', color: COLOR.gold, marginBottom: 8 },
   expItemLabel:     { fontSize: 9, color: COLOR.dim, letterSpacing: 1, textAlign: 'center', lineHeight: 14 },
 
   applySection:     { backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLOR.borderGold, padding: SPACING.xl, marginBottom: SPACING.lg },

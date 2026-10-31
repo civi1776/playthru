@@ -33,9 +33,9 @@ import ArcadeHUD, { VerdictOverlay } from '../components/arcade/ArcadeHUD';
 import InitialsAvatar from '../components/InitialsAvatar';
 
 const DIFFICULTIES = [
-  { key: 'beginner',     label: 'BEGINNER', sub: 'Roomy clock',  color: COLOR.green },
-  { key: 'intermediate', label: 'INTER.',   sub: 'The standard', color: COLOR.amber },
-  { key: 'pro',          label: 'PRO',      sub: 'Tour pace',    color: COLOR.red },
+  { key: 'beginner',     label: 'BEGINNER', sub: 'Big cup · slow meter',  color: COLOR.green },
+  { key: 'intermediate', label: 'INTER.',   sub: 'The standard',          color: COLOR.amber },
+  { key: 'pro',          label: 'PRO',      sub: 'Small cup · fast meter', color: COLOR.red },
 ];
 
 // Launched from the Arcade tab (ArcadeHomeScreen) with
@@ -398,7 +398,7 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
           <View style={st.transitionCard} pointerEvents="none">
             <Text style={st.transitionHole}>HOLE {g.holeIdx + 1}</Text>
             <Text style={st.transitionPar}>PAR {g.hole.par} · {g.hole.length} YDS</Text>
-            <Text style={st.transitionTp}>TIME PAR {formatSeconds(g.timePar)} — ALREADY RUNNING</Text>
+            <Text style={st.transitionTp}>TIME PAR {formatSeconds(g.timePar)} · CLOCK ALREADY RUNNING</Text>
           </View>
         )}
         <VerdictOverlay verdict={verdict} />

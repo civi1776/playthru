@@ -13,17 +13,19 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { COLOR, TYPE, SPACING, RADIUS, CARD } from '../lib/theme';
 import { formatSeconds } from '../lib/clockedSport';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  DEFAULT_AVATAR, SKIN, SHIRT, PANTS, HAIR, HATS,
+  DEFAULT_AVATAR, SKIN, SHIRT, PANTS, HAIR, HATS, AVATAR_KEY,
   loadAvatar, saveAvatar, loadArcadeDifficulty, saveArcadeDifficulty,
 } from '../lib/arcade/avatar';
+import { DIFFICULTY as ARCADE_DIFFICULTY } from '../lib/arcade/engine';
 import { SwingStage } from '../components/arcade/Golfer';
 import InitialsAvatar from '../components/InitialsAvatar';
 
 const DIFFICULTIES = [
-  { key: 'beginner',     label: 'BEGINNER', sub: 'Roomy clock',  color: COLOR.green },
-  { key: 'intermediate', label: 'INTER.',   sub: 'The standard', color: COLOR.amber },
-  { key: 'pro',          label: 'PRO',      sub: 'Tour pace',    color: COLOR.red },
+  { key: 'beginner',     label: 'BEGINNER', sub: ARCADE_DIFFICULTY.beginner.blurb,     color: COLOR.green },
+  { key: 'intermediate', label: 'INTER.',   sub: ARCADE_DIFFICULTY.intermediate.blurb, color: COLOR.amber },
+  { key: 'pro',          label: 'PRO',      sub: ARCADE_DIFFICULTY.pro.blurb,          color: COLOR.red },
 ];
 
 // Demo swing loop for the lobby: idle → backswing → down → finish → hold.
@@ -56,11 +58,14 @@ export default function ArcadeHomeScreen({ navigation }) {
   const [difficulty, setDifficulty] = useState(profile?.preferred_difficulty ?? 'intermediate');
   const [board, setBoard] = useState(null);
   const [best, setBest] = useState(null);
+  const [customize, setCustomize] = useState(false);
   const { pose, t } = useDemoSwing();
   const loadedRef = useRef(false);
 
   useEffect(() => {
     loadAvatar().then(a => { setAvatar(a); loadedRef.current = true; });
+    // First visit: open the customizer. After that it stays collapsed.
+    AsyncStorage.getItem(AVATAR_KEY).then(v => { if (!v) setCustomize(true); }).catch(() => {});
     loadArcadeDifficulty(profile?.preferred_difficulty ?? 'intermediate').then(setDifficulty);
   }, []);
 
@@ -153,7 +158,11 @@ export default function ArcadeHomeScreen({ navigation }) {
         </View>
 
         {/* Avatar */}
-        <Text style={st.sectionQ}>YOUR GOLFER</Text>
+        <TouchableOpacity style={st.sectionToggle} onPress={() => setCustomize(c => !c)} activeOpacity={0.7} accessibilityRole="button" accessibilityState={{ expanded: customize }}>
+          <Text style={[st.sectionQ, { marginTop: 0, marginBottom: 0 }]}>YOUR GOLFER</Text>
+          <Text style={st.sectionToggleText}>{customize ? 'DONE' : 'CUSTOMIZE'}</Text>
+        </TouchableOpacity>
+        {customize && (
         <View style={st.card}>
           <SwatchRow label="SKIN"  colors={SKIN}  value={avatar.skin}  onPick={(i) => updateAvatar({ skin: i })} />
           <SwatchRow label="SHIRT" colors={SHIRT} value={avatar.shirt} onPick={(i) => updateAvatar({ shirt: i })} />
@@ -173,13 +182,14 @@ export default function ArcadeHomeScreen({ navigation }) {
             <SwatchRow label="HAT COLOR" colors={SHIRT} value={avatar.hatColor} onPick={(i) => updateAvatar({ hatColor: i })} />
           )}
         </View>
+        )}
 
         {/* How it plays */}
         <Text style={st.sectionQ}>HOW IT PLAYS</Text>
         <View style={st.card}>
           <HowRow icon="locate-outline" text="Drag from the ball to aim. Release to start the meter — your golfer's backswing grows with the power. Tap to swing." />
           <HowRow icon="timer-outline"  text="Stand over the ball too long and the shot cone widens. Hesitation costs accuracy and clock." />
-          <HowRow icon="car-sport-outline" text="Drive to your ball. The cart has real momentum: it drifts wide at speed and slides in sand. Hit TURBO when it's charged." />
+          <HowRow icon="car-sport-outline" text="Drive to your ball. The cart has real momentum: it drifts wide at speed and slides in sand. Hit TURBO when it's charged. Hole out and you're already on the next tee." />
           <HowRow icon="trophy-outline" text="Real Clocked scoring: par 1, birdie 3, eagle 6. Over time par costs half a point per 30s. Pick up at double." />
         </View>
 
@@ -252,6 +262,8 @@ const st = StyleSheet.create({
   primaryBtnText: { color: COLOR.bg, fontSize: 14, fontWeight: '800', letterSpacing: 3 },
 
   sectionQ: { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 8, marginTop: 22 },
+  sectionToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 8 },
+  sectionToggleText: { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
   difficultyRow: { flexDirection: 'row', gap: 10 },
   diffBtn: { flex: 1, backgroundColor: COLOR.surface, borderRadius: 14, borderWidth: 1, borderColor: COLOR.border, paddingVertical: 14, alignItems: 'center', gap: 4 },
   diffBtnActive: { borderColor: COLOR.gold, backgroundColor: '#C9A84C0F' },

@@ -463,7 +463,7 @@ const s = StyleSheet.create({
   roundPop:       { fontSize: 22, fontWeight: '300' },
 
   emptyRounds:    { alignItems: 'center', paddingVertical: 40 },
-  emptyRoundsText:{ fontSize: 16, color: '#7A6E58', fontFamily: 'serif' },
+  emptyRoundsText:{ fontSize: 16, color: '#7A6E58' },
 
   pubTabBar:      { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 8, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
   pubTabBtn:      { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A22' },

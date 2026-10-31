@@ -638,7 +638,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       // Get fresh auth uid — don't rely on context which may be stale
       const { data: { user: authUser } } = await supabase.auth.getUser();
       const uid = authUser?.id ?? user?.id;
-      if (!uid) { Alert.alert('Error', 'Not signed in. Please restart the app.'); return; }
+      if (!uid) { Alert.alert('Not signed in', 'Restart the app and sign in again, then save the round.'); return; }
 
       // Daily rate limit (20 rounds per 24h)
       const { count: todayCount } = await supabase
@@ -793,7 +793,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
         holeScores: results.filter(Boolean).slice(0, holeCount),
       });
     } catch (e) {
-      Alert.alert('Error', 'Could not save your round. Please try again.');
+      Alert.alert('Round not saved', 'Check your connection and tap Save again. Your scores are still here.');
     } finally {
       setIsFinishing(false);
     }
@@ -950,23 +950,35 @@ export default function ClockedRoundScreen({ navigation, route }) {
           <Text style={st.scTitle}>SCORECARD</Text>
           <Text style={st.scHint}>Tap a hole to edit</Text>
           <View style={st.scHeaderRow}>
-            <Text style={[st.scCell, st.scCellHole]} numberOfLines={1}>HOLE</Text>
+            <Text style={[st.scCell, st.scCellHole]} numberOfLines={1}>#</Text>
             <Text style={[st.scCell, st.scCellPar]}>PAR</Text>
             {playerDefs.map((p, i) => (
               <Text key={i} style={[st.scCell, st.scCellPlayer]} numberOfLines={1}>{p.name.split(' ')[0]}</Text>
             ))}
             <Text style={[st.scCell, st.scCellTime]}>TIME</Text>
-            <Text style={[st.scCell, st.scCellPen]}>PEN</Text>
-            <Text style={[st.scCell, st.scCellScore]}>SCORE</Text>
+            <Text style={[st.scCell, st.scCellScore]}>PTS</Text>
           </View>
           {/* Sparse array \u2014 holes can be scored out of order via the hole
               picker, so index into holeResults by real hole number and skip
               any hole that hasn't been played yet rather than mis-labeling
               rows by completion order. */}
           {Array.from({ length: holeCount }, (_, i) => i)
-            .filter(i => holeResults[i] != null)
             .map(i => {
               const r = holeResults[i];
+              if (r == null) {
+                // Unplayed: show the row so the card reads as a scorecard from hole 1.
+                const isCurrent = i + 1 === currentHole;
+                const par = holeDataState?.[i]?.par ?? defaultPar;
+                return (
+                  <View key={i} style={[st.scRow, isCurrent && st.scRowCurrent]}>
+                    <Text style={[st.scCell, st.scCellHole, isCurrent ? st.scValText : st.scDimText]}>{i + 1}</Text>
+                    <Text style={[st.scCell, st.scCellPar, st.scDimText]}>{par ?? '\u2014'}</Text>
+                    {playerDefs.map((_, j) => <Text key={j} style={[st.scCell, st.scCellPlayer, st.scDimText]}>{'\u2014'}</Text>)}
+                    <Text style={[st.scCell, st.scCellTime, st.scDimText]}>{isCurrent ? 'LIVE' : '\u2014'}</Text>
+                    <Text style={[st.scCell, st.scCellScore, st.scDimText]}>{'\u2014'}</Text>
+                  </View>
+                );
+              }
               return (
                 <TouchableOpacity key={i} style={st.scRow} onPress={() => setEditHoleIdx(i)} activeOpacity={0.7}>
                   <Text style={[st.scCell, st.scCellHole, st.scValText]}>{i + 1}</Text>
@@ -976,9 +988,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
                       {pr.points > 0 ? `+${pr.points}` : pr.points}
                     </Text>
                   ))}
-                  <Text style={[st.scCell, st.scCellTime, st.scValText]}>{formatSeconds(r.elapsed)}</Text>
-                  <Text style={[st.scCell, st.scCellPen, { color: r.penalty < 0 ? RED_WARN : DIM }]}>
-                    {r.penalty < 0 ? r.penalty : '\u2014'}
+                  <Text style={[st.scCell, st.scCellTime, st.scValText]} numberOfLines={1}>
+                    {formatSeconds(r.elapsed)}{r.penalty < 0 ? <Text style={{ color: RED_WARN }}> {r.penalty}</Text> : null}
                   </Text>
                   <Text style={[st.scCell, st.scCellScore, { color: r.holeScore >= 0 ? GREEN : RED_WARN, fontWeight: '700' }]}>
                     {r.holeScore > 0 ? `+${r.holeScore}` : r.holeScore}
@@ -994,9 +1005,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
                 {pt.totalPoints > 0 ? `+${pt.totalPoints}` : pt.totalPoints}
               </Text>
             ))}
-            <Text style={[st.scCell, st.scCellTime, st.scTotalText]}>{formatSecondsLong(runningSummary.totalElapsed)}</Text>
-            <Text style={[st.scCell, st.scCellPen, st.scTotalText, { color: runningSummary.totalPenalty < 0 ? RED_WARN : DIM }]}>
-              {runningSummary.totalPenalty < 0 ? runningSummary.totalPenalty : '\u2014'}
+            <Text style={[st.scCell, st.scCellTime, st.scTotalText]} numberOfLines={1}>
+              {formatSeconds(runningSummary.totalElapsed)}{runningSummary.totalPenalty < 0 ? <Text style={{ color: RED_WARN }}> {runningSummary.totalPenalty}</Text> : null}
             </Text>
             <Text style={[st.scCell, st.scCellScore, st.scTotalText, { color: runningSummary.totalScore >= 0 ? GREEN : RED_WARN, fontWeight: '700' }]}>
               {runningSummary.totalScore > 0 ? `+${runningSummary.totalScore}` : runningSummary.totalScore}
@@ -1013,7 +1023,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
           {/* ── Running total strip ── */}
           <View style={st.totalStrip}>
-            <Text style={st.totalLabel}>TEAM TOTAL</Text>
+            <Text style={st.totalLabel}>{playerDefs.length > 1 ? 'TEAM TOTAL' : 'TOTAL'}</Text>
             <Text style={[st.totalValue, { color: runningSummary.totalScore >= 0 ? GREEN : RED_WARN }]}>
               {runningSummary.totalScore > 0 ? `+${runningSummary.totalScore}` : runningSummary.totalScore}
             </Text>
@@ -1508,14 +1518,15 @@ const st = StyleSheet.create({
   scRow:            { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#7DC87A0D' },
   scTotalRow:       { borderTopWidth: 1, borderTopColor: GOLD + '44', marginTop: 4 },
   scCell:           { fontSize: 11, color: MUTED, textAlign: 'center' },
-  scCellHole:       { width: 32, fontWeight: '700', letterSpacing: 1 },
+  scCellHole:       { width: 26, fontWeight: '700', letterSpacing: 1 },
   scCellPar:        { width: 28 },
   scCellPlayer:     { flex: 1, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  scCellTime:       { width: 44, fontSize: 10 },
-  scCellPen:        { width: 32, fontSize: 10, fontVariant: ['tabular-nums'] },
+  scCellTime:       { width: 64, fontSize: 10, fontVariant: ['tabular-nums'] },
   scCellScore:      { width: 40, fontVariant: ['tabular-nums'] },
   scValText:        { color: CREAM },
   scTotalText:      { fontSize: 12, fontWeight: '700' },
+  scDimText:        { color: DIM },
+  scRowCurrent:     { backgroundColor: '#C9A84C0F' },
   abandonBtn:       { marginTop: 24, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E85D4A44', borderRadius: 12 },
   abandonBtnText:   { color: RED_WARN, fontSize: 13, fontWeight: '600', letterSpacing: 1 },
 });

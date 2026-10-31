@@ -275,5 +275,5 @@ const s = StyleSheet.create({
   followBtnText:   { fontSize: 9, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
   followingBtnText:{ color: '#C9A84C' },
   emptyState:      { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  emptyText:       { fontSize: 20, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', lineHeight: 28 },
+  emptyText:       { fontSize: 20, color: '#7A6E58', textAlign: 'center', lineHeight: 28 },
 });

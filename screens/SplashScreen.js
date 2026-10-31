@@ -67,7 +67,6 @@ const s = StyleSheet.create({
     fontWeight: '400',
     color: '#F0CB5B',
     letterSpacing: 8,
-    fontFamily: 'serif',
     marginBottom: 20,
   },
   divider: {

@@ -114,7 +114,7 @@ export default function ShareScreen({ navigation, route }) {
       await new Promise(r => setTimeout(r, 160));
       return await captureRef(CARD_REFS[activeIndex], { format: 'png', quality: 1, result: resultType });
     } catch {
-      Alert.alert('Error', 'Could not capture the card.');
+      Alert.alert('Card not ready', 'Give it a second and tap Share again.');
       return null;
     } finally {
       setSaving(false);
@@ -129,7 +129,7 @@ export default function ShareScreen({ navigation, route }) {
       await Clipboard.setImageAsync(base64);
       showToast('Sticker copied — paste onto any photo!');
     } catch {
-      Alert.alert('Error', 'Could not copy sticker.');
+      Alert.alert('Sticker not copied', 'Try again, or save the card to Photos instead.');
     } finally {
       setSaving(false);
     }
@@ -145,7 +145,7 @@ export default function ShareScreen({ navigation, route }) {
     try {
       await MediaLibrary.saveToLibraryAsync(uri);
       showToast('Saved to camera roll!');
-    } catch { Alert.alert('Error', 'Could not save the image.'); }
+    } catch { Alert.alert('Not saved to Photos', 'Check that Clocked is allowed to add to your photo library in Settings.'); }
   };
 
   const shareCard = async () => {

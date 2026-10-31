@@ -706,6 +706,20 @@ export default function ProfileScreen({ navigation }) {
           const hasRounds = (clockedRating.roundsUsed ?? 0) > 0;
           const hasScore = hasRounds && clockedRating.clockedScore != null;
           const tier = scoreTier(clockedRating.clockedScore, clockedRating.isProvisional);
+          if (!hasRounds) {
+            // One empty state, not three: no chart, no dash, no bar.
+            return (
+              <View style={s.firstRound}>
+                <Text style={s.heroLabel}>CLOCKED SCORE</Text>
+                <Text style={s.firstRoundTitle}>Your score starts with your first round.</Text>
+                <Text style={s.firstRoundSub}>One number, 0 to 100. Part how you score, part how you handle the clock.</Text>
+                <TouchableOpacity style={s.firstRoundBtn} onPress={() => navigation.navigate('ClockedSetup')} activeOpacity={0.85}>
+                  <Ionicons name="timer-outline" size={16} color="#090F0A" />
+                  <Text style={s.firstRoundBtnText}>START A ROUND</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
           return (
           <View style={s.heroScore}>
             <Text style={s.heroLabel}>CLOCKED SCORE</Text>
@@ -867,26 +881,14 @@ export default function ProfileScreen({ navigation }) {
           </View>
         )}
 
-        {/* National Rankings row */}
-        <TouchableOpacity style={s.rankingsRow} onPress={() => navigation.navigate('Leaderboard')} activeOpacity={0.8}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="trophy-outline" size={18} color="#C9A84C" />
-              <Text style={s.rankingsRowText}>National Rankings</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#7A6E58" />
-          </TouchableOpacity>
 
         {/* Recent clocked rounds */}
         {!loading && (() => {
           const clockedRounds = rounds.filter(r => r.round_format === 'clocked');
+          // The first-round card above already covers the empty case.
           return clockedRounds.length > 0 ? (
             <RecentRoundsList rounds={clockedRounds.slice(0, 8)} navigation={navigation} />
-          ) : (
-            <View style={s.emptyRounds}>
-              <Ionicons name="timer-outline" size={32} color="#C9A84C44" />
-              <Text style={s.emptyRoundsText}>No rounds yet — tap PLAY to start</Text>
-            </View>
-          );
+          ) : null;
         })()}
       </ScrollView>
     </SafeAreaView>
@@ -1010,6 +1012,11 @@ statSection:         { paddingHorizontal: 16, marginBottom: 16 },
   statRow:          { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   statRowBorder:    { borderBottomWidth: 1, borderBottomColor: '#7DC87A11' },
   statRowLabel:     { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  firstRound:       { paddingHorizontal: 20, paddingVertical: 22, borderBottomWidth: 1, borderBottomColor: '#7DC87A14' },
+  firstRoundTitle:  { fontSize: 20, fontWeight: '600', color: '#F5EDD8', marginTop: 10, lineHeight: 26 },
+  firstRoundSub:    { fontSize: 13, color: '#B8A882', marginTop: 6, lineHeight: 19 },
+  firstRoundBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 14, marginTop: 16 },
+  firstRoundBtnText:{ fontSize: 12, fontWeight: '800', color: '#090F0A', letterSpacing: 2.5 },
   statRowValue:     { fontSize: 15, fontWeight: '500', color: '#F5EDD8' },
   barRow:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   barLabel:         { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 1, width: 32 },
@@ -1040,7 +1047,7 @@ statSection:         { paddingHorizontal: 16, marginBottom: 16 },
   addFriendBtn:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 14, borderStyle: 'dashed', paddingVertical: 18, alignItems: 'center', marginTop: 4 },
   addFriendText:    { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
   emptyState:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingVertical: 60 },
-  emptyText:        { fontSize: 20, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', marginBottom: 20, lineHeight: 28 },
+  emptyText:        { fontSize: 20, color: '#7A6E58', textAlign: 'center', marginBottom: 20, lineHeight: 28 },
   emptyBtn:         { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24 },
   emptyBtnText:     { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
   // Handicap card

@@ -170,7 +170,13 @@ export default function RulesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <View style={s.tabHeader}><Text style={s.tabHeaderText}>The On-the-Clock Rules</Text></View>
+      <View style={s.tabHeader}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn} accessibilityLabel="Back" hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color={GOLD} />
+        </TouchableOpacity>
+        <Text style={s.tabHeaderText}>THE RULES</Text>
+        <View style={s.backBtn} />
+      </View>
 
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: 40 + bannerInset }]} showsVerticalScrollIndicator={false}>
 
@@ -235,7 +241,7 @@ export default function RulesScreen({ navigation }) {
         <View style={s.card}>
           <Text style={s.cardBody}>Golf rules apply with three modifications built for pace:</Text>
           <View style={s.ruleItem}>
-            <Text style={s.ruleLabel}>READY GOLF — ALWAYS.</Text>
+            <Text style={s.ruleLabel}>READY GOLF. ALWAYS.</Text>
             <Text style={s.ruleBody}>If you're ready, you play. No waiting on honors.</Text>
           </View>
           <View style={s.ruleDivider} />
@@ -245,7 +251,7 @@ export default function RulesScreen({ navigation }) {
           </View>
           <View style={s.ruleDivider} />
           <View style={s.ruleItem}>
-            <Text style={s.ruleLabel}>LATERAL DROP — TWO CLUB LENGTHS.</Text>
+            <Text style={s.ruleLabel}>LATERAL DROP. TWO CLUB LENGTHS.</Text>
             <Text style={s.ruleBody}>Lost ball or unplayable lie? Drop at the point of entry, two club lengths, no closer to the hole. One stroke penalty. No stroke and distance. Keep moving.</Text>
           </View>
         </View>
@@ -315,8 +321,9 @@ const ex = StyleSheet.create({
 // ─── Main styles ─────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  tabHeader:     { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
-  tabHeaderText: { fontSize: 13, fontWeight: '700', color: GOLD, letterSpacing: 3 },
+  tabHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingTop: 6, paddingBottom: 6 },
+  backBtn:       { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  tabHeaderText: { fontSize: 12, fontWeight: '700', color: GOLD, letterSpacing: 3 },
   content:   { paddingBottom: 40 },
 
   hookBlock:    { alignItems: 'center', paddingHorizontal: 24, paddingTop: 28, paddingBottom: 20 },

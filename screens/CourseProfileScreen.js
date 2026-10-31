@@ -300,7 +300,7 @@ export default function CourseProfileScreen({ navigation, route }) {
         body: reviewInput.trim(),
         pace_rating: paceRating,
       });
-      if (error) { Alert.alert('Error', error.message); return; }
+      if (error) { Alert.alert('Review not saved', error.message); return; }
       setReviewInput('');
       setPaceRating(0);
       setShowReviewForm(false);
@@ -707,7 +707,7 @@ const s = StyleSheet.create({
 
   // POPScore hero card
   popHeroCard:        { margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 28, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center', gap: 4 },
-  popHeroNum:         { fontSize: 80, fontFamily: 'Georgia', lineHeight: 88, textAlign: 'center' },
+  popHeroNum:         { fontSize: 80, lineHeight: 88, textAlign: 'center' },
   popHeroLabel:       { fontSize: 9, fontWeight: '700', color: 'rgba(201,168,76,0.6)', letterSpacing: 4, marginTop: 2, marginBottom: 4 },
   popHeroRounds:      { fontSize: 12, color: '#B8A882', marginBottom: 4 },
   popHeroTimeRow:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 12 },
@@ -794,10 +794,10 @@ const s = StyleSheet.create({
 
   // Empty / Error
   emptyCard:          { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 28, alignItems: 'center' },
-  emptyText:          { fontSize: 20, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', lineHeight: 28 },
+  emptyText:          { fontSize: 20, color: '#7A6E58', textAlign: 'center', lineHeight: 28 },
   emptyTextSmall:     { fontSize: 14, color: '#7A6E58', textAlign: 'center' },
   errorState:         { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
-  errorText:          { fontSize: 20, color: '#7A6E58', textAlign: 'center', fontFamily: 'serif', marginBottom: 20 },
+  errorText:          { fontSize: 20, color: '#7A6E58', textAlign: 'center', marginBottom: 20 },
   retryBtn:           { backgroundColor: '#C9A84C', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 },
   retryText:          { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
   lockedCard:         { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, gap: 12, overflow: 'hidden' },

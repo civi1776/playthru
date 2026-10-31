@@ -28,16 +28,13 @@ import SignInScreen        from './screens/SignInScreen';
 import SearchUsersScreen  from './screens/SearchUsersScreen';
 import ShareScreen        from './screens/ShareScreen';
 import CourseProfileScreen from './screens/CourseProfileScreen';
-import POPScoreInfoScreen    from './screens/POPScoreInfoScreen';
 import PublicProfileScreen   from './screens/PublicProfileScreen';
-import ActivityFeedScreen    from './screens/ActivityFeedScreen';
 import ResetPasswordScreen  from './screens/ResetPasswordScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 // GamesScreen retired — the sport is the one game
 import PreviewModeScreen    from './screens/PreviewModeScreen';
 import SettingsScreen       from './screens/SettingsScreen';
 import EditProfileScreen   from './screens/EditProfileScreen';
-import PaywallScreen              from './screens/PaywallScreen';
 import NotificationCenterScreen  from './screens/NotificationCenterScreen';
 import ClockedSetupScreen        from './screens/ClockedSetupScreen';
 import ClockedRoundScreen        from './screens/ClockedRoundScreen';
@@ -622,11 +619,9 @@ function AppNavigator() {
         <RootStack.Screen name="SearchUsers"   component={SearchUsersScreen} />
         <RootStack.Screen name="Share"         component={ShareScreen} />
         <RootStack.Screen name="CourseProfile" component={CourseProfileScreen} />
-        <RootStack.Screen name="POPScoreInfo"   component={POPScoreInfoScreen} />
         <RootStack.Screen name="PublicProfile"  component={PublicProfileScreen} />
         <RootStack.Screen name="Rivalry"        component={RivalryScreen} />
         <RootStack.Screen name="Admin"          component={AdminScreen} />
-        <RootStack.Screen name="ActivityFeed"   component={ActivityFeedScreen} />
         <RootStack.Screen name="ResetPassword"   component={ResetPasswordScreen} />
         <RootStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         {/* Games screen retired — the sport is the one game */}
@@ -634,11 +629,9 @@ function AppNavigator() {
             is the one way to play. Untimed logging (Log/ClaimRound) also retired. */}
         <RootStack.Screen name="Settings"       component={SettingsScreen} />
         <RootStack.Screen name="EditProfile"    component={EditProfileScreen} />
-        <RootStack.Screen name="Paywall"        component={PaywallScreen} />
         <RootStack.Screen name="Notifications"  component={NotificationCenterScreen} />
         <RootStack.Screen name="Onboarding"     component={OnboardingScreen} />
-        <RootStack.Screen name="RulesScreen" component={RulesScreen}
-          options={{ headerShown: true, headerTitle: '', headerStyle: { backgroundColor: '#090F0A' }, headerTintColor: '#C9A84C', headerShadowVisible: false }} />
+        <RootStack.Screen name="RulesScreen" component={RulesScreen} />
         <RootStack.Screen name="Leaderboard"   component={LeaderboardScreen} />
         <RootStack.Screen name="ClockedSetup"   component={ClockedSetupScreen} />
         <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} />

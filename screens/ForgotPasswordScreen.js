@@ -21,7 +21,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         redirectTo: 'playthru://auth/callback',
       });
       if (error) {
-        Alert.alert('Error', error.message);
+        Alert.alert('Reset link not sent', error.message);
       } else {
         Alert.alert(
           'Check your email',
@@ -30,7 +30,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         );
       }
     } catch (e) {
-      Alert.alert('Error', e.message || 'Something went wrong. Please check your connection and try again.');
+      Alert.alert('Reset link not sent', e.message || 'Check your connection and try again.');
     } finally {
       setLoading(false);
     }

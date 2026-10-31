@@ -24,7 +24,7 @@ const TEE_COLORS = {
 };
 
 const PHASE = { COURSE: 0, HOLES: 1, TEE: 2, MODE: 3, PLAYERS: 4, TRANSPORT: 5, CONFIRM: 6 };
-const STEP_LABELS = ['Course', 'Holes', 'Tee', 'Mode', 'Players', 'Transport', 'Confirm'];
+// Dots are built from the steps this round will actually show (see visibleSteps).
 
 export default function ClockedSetupScreen({ navigation }) {
   const { profile, user } = useAuth();
@@ -90,7 +90,7 @@ export default function ClockedSetupScreen({ navigation }) {
     setSelectedTeeIdx(null);
     setSelectedNine('front');
     setCertData(null);
-    setPhase(PHASE.HOLES);
+    let hasTees = false;
     if (c.id) {
       try {
         const { data } = await supabase.from('courses').select('raw_data').eq('id', c.id).maybeSingle();
@@ -98,8 +98,12 @@ export default function ClockedSetupScreen({ navigation }) {
         if (maleTees?.length > 0) {
           setCourseTees(maleTees);
           setSelectedTeeIdx(Math.floor(maleTees.length / 2));
+          hasTees = true;
         }
       } catch { /* silent */ }
+    }
+    setPhase(hasTees ? PHASE.TEE : PHASE.MODE);
+    if (c.id) {
 
       // Fetch certified time pars
       try {
@@ -118,9 +122,6 @@ export default function ClockedSetupScreen({ navigation }) {
     }
   };
 
-  const handleHolesNext = () => {
-    setPhase((courseTees?.length ?? 0) > 0 ? PHASE.TEE : PHASE.MODE);
-  };
 
   const handleTeeNext = () => setPhase(PHASE.MODE);
 
@@ -247,10 +248,9 @@ export default function ClockedSetupScreen({ navigation }) {
 
   const handleBack = () => {
     if (phase === PHASE.COURSE) { navigation.goBack(); return; }
-    if (phase === PHASE.HOLES) { setPhase(PHASE.COURSE); return; }
-    if (phase === PHASE.TEE) { setPhase(PHASE.HOLES); return; }
+    if (phase === PHASE.TEE) { setPhase(PHASE.COURSE); return; }
     if (phase === PHASE.MODE) {
-      setPhase((courseTees?.length ?? 0) > 0 ? PHASE.TEE : PHASE.HOLES);
+      setPhase((courseTees?.length ?? 0) > 0 ? PHASE.TEE : PHASE.COURSE);
       return;
     }
     if (phase === PHASE.PLAYERS) { setPhase(PHASE.MODE); return; }
@@ -282,13 +282,24 @@ export default function ClockedSetupScreen({ navigation }) {
       </View>
 
       {/* Step dots */}
-      {phase <= PHASE.CONFIRM && (
-        <View style={s.dotsRow}>
-          {STEP_LABELS.map((_, i) => (
-            <View key={i} style={[s.dot, i === phase && s.dotActive, i < phase && s.dotDone]} />
-          ))}
-        </View>
-      )}
+      {phase <= PHASE.CONFIRM && (() => {
+        const visibleSteps = [
+          PHASE.COURSE,
+          (courseTees?.length ?? 0) > 0 ? PHASE.TEE : null,
+          PHASE.MODE,
+          mode > 1 ? PHASE.PLAYERS : null,
+          PHASE.TRANSPORT,
+          PHASE.CONFIRM,
+        ].filter(p => p != null);
+        const at = Math.max(0, visibleSteps.indexOf(phase));
+        return (
+          <View style={s.dotsRow}>
+            {visibleSteps.map((p, i) => (
+              <View key={p} style={[s.dot, i === at && s.dotActive, i < at && s.dotDone]} />
+            ))}
+          </View>
+        );
+      })()}
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <ScrollView
@@ -313,11 +324,11 @@ export default function ClockedSetupScreen({ navigation }) {
             {/* Quick-play: skip course selection */}
             <TouchableOpacity
               style={s.skipCourseBtn}
-              onPress={() => { setCourse(null); setPhase(PHASE.HOLES); }}
+              onPress={() => { setCourse(null); setPhase(PHASE.MODE); }}
               activeOpacity={0.7}
             >
               <Ionicons name="flash-outline" size={14} color="#C9A84C88" />
-              <Text style={s.skipCourseText}>Skip — I'll set par manually</Text>
+              <Text style={s.skipCourseText}>Skip. I'll set par manually</Text>
             </TouchableOpacity>
             {/* Not at a course — play the arcade on the same rules */}
             <TouchableOpacity
@@ -352,28 +363,6 @@ export default function ClockedSetupScreen({ navigation }) {
         )}
 
         {/* ── HOLES ── */}
-        {phase === PHASE.HOLES && (
-          <View>
-            <Text style={s.stepTitle}>How many holes?</Text>
-            <Text style={s.stepSub}>Clocked defaults to 9 — quick, competitive rounds.</Text>
-            <View style={s.btnGroup}>
-              {[{ label: '9 Holes', v: '9' }, { label: '18 Holes', v: '18' }].map(({ label, v }) => (
-                <TouchableOpacity
-                  key={v}
-                  style={[s.groupBtn, s.groupBtnWide, holes === v && s.groupBtnOn]}
-                  onPress={() => setHoles(v)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.groupBtnTxt, holes === v && s.groupBtnTxtOn]}>{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity style={[s.primaryBtn, { marginTop: 32 }]} onPress={handleHolesNext} activeOpacity={0.8}>
-              <Text style={s.primaryBtnText}>CONTINUE</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* ── TEE ── */}
         {phase === PHASE.TEE && (
           <View>
@@ -571,8 +560,22 @@ export default function ClockedSetupScreen({ navigation }) {
         {/* ── TRANSPORT ── */}
         {phase === PHASE.TRANSPORT && (
           <View>
-            <Text style={s.stepTitle}>How are you getting around?</Text>
-            <Text style={s.stepSub}>This affects your time par — walking gets more time.</Text>
+            <Text style={s.stepTitle}>Set up the round</Text>
+            <Text style={s.stepSub}>Holes, how you're getting around, and the clock. Walking earns more time per hole.</Text>
+            <Text style={s.sectionQ}>HOLES</Text>
+            <View style={s.btnGroup}>
+              {[{ label: '9 Holes', v: '9' }, { label: '18 Holes', v: '18' }].map(({ label, v }) => (
+                <TouchableOpacity
+                  key={v}
+                  style={[s.groupBtn, s.groupBtnWide, holes === v && s.groupBtnOn]}
+                  onPress={() => setHoles(v)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.groupBtnTxt, holes === v && s.groupBtnTxtOn]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={[s.sectionQ, { marginTop: 24 }]}>GETTING AROUND</Text>
             <View style={s.btnGroup}>
               {['Walking', 'Cart'].map(t => (
                 <TouchableOpacity
@@ -626,7 +629,12 @@ export default function ClockedSetupScreen({ navigation }) {
         {/* ── CONFIRM ── */}
         {phase === PHASE.CONFIRM && (
           <View style={s.confirmWrap}>
-            <Text style={s.confirmCourse}>{course?.name ?? 'Quick Play'}</Text>
+            <Text style={[s.confirmCourse, !course && { color: '#B8A882', fontWeight: '500' }]}>{course?.name ?? 'No course selected'}</Text>
+            {!course && (
+              <TouchableOpacity onPress={() => setPhase(PHASE.COURSE)} style={{ marginBottom: 12 }}>
+                <Text style={s.backLink}>Pick a course</Text>
+              </TouchableOpacity>
+            )}
 
             <View style={s.confirmGrid}>
               <View style={s.confirmItem}>

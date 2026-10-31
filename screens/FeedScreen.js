@@ -5,7 +5,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, RefreshControl, Modal, KeyboardAvoidingView, Platform,
-  Animated, Easing,
+  Animated, Easing, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -122,7 +122,7 @@ function RoundContentCard({ content, navigation }) {
 
   // "Hero" pop for a round worth noticing: an APEX/CONTENDER legacy score,
   // or a clearly strong on-the-clock result. Presentational thresholds only.
-  const legacyIsHero = legacyTier && (legacyTier.name === 'APEX' || legacyTier.name === 'CONTENDER');
+  const legacyIsHero = false; // legacy (pre-clock) rounds stay flat; only Clocked rounds earn the glow
   const clockIsHero  = isOnTheClock && teamScore != null && teamScore >= 10;
   const isHero = legacyIsHero || clockIsHero;
   const heroColor = clockIsHero ? COLOR.gold : (legacyTier?.color ?? COLOR.gold);
@@ -183,7 +183,7 @@ function RoundContentCard({ content, navigation }) {
         ) : legacyClockedScore != null ? (
           <View style={[s.scoreBadge, { borderColor: `${heroColor}55` }, isHero && s.scoreBadgeHero]}>
             <Text style={[s.scoreBadgeNum, { color: legacyTier.color, fontSize: isHero ? 28 : 22 }]}>{legacyClockedScore}</Text>
-            <Text style={s.scoreBadgeLabel}>CLK</Text>
+            <Text style={s.scoreBadgeLabel}>LEGACY</Text>
           </View>
         ) : null}
         <Ionicons name="chevron-forward" size={14} color={COLOR.dim} style={{ marginLeft: 2 }} />
@@ -225,7 +225,7 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
   const actionLabel = (() => {
     switch (item.type) {
       case 'round_logged': {
-        if (!isOnTheClock) return 'logged a pace round';
+        if (!isOnTheClock) return 'logged a round';
         const d = item.content?.difficulty;
         const diffTag = d === 'pro' ? ' \u00B7 PRO' : d === 'beginner' ? ' \u00B7 BEGINNER' : '';
         return `played on the clock${diffTag}`;
@@ -300,12 +300,12 @@ function FeedItem({ item, userId, navigation, likedIds, commentCounts, onLike, o
           {/* Actions */}
           <View style={s.actionBar}>
             <TouchableOpacity style={s.actionBtn} onPress={() => onLike(item, liked)} activeOpacity={0.7}>
-              <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={liked ? COLOR.green : COLOR.dim} />
-              {item.likes > 0 && <Text style={[s.actionCount, liked && { color: COLOR.green }]}>{item.likes}</Text>}
+              <Ionicons name={liked ? 'thumbs-up' : 'thumbs-up-outline'} size={15} color={liked ? COLOR.green : COLOR.muted} />
+              <Text style={[s.actionCount, liked && { color: COLOR.green }]}>{item.likes ?? 0}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={s.actionBtn} onPress={() => onComment(item)} activeOpacity={0.7}>
-              <Ionicons name="chatbubble-outline" size={13} color={COLOR.dim} />
-              {cCount > 0 && <Text style={s.actionCount}>{cCount}</Text>}
+              <Ionicons name="chatbubble-outline" size={14} color={COLOR.muted} />
+              <Text style={s.actionCount}>{cCount}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -624,15 +624,11 @@ export default function FeedScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Image source={require('../assets/PlayThru_Logo.png')} style={s.logoMark} resizeMode="contain" accessibilityIgnoresInvertColors />
           <Text style={s.wordmark}>CLOCKED</Text>
-          <Text style={s.tagline}>THE WAY TO PLAY GOLF FOR ATHLETES.</Text>
         </View>
         <View style={s.headerRight}>
-          {/* + menu for secondary actions */}
-          <TouchableOpacity onPress={() => setShowPlusMenu(!showPlusMenu)} activeOpacity={0.7} accessibilityLabel="More actions" style={s.headerIcon}>
-            <Ionicons name={showPlusMenu ? 'close' : 'add'} size={20} color="#B8A882" />
-          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('RulesScreen')} activeOpacity={0.7} accessibilityLabel="Rules of Clocked Golf" style={s.headerIcon}>
             <Ionicons name="book-outline" size={20} color="#B8A882" />
           </TouchableOpacity>
@@ -645,15 +641,6 @@ export default function FeedScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Plus menu dropdown — one way to play: on the clock */}
-      {showPlusMenu && (
-        <View style={s.plusMenu}>
-          <TouchableOpacity style={s.plusMenuItem} onPress={() => { setShowPlusMenu(false); navigation.navigate('ClockedSetup'); }} activeOpacity={0.8}>
-            <Ionicons name="play-outline" size={16} color="#7A6E58" />
-            <Text style={s.plusMenuText}>Play on the clock</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       <FlatList
         data={items}
@@ -708,6 +695,7 @@ const s = StyleSheet.create({
   wordmark:    { fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 5 },
   tagline:     { fontSize: 8, color: '#C9A84C88', letterSpacing: 1.5, marginTop: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  logoMark:    { width: 30, height: 20, tintColor: '#C9A84C' },
   headerIcon:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
 
   // Plus menu

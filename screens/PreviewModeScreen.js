@@ -643,7 +643,7 @@ const p = StyleSheet.create({
   // Gate modal
   gateOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   gateCard:    { backgroundColor: '#0D1A0F', borderRadius: 16, padding: 24, width: '100%', borderWidth: 1, borderColor: 'rgba(201,168,76,0.3)' },
-  gateTitle:   { fontSize: 22, fontWeight: '700', color: '#F5EDD8', fontFamily: 'Georgia', marginBottom: 8, textAlign: 'center' },
+  gateTitle:   { fontSize: 22, fontWeight: '700', color: '#F5EDD8', marginBottom: 8, textAlign: 'center' },
   gateSub:     { fontSize: 14, color: '#B8A882', textAlign: 'center', marginBottom: 24, lineHeight: 20 },
   gateBtn:     { backgroundColor: '#C9A84C', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10 },
   gateBtnText: { color: '#090F0A', fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },

@@ -25,7 +25,7 @@ import { COLOR } from '../lib/theme';
 
 const { bg: BG, surface: CARD, gold: GOLD, goldBright: GOLD_BRIGHT, cream: CREAM, muted: MUTED, dim: DIM, green: GREEN, red: RED_WARN, border: BORDER } = COLOR;
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 7;
 
 const DIFFICULTIES = [
   { key: 'beginner',     label: 'BEGINNER',     pace: '~4:30', color: GREEN,  desc: 'Learning the clock. Generous time pars.' },
@@ -102,14 +102,11 @@ export default function OnboardingScreen({ navigation }) {
       <Animated.View style={{ flex: 1, opacity: fade }}>
         {step === 0 && <StepProblem onNext={next} />}
         {step === 1 && <StepFix onNext={next} />}
-        {step === 2 && <StepVision onNext={next} />}
-        {step === 3 && <StepWelcome onNext={next} />}
-        {step === 4 && <StepPhoto profile={profile} avatarUrl={avatarUrl} onUploaded={(url) => { setAvatarUrl(url); refreshProfile?.(); }} onNext={next} />}
-        {step === 5 && <StepHomeCourse selected={homeCourse} onSelect={saveHomeCourse} onSkip={next} />}
-        {step === 6 && <StepDifficulty selected={difficulty} onSelect={saveDifficulty} />}
-        {step === 7 && <StepRules onNext={next} />}
-        {step === 8 && <StepInvitation onApply={goApply} onLater={next} saving={saving} />}
-        {step === 9 && <StepWelcomeFinal onEnter={goToMain} />}
+        {step === 2 && <StepPhoto profile={profile} avatarUrl={avatarUrl} onUploaded={(url) => { setAvatarUrl(url); refreshProfile?.(); }} onNext={next} />}
+        {step === 3 && <StepHomeCourse selected={homeCourse} onSelect={saveHomeCourse} onSkip={next} />}
+        {step === 4 && <StepDifficulty selected={difficulty} onSelect={saveDifficulty} />}
+        {step === 5 && <StepRules onNext={next} />}
+        {step === 6 && <StepWelcomeFinal onEnter={goToMain} />}
       </Animated.View>
     </SafeAreaView>
   );
@@ -140,13 +137,13 @@ function StepProblem({ onNext }) {
     <StepShell
       eyebrow="GOLF'S #1 COMPLAINT"
       headline="Golf has never had real accountability for pace."
-      line="Nobody's ever tracked it. Until now."
+      line="A typical 18 takes about four and a half hours. Nobody tracks it, nobody owns it. Until now."
       cta="CONTINUE →"
       onCta={onNext}
     >
       <View style={st.statBlock}>
-        <Text style={st.bigStat}>4:30</Text>
-        <Text style={st.bigStatLabel}>AVERAGE ROUND — ALL-TIME HIGH</Text>
+        <Text style={[st.bigStat, { color: CREAM }]}>4½ hrs</Text>
+        <Text style={st.bigStatLabel}>A TYPICAL ROUND TODAY</Text>
       </View>
     </StepShell>
   );
@@ -158,7 +155,7 @@ function StepFix({ onNext }) {
     <StepShell
       eyebrow="THE FIX"
       headline="We built the shot clock."
-      line="One score, 0 to 100. Half how you score. Half how you beat the clock."
+      line="Every hole has a time par. Every round earns one score, 0 to 100: part how you score, part how you beat the clock. This is golf for people who compete."
       cta="CONTINUE →"
       onCta={onNext}
     >

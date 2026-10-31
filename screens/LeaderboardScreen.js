@@ -110,11 +110,17 @@ function ClockedRow({ entry, navigation }) {
       <View style={s.rowInfo}>
         <Text style={[s.rowName, isYou && { color: '#C9A84C' }]} numberOfLines={1}>{entry.name}</Text>
         <View style={s.rowSubStats}>
-          <Text style={s.rowSubStat}>S {entry.scoring != null ? Math.round(entry.scoring) : '\u2014'}</Text>
-          <Text style={s.rowSubDot}>{'\u00B7'}</Text>
-          <Text style={s.rowSubStat}>C {entry.clock != null ? Math.round(entry.clock) : '\u2014'}</Text>
-          {entry.roundsUsed != null && <Text style={s.rowRoundsLabel}>{'\u00B7'} {entry.roundsUsed}r</Text>}
-          {entry.isProvisional && <Text style={s.rowProvBadge}>{'\u00B7'} PROV</Text>}
+          {entry.isLegacy ? (
+            <Text style={s.rowSubStat}>Legacy{entry.roundsUsed != null ? ` · ${entry.roundsUsed} round${entry.roundsUsed === 1 ? '' : 's'}` : ''}</Text>
+          ) : (
+            <>
+              <Text style={s.rowSubStat}>Scoring {entry.scoring != null ? Math.round(entry.scoring) : '\u2014'}</Text>
+              <Text style={s.rowSubDot}>{'\u00B7'}</Text>
+              <Text style={s.rowSubStat}>Clock {entry.clock != null ? Math.round(entry.clock) : '\u2014'}</Text>
+              {entry.roundsUsed != null && <Text style={s.rowRoundsLabel}>{'\u00B7'} {entry.roundsUsed} round{entry.roundsUsed === 1 ? '' : 's'}</Text>}
+              {entry.isProvisional && <Text style={s.rowProvBadge}>{'\u00B7'} PROVISIONAL</Text>}
+            </>
+          )}
         </View>
       </View>
       <View style={s.rowRight}>
@@ -253,7 +259,6 @@ export default function LeaderboardScreen({ navigation }) {
         ? (allClockedRounds ?? [])
         : (allClockedRounds ?? []).filter(r => (r.difficulty ?? 'intermediate') === difficulty.toLowerCase());
 
-      if (!clockedRounds.length) { setData([]); setMyRank(null); setMyProjected(null); setLoading(false); return; }
 
       const byUser = {};
       const roundMap = {};
@@ -282,7 +287,27 @@ export default function LeaderboardScreen({ navigation }) {
         }
       }
 
-      const userIds = Object.keys(byUser);
+      // Legacy (pre-clock) rounds. Until Clocked rounds outnumber them, players
+      // with only legacy rounds are ranked on their stored score (0..5 → 0..100)
+      // and tagged LEGACY, so the board shows the community that actually
+      // exists instead of a single name. Only on the ALL segment: legacy rounds
+      // have no difficulty.
+      const legacyByUser = {};
+      if (difficulty === 'ALL') {
+        const { data: legacyRounds } = await supabase
+          .from('rounds')
+          .select('user_id, pop_score')
+          .eq('round_format', 'pace')
+          .eq('flagged', false)
+          .not('pop_score', 'is', null);
+        for (const r of legacyRounds ?? []) {
+          if (byUser[r.user_id]) continue;             // has Clocked rounds: those rule
+          (legacyByUser[r.user_id] ??= []).push(Number(r.pop_score));
+        }
+      }
+
+      const userIds = [...new Set([...Object.keys(byUser), ...Object.keys(legacyByUser)])];
+      if (!userIds.length) { setData([]); setMyRank(null); setMyProjected({ roundsNeeded: computeFullRating({ roundStats: [] }).roundsNeeded, hasRounds: false }); setLoading(false); return; }
       const { data: profiles } = await supabase
         .from('profiles').select('id, full_name, username, handicap_index, avatar_url').in('id', userIds);
       const profileMap = {};
@@ -291,6 +316,12 @@ export default function LeaderboardScreen({ navigation }) {
       const allEntries = userIds.map(userId => {
         const prof = profileMap[userId];
         const playerName = prof?.full_name || prof?.username || 'Player';
+        if (!byUser[userId]) {
+          const scores = legacyByUser[userId];
+          const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+          const rating = { clockedScore: Math.round(avg * 20), scoring: null, clock: null, roundsUsed: scores.length, isProvisional: false, roundsNeeded: 0 };
+          return { userId, name: playerName, handle: prof?.username ? `@${prof.username}` : '', avatarUrl: prof?.avatar_url, rating, isYou: userId === uid, isLegacy: true };
+        }
         const rounds = byUser[userId];
         const roundStats = rounds.map(r => {
           const key = r._playerKey ?? playerName;
@@ -320,7 +351,7 @@ export default function LeaderboardScreen({ navigation }) {
         rank: i + 1, userId: e.userId, name: e.name, handle: e.handle,
         sortVal: getSortVal(e), sortLabel: 'CLK',
         clockedScore: e.rating.clockedScore, scoring: e.rating.scoring, clock: e.rating.clock,
-        roundsUsed: e.rating.roundsUsed, isProvisional: e.rating.isProvisional,
+        roundsUsed: e.rating.roundsUsed, isProvisional: e.rating.isProvisional, isLegacy: !!e.isLegacy,
         avatarUrl: e.avatarUrl, isYou: e.isYou,
       }));
 
@@ -329,12 +360,11 @@ export default function LeaderboardScreen({ navigation }) {
 
       const myEntry = combined.find(e => e.isYou);
       if (mine?.isProvisional) {
-        setMyProjected({ roundsNeeded: myEntry?.rating.roundsNeeded ?? 0 });
-      } else if (!myEntry && uid && difficulty === 'ALL') {
-        // Current user has no clocked rounds at all: unranked, show the
-        // projected treatment with the full provisional requirement.
+        setMyProjected({ roundsNeeded: myEntry?.rating.roundsNeeded ?? 0, hasRounds: true });
+      } else if ((!myEntry || myEntry.isLegacy) && uid && difficulty === 'ALL') {
+        // No Clocked rounds yet (legacy only, or none): say what it takes.
         const { roundsNeeded } = computeFullRating({ roundStats: [] });
-        setMyProjected({ roundsNeeded });
+        setMyProjected({ roundsNeeded, hasRounds: false });
       } else {
         setMyProjected(null);
       }
@@ -614,9 +644,11 @@ export default function LeaderboardScreen({ navigation }) {
 
           {myProjected && (
             <View style={s.provCard}>
-              <Text style={s.provCardLabel}>PROVISIONAL RANK</Text>
+              <Text style={s.provCardLabel}>{myProjected.hasRounds ? 'PROVISIONAL RANK' : 'NOT RANKED YET'}</Text>
               <Text style={s.provCardHint}>
-                Play {myProjected.roundsNeeded} more round{myProjected.roundsNeeded !== 1 ? 's' : ''} to make it official
+                {myProjected.hasRounds
+                  ? `Play ${myProjected.roundsNeeded} more Clocked round${myProjected.roundsNeeded !== 1 ? 's' : ''} to make it official`
+                  : `Play ${myProjected.roundsNeeded} Clocked rounds to get ranked`}
               </Text>
             </View>
           )}

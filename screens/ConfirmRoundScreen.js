@@ -79,7 +79,7 @@ export default function ConfirmRoundScreen({ navigation, route }) {
 
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Error', 'Could not confirm this round. Check your connection and try again.');
+      Alert.alert('Round not confirmed', 'Check your connection and tap Confirm again.');
     } finally {
       setSubmitting(false);
     }
@@ -93,7 +93,7 @@ export default function ConfirmRoundScreen({ navigation, route }) {
         .eq('round_id', roundId).eq('user_id', user.id);
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Error', 'Could not decline this round. Check your connection and try again.');
+      Alert.alert('Round not declined', 'Check your connection and try again.');
     } finally {
       setSubmitting(false);
     }
