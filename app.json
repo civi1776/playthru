@@ -29,7 +29,6 @@
         ],
         "NSSupportsLiveActivities": true
       },
-      "buildNumber": "9",
       "version": "1.6.0",
       "entitlements": {
         "com.apple.security.application-groups": ["group.com.civiswings.playthru"]
