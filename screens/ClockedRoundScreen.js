@@ -998,8 +998,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
               );
             })}
           <View style={[st.scRow, st.scTotalRow]}>
-            <Text style={[st.scCell, st.scCellHole, st.scTotalText]}>TOT</Text>
-            <Text style={[st.scCell, st.scCellPar, st.scTotalText]}></Text>
+            <Text style={[st.scCell, st.scCellHole, st.scTotalText]} numberOfLines={1}>Σ</Text>
+            <Text style={[st.scCell, st.scCellPar, st.scTotalText]}>{Array.from({ length: holeCount }, (_, i) => holeDataState?.[i]?.par ?? defaultPar).reduce((a, b) => a + (b ?? 0), 0)}</Text>
             {runningSummary.playerTotals.map((pt, i) => (
               <Text key={i} style={[st.scCell, st.scCellPlayer, st.scTotalText, { color: pointsColor(pt.totalPoints) }]}>
                 {pt.totalPoints > 0 ? `+${pt.totalPoints}` : pt.totalPoints}
