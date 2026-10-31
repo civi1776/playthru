@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated } from 'react-native';
+import { COLOR, RADIUS } from '../lib/theme';
 
 export default function SkeletonLoader({ width, height, style }) {
   const opacity = useRef(new Animated.Value(0.4)).current;
@@ -16,7 +17,7 @@ export default function SkeletonLoader({ width, height, style }) {
   return (
     <Animated.View
       style={[
-        { backgroundColor: '#1A2E1C', borderRadius: 8, width, height, opacity },
+        { backgroundColor: COLOR.surfaceAlt, borderRadius: RADIUS.sm, width, height, opacity },
         style,
       ]}
     />

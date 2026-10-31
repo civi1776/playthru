@@ -4,6 +4,7 @@ import {
   StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { COLOR, RADIUS } from '../lib/theme';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email,   setEmail]   = useState('');
@@ -78,7 +79,7 @@ export default function ForgotPasswordScreen({ navigation }) {
           disabled={!email.trim() || loading}
         >
           {loading
-            ? <ActivityIndicator size="small" color="#090F0A" />
+            ? <ActivityIndicator size="small" color={COLOR.bg} />
             : <Text style={s.btnText}>SEND RESET LINK</Text>
           }
         </TouchableOpacity>
@@ -98,18 +99,18 @@ export default function ForgotPasswordScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#090F0A' },
+  container:    { flex: 1, backgroundColor: COLOR.bg },
   scroll:       { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 48 },
   backBtn:      { marginTop: 60, width: 40, height: 40, justifyContent: 'center' },
-  backArrow:    { fontSize: 22, color: '#C9A84C' },
+  backArrow:    { fontSize: 22, color: COLOR.gold },
   header:       { marginTop: 24, marginBottom: 36 },
-  wordmark:     { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 16 },
-  title:        { fontSize: 26, fontWeight: '600', color: '#F5EDD8', marginBottom: 8 },
-  subtitle:     { fontSize: 14, color: '#B8A882', lineHeight: 20 },
-  input:        { backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: 'rgba(125,200,122,0.2)', borderRadius: 12, padding: 16, fontSize: 16, color: '#F5EDD8', marginBottom: 16 },
-  btn:          { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 18, alignItems: 'center' },
+  wordmark:     { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 5, marginBottom: 16 },
+  title:        { fontSize: 26, fontWeight: '600', color: COLOR.cream, marginBottom: 8 },
+  subtitle:     { fontSize: 14, color: COLOR.muted, lineHeight: 20 },
+  input:        { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: 'rgba(125,200,122,0.2)', borderRadius: RADIUS.md, padding: 16, fontSize: 16, color: COLOR.cream, marginBottom: 16 },
+  btn:          { backgroundColor: COLOR.gold, borderRadius: RADIUS.md, paddingVertical: 18, alignItems: 'center' },
   btnDisabled:  { opacity: 0.5 },
-  btnText:      { fontSize: 13, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  btnText:      { fontSize: 13, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
   backLink:     { marginTop: 24, alignItems: 'center', padding: 8 },
-  backLinkText: { fontSize: 13, color: '#B8A882' },
+  backLinkText: { fontSize: 13, color: COLOR.muted },
 });

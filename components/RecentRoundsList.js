@@ -4,6 +4,7 @@
 
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import CourseAvatar from './CourseAvatar';
+import { COLOR, RADIUS } from '../lib/theme';
 
 function formatShortDate(isoStr) {
   if (!isoStr) return '';
@@ -15,12 +16,12 @@ function formatShortDate(isoStr) {
 function resultColor(round) {
   if (round.round_format === 'clocked') {
     const pts = round.active_game?.summary?.totalScore;
-    if (pts == null) return '#B8A882';
-    return pts >= 0 ? '#7DC87A' : '#E85D4A';
+    if (pts == null) return COLOR.muted;
+    return pts >= 0 ? COLOR.green : COLOR.red;
   }
   const pop = round.pop_score;
-  if (pop == null) return '#B8A882';
-  if (pop >= 4.0) return '#7DC87A';
+  if (pop == null) return COLOR.muted;
+  if (pop >= 4.0) return COLOR.green;
   if (pop >= 3.0) return '#D4B86A';
   return '#C07A6A';
 }
@@ -47,9 +48,9 @@ function formatLabel(round) {
 }
 
 function difficultyColor(d) {
-  if (d === 'pro') return '#E85D4A';
-  if (d === 'beginner') return '#7DC87A';
-  return '#C9A84C';
+  if (d === 'pro') return COLOR.red;
+  if (d === 'beginner') return COLOR.green;
+  return COLOR.gold;
 }
 
 export default function RecentRoundsList({ rounds, navigation, limit = 10 }) {
@@ -90,12 +91,12 @@ export default function RecentRoundsList({ rounds, navigation, limit = 10 }) {
 
 const s = StyleSheet.create({
   container:  { paddingHorizontal: 16, marginBottom: 8 },
-  header:     { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 8 },
-  row:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0D1A0F', borderRadius: 10, borderWidth: 1, borderColor: '#7DC87A18', borderLeftWidth: 3, borderLeftColor: '#C9A84C', padding: 10, marginBottom: 6 },
+  header:     { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 3, marginBottom: 8 },
+  row:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#7DC87A18', borderLeftWidth: 3, borderLeftColor: COLOR.gold, padding: 10, marginBottom: 6 },
   info:       { flex: 1 },
-  course:     { fontSize: 13, fontWeight: '500', color: '#F5EDD8', marginBottom: 2 },
-  meta:       { fontSize: 10, color: '#B8A882' },
+  course:     { fontSize: 13, fontWeight: '500', color: COLOR.cream, marginBottom: 2 },
+  meta:       { fontSize: 10, color: COLOR.muted },
   resultCol:  { alignItems: 'flex-end', minWidth: 44 },
   resultNum:  { fontSize: 20, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  resultLabel:{ fontSize: 9, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginTop: 1 },
+  resultLabel:{ fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 1, marginTop: 1 },
 });

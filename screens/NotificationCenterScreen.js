@@ -5,6 +5,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sendPushToUser } from '../lib/notifications';
+import ScreenHeader from '../components/ScreenHeader';
+import { COLOR, RADIUS } from '../lib/theme';
 
 function timeAgo(iso) {
   const m = Math.floor((Date.now() - new Date(iso)) / 60000);
@@ -16,32 +18,32 @@ function timeAgo(iso) {
 }
 
 const ICON = {
-  rank_move:          { name: 'trending-up',      color: '#C9A84C' },
-  milestone:          { name: 'star',             color: '#C9A84C' },
-  friend_round:       { name: 'flag',             color: '#7DC87A' },
-  friend_activity:    { name: 'flag',             color: '#7DC87A' },
-  course_update:      { name: 'location',         color: '#7DC87A' },
-  course_leader:      { name: 'trophy',           color: '#C9A84C' },
-  new_follower:       { name: 'person-add',       color: '#7DC87A' },
-  comment:            { name: 'chatbubble',       color: '#7DC87A' },
+  rank_move:          { name: 'trending-up',      color: COLOR.gold },
+  milestone:          { name: 'star',             color: COLOR.gold },
+  friend_round:       { name: 'flag',             color: COLOR.green },
+  friend_activity:    { name: 'flag',             color: COLOR.green },
+  course_update:      { name: 'location',         color: COLOR.green },
+  course_leader:      { name: 'trophy',           color: COLOR.gold },
+  new_follower:       { name: 'person-add',       color: COLOR.green },
+  comment:            { name: 'chatbubble',       color: COLOR.green },
   like:               { name: 'heart',            color: '#e05c5c' },
-  referral:           { name: 'people',           color: '#7DC87A' },
-  push:               { name: 'notifications',    color: '#B8A882' },
-  challenge_received: { name: 'flash',            color: '#C9A84C' },
-  challenge_accepted: { name: 'flash',            color: '#7DC87A' },
-  challenge_declined: { name: 'flash',            color: '#7A6E58' },
-  challenge_result:   { name: 'trophy',           color: '#C9A84C' },
-  challenge_won:      { name: 'flash',            color: '#C9A84C' },
-  welcome:            { name: 'golf',             color: '#C9A84C' },
-  course_update:      { name: 'location',         color: '#7DC87A' },
-  friend_round:       { name: 'flag',             color: '#7DC87A' },
-  rank_move:          { name: 'trending-up',      color: '#C9A84C' },
-  milestone:          { name: 'star',             color: '#C9A84C' },
-  course_leader:      { name: 'trophy',           color: '#C9A84C' },
+  referral:           { name: 'people',           color: COLOR.green },
+  push:               { name: 'notifications',    color: COLOR.muted },
+  challenge_received: { name: 'flash',            color: COLOR.gold },
+  challenge_accepted: { name: 'flash',            color: COLOR.green },
+  challenge_declined: { name: 'flash',            color: COLOR.dim },
+  challenge_result:   { name: 'trophy',           color: COLOR.gold },
+  challenge_won:      { name: 'flash',            color: COLOR.gold },
+  welcome:            { name: 'golf',             color: COLOR.gold },
+  course_update:      { name: 'location',         color: COLOR.green },
+  friend_round:       { name: 'flag',             color: COLOR.green },
+  rank_move:          { name: 'trending-up',      color: COLOR.gold },
+  milestone:          { name: 'star',             color: COLOR.gold },
+  course_leader:      { name: 'trophy',           color: COLOR.gold },
 };
 
 function NotifRow({ item, onAccept, onDecline, actioned }) {
-  const ic = ICON[item.type] ?? { name: 'notifications', color: '#B8A882' };
+  const ic = ICON[item.type] ?? { name: 'notifications', color: COLOR.muted };
   const isChallenge = item.type === 'challenge_received';
   return (
     <View style={[s.row, !item.read && s.unread]}>
@@ -124,16 +126,10 @@ export default function NotificationCenterScreen({ navigation }) {
 
   return (
     <View style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-          <Ionicons name="chevron-back" size={22} color="#C9A84C" />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>NOTIFICATIONS</Text>
-        <View style={{ width: 38 }} />
-      </View>
+      <ScreenHeader title="NOTIFICATIONS" onBack={() => navigation.goBack()} style={{ paddingTop: 58 }} />
 
       {loading ? (
-        <ActivityIndicator color="#C9A84C" style={{ marginTop: 60 }} />
+        <ActivityIndicator color={COLOR.gold} style={{ marginTop: 60 }} />
       ) : notifs.length === 0 ? (
         <View style={s.empty}>
           <Ionicons name="notifications-off-outline" size={48} color="rgba(184,168,130,0.2)" />
@@ -160,25 +156,22 @@ export default function NotificationCenterScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#090F0A' },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 64, paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(125,200,122,0.1)' },
-  back:        { width: 38, height: 38, justifyContent: 'center' },
-  headerTitle: { fontSize: 13, fontFamily: 'Montserrat_700Bold', color: '#C9A84C', letterSpacing: 2.5 },
+  container:   { flex: 1, backgroundColor: COLOR.bg },
   row:         { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)' },
   unread:      { backgroundColor: 'rgba(125,200,122,0.04)' },
   iconWrap:    { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(125,200,122,0.08)', alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 1 },
   content:     { flex: 1 },
   title:       { fontSize: 14, fontWeight: '600', color: '#F5F0E8', marginBottom: 2 },
-  body:        { fontSize: 13, color: '#B8A882', lineHeight: 18, marginBottom: 4 },
+  body:        { fontSize: 13, color: COLOR.muted, lineHeight: 18, marginBottom: 4 },
   time:        { fontSize: 11, color: 'rgba(184,168,130,0.5)', letterSpacing: 0.3 },
-  dot:             { width: 8, height: 8, borderRadius: 4, backgroundColor: '#C9A84C', marginTop: 5, marginLeft: 8 },
+  dot:             { width: 8, height: 8, borderRadius: RADIUS.xs, backgroundColor: COLOR.gold, marginTop: 5, marginLeft: 8 },
   challengeActions:{ flexDirection: 'row', gap: 8, marginTop: 10 },
-  acceptBtn:       { backgroundColor: '#7DC87A22', borderWidth: 1, borderColor: '#7DC87A55', borderRadius: 8, paddingVertical: 7, paddingHorizontal: 14 },
-  acceptBtnText:   { fontSize: 11, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
-  declineBtn:      { borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 8, paddingVertical: 7, paddingHorizontal: 14 },
-  declineBtnText:  { fontSize: 11, fontWeight: '700', color: '#7A6E58', letterSpacing: 1.5 },
+  acceptBtn:       { backgroundColor: '#7DC87A22', borderWidth: 1, borderColor: '#7DC87A55', borderRadius: RADIUS.sm, paddingVertical: 7, paddingHorizontal: 14 },
+  acceptBtnText:   { fontSize: 11, fontWeight: '700', color: COLOR.green, letterSpacing: 1.5 },
+  declineBtn:      { borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', borderRadius: RADIUS.sm, paddingVertical: 7, paddingHorizontal: 14 },
+  declineBtnText:  { fontSize: 11, fontWeight: '700', color: COLOR.dim, letterSpacing: 1.5 },
   actionedText:    { fontSize: 11, color: 'rgba(184,168,130,0.4)', marginTop: 6, fontStyle: 'italic' },
   empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyText:   { fontSize: 16, fontWeight: '600', color: '#B8A882', marginTop: 16, marginBottom: 8 },
+  emptyText:   { fontSize: 16, fontWeight: '600', color: COLOR.muted, marginTop: 16, marginBottom: 8 },
   emptySub:    { fontSize: 13, color: 'rgba(184,168,130,0.5)', textAlign: 'center', lineHeight: 19 },
 });

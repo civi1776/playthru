@@ -21,6 +21,8 @@ import {
 import { DIFFICULTY as ARCADE_DIFFICULTY } from '../lib/arcade/engine';
 import { SwingStage } from '../components/arcade/Golfer';
 import InitialsAvatar from '../components/InitialsAvatar';
+import ScreenHeader from '../components/ScreenHeader';
+import Button from '../components/Button';
 
 const DIFFICULTIES = [
   { key: 'beginner',     label: 'BEGINNER', sub: ARCADE_DIFFICULTY.beginner.blurb,     color: COLOR.green },
@@ -113,13 +115,7 @@ export default function ArcadeHomeScreen({ navigation }) {
   return (
     <SafeAreaView style={st.screen} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        <View style={st.header}>
-          <View>
-            <Text style={st.wordmark}>CLOCKED ARCADE</Text>
-            <Text style={st.tag}>SAME RULES. SAME CLOCK. NO TEE TIME.</Text>
-          </View>
-          <Ionicons name="game-controller-outline" size={22} color={COLOR.gold} />
-        </View>
+        <ScreenHeader title="ARCADE" subtitle="Same rules. Same clock. No tee time." brand style={{ paddingHorizontal: 0, paddingTop: 0 }} />
 
         {/* Hero: your golfer, swinging */}
         <View style={st.heroCard}>
@@ -128,7 +124,7 @@ export default function ArcadeHomeScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={st.heroTitle}>Nine holes.{'\n'}One clock.</Text>
-            <Text style={st.heroSub}>Drive the cart, swing on the meter, beat time par. The clock never stops — not even between holes.</Text>
+            <Text style={st.heroSub}>Drive the cart, swing on the meter, beat time par. The clock never stops, not even between holes.</Text>
             {best ? (
               <View style={st.bestPill}>
                 <Text style={st.bestLabel}>YOUR BEST</Text>
@@ -140,10 +136,7 @@ export default function ArcadeHomeScreen({ navigation }) {
           </View>
         </View>
 
-        <TouchableOpacity style={st.primaryBtn} onPress={play} activeOpacity={0.85} accessibilityLabel="Play the arcade">
-          <Ionicons name="play" size={16} color={COLOR.bg} />
-          <Text style={st.primaryBtnText}>PLAY NINE</Text>
-        </TouchableOpacity>
+        <Button label="PLAY NINE" icon="play" size="lg" onPress={play} style={{ marginTop: 14 }} accessibilityLabel="Play the arcade" />
 
         {/* Difficulty */}
         <Text style={st.sectionQ}>SHOT CLOCK</Text>
@@ -245,9 +238,6 @@ function HowRow({ icon, text }) {
 
 const st = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLOR.bg },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  wordmark: { ...TYPE.labelOn, fontSize: 12, letterSpacing: 3 },
-  tag: { fontSize: 8, color: '#C9A84C88', letterSpacing: 1.5, marginTop: 3 },
 
   heroCard: { ...CARD, flexDirection: 'row', alignItems: 'center', gap: 10, borderColor: COLOR.borderGold, padding: 12 },
   stage: { width: 150, height: 112, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: '#0B1F11', borderWidth: 1, borderColor: COLOR.border, alignItems: 'center', justifyContent: 'flex-end' },
@@ -258,16 +248,13 @@ const st = StyleSheet.create({
   bestVal: { ...TYPE.statNumber, fontSize: 20, color: COLOR.green, marginTop: 2 },
   bestMeta: { fontSize: 10, color: COLOR.dim, letterSpacing: 0.5 },
 
-  primaryBtn: { backgroundColor: COLOR.gold, borderRadius: RADIUS.lg, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', marginTop: 14, flexDirection: 'row', gap: 8 },
-  primaryBtnText: { color: COLOR.bg, fontSize: 14, fontWeight: '800', letterSpacing: 3 },
-
   sectionQ: { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 8, marginTop: 22 },
   sectionToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 8 },
   sectionToggleText: { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
   difficultyRow: { flexDirection: 'row', gap: 10 },
-  diffBtn: { flex: 1, backgroundColor: COLOR.surface, borderRadius: 14, borderWidth: 1, borderColor: COLOR.border, paddingVertical: 14, alignItems: 'center', gap: 4 },
+  diffBtn: { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, paddingVertical: 14, alignItems: 'center', gap: 4 },
   diffBtnActive: { borderColor: COLOR.gold, backgroundColor: '#C9A84C0F' },
-  diffDot: { width: 8, height: 8, borderRadius: 4, marginBottom: 2 },
+  diffDot: { width: 8, height: 8, borderRadius: RADIUS.xs, marginBottom: 2 },
   diffLabel: { fontSize: 11, fontWeight: '700', color: COLOR.dim, letterSpacing: 1 },
   diffLabelActive: { color: COLOR.cream },
   diffSub: { fontSize: 10, color: COLOR.dim },
@@ -276,7 +263,7 @@ const st = StyleSheet.create({
   swatchRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   swatchLabel: { width: 78, fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 1.5 },
   swatches: { flexDirection: 'row', gap: 10, flex: 1, flexWrap: 'wrap' },
-  swatch: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: 'transparent' },
+  swatch: { width: 28, height: 28, borderRadius: RADIUS.md, borderWidth: 2, borderColor: 'transparent' },
   swatchActive: { borderColor: COLOR.cream, transform: [{ scale: 1.12 }] },
   segs: { flexDirection: 'row', gap: 6, flex: 1, flexWrap: 'wrap' },
   seg: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: COLOR.border },

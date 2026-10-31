@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { COLOR, RADIUS } from '../lib/theme';
 
 export default function SignInScreen({ navigation }) {
   const { refreshProfile } = useAuth();
@@ -104,7 +105,7 @@ export default function SignInScreen({ navigation }) {
               style={styles.eyeBtn}
               activeOpacity={0.7}
             >
-              <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={18} color="#B8A882" />
+              <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={18} color={COLOR.muted} />
             </TouchableOpacity>
           </View>
 
@@ -139,7 +140,7 @@ export default function SignInScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#090F0A',
+    backgroundColor: COLOR.bg,
   },
   scroll: {
     flexGrow: 1,
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
   },
   backArrow: {
     fontSize: 24,
-    color: '#C9A84C',
+    color: COLOR.gold,
   },
   header: {
     marginBottom: 36,
@@ -163,40 +164,40 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#C9A84C',
+    color: COLOR.gold,
     letterSpacing: 4,
     marginBottom: 8,
   },
   title: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#F5EDD8',
+    color: COLOR.cream,
   },
   form: {
     gap: 12,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#0D1A0F',
+    backgroundColor: COLOR.surface,
     borderWidth: 1,
     borderColor: 'rgba(125,200,122,0.2)',
-    borderRadius: 12,
+    borderRadius: RADIUS.md,
     padding: 16,
-    color: '#F5EDD8',
+    color: COLOR.cream,
     fontSize: 16,
   },
   passwordRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D1A0F',
+    backgroundColor: COLOR.surface,
     borderWidth: 1,
     borderColor: 'rgba(125,200,122,0.2)',
-    borderRadius: 12,
+    borderRadius: RADIUS.md,
   },
   passwordInput: {
     flex: 1,
     padding: 16,
-    color: '#F5EDD8',
+    color: COLOR.cream,
     fontSize: 16,
   },
   eyeBtn: {
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 13,
-    color: '#C9A84C',
+    color: COLOR.gold,
   },
   errorText: {
     fontSize: 13,
@@ -221,8 +222,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   btnPrimary: {
-    backgroundColor: '#C9A84C',
-    borderRadius: 14,
+    backgroundColor: COLOR.gold,
+    borderRadius: RADIUS.md,
     paddingVertical: 18,
     alignItems: 'center',
     marginTop: 8,
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#090F0A',
+    color: COLOR.bg,
     letterSpacing: 2,
   },
 });

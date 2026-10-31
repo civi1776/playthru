@@ -4,6 +4,9 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useActiveRoundInset } from '../lib/activeRound';
+import ScreenHeader from '../components/ScreenHeader';
+import Button from '../components/Button';
+import { COLOR, RADIUS } from '../lib/theme';
 import {
   computeTimePar, timePenalty, pointsForHole, formatSeconds,
   DEFAULT_CLOCK_COEFFICIENTS, DEFAULT_PENALTY_PARAMS,
@@ -31,23 +34,23 @@ const EX_HOLE_SCORE = EX_TEAM_PTS + EX_PENALTY;
 
 // ─── Scoring table ───────────────────────────────────────────────────────────
 const SCORING_ROWS = [
-  { result: 'Albatross',            pts: '+9', color: '#C9A84C' },
-  { result: 'Eagle',                pts: '+6', color: '#C9A84C' },
-  { result: 'Birdie',               pts: '+3', color: '#7DC87A' },
-  { result: 'Par',                  pts: '+1', color: '#F5EDD8' },
-  { result: 'Bogey',                pts: '0',  color: '#B8A882' },
-  { result: 'Double bogey or worse', pts: '\u22122', color: '#E85D4A' },
+  { result: 'Albatross',            pts: '+9', color: COLOR.gold },
+  { result: 'Eagle',                pts: '+6', color: COLOR.gold },
+  { result: 'Birdie',               pts: '+3', color: COLOR.green },
+  { result: 'Par',                  pts: '+1', color: COLOR.cream },
+  { result: 'Bogey',                pts: '0',  color: COLOR.muted },
+  { result: 'Double bogey or worse', pts: '\u22122', color: COLOR.red },
 ];
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
-const GOLD   = '#C9A84C';
-const CREAM  = '#F5EDD8';
-const MUTED  = '#B8A882';
-const DIM    = '#7A6E58';
-const BG     = '#090F0A';
-const CARD   = '#0D1A0F';
-const GREEN  = '#7DC87A';
-const RED    = '#E85D4A';
+const GOLD   = COLOR.gold;
+const CREAM  = COLOR.cream;
+const MUTED  = COLOR.muted;
+const DIM    = COLOR.dim;
+const BG     = COLOR.bg;
+const CARD   = COLOR.surface;
+const GREEN  = COLOR.green;
+const RED    = COLOR.red;
 const BORDER = '#7DC87A22';
 
 // ─── Reusable pieces ─────────────────────────────────────────────────────────
@@ -170,13 +173,7 @@ export default function RulesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <View style={s.tabHeader}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn} accessibilityLabel="Back" hitSlop={8}>
-          <Ionicons name="chevron-back" size={22} color={GOLD} />
-        </TouchableOpacity>
-        <Text style={s.tabHeaderText}>THE RULES</Text>
-        <View style={s.backBtn} />
-      </View>
+      <ScreenHeader title="THE RULES" onBack={() => navigation.goBack()} borderless />
 
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: 40 + bannerInset }]} showsVerticalScrollIndicator={false}>
 
@@ -265,10 +262,7 @@ export default function RulesScreen({ navigation }) {
 
         {/* CTA */}
         <View style={s.ctaBlock}>
-          <TouchableOpacity style={s.ctaBtn} onPress={playCTA} activeOpacity={0.85}>
-            <Ionicons name="timer-outline" size={20} color={BG} />
-            <Text style={s.ctaBtnTxt}>PLAY ON THE CLOCK</Text>
-          </TouchableOpacity>
+          <Button label="PLAY ON THE CLOCK" icon="timer-outline" size="lg" onPress={playCTA} />
         </View>
 
       </ScrollView>
@@ -278,18 +272,18 @@ export default function RulesScreen({ navigation }) {
 
 // ─── Demo styles ─────────────────────────────────────────────────────────────
 const d = StyleSheet.create({
-  wrap:        { marginHorizontal: 16, marginBottom: 20, backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: GOLD + '33', padding: 20, alignItems: 'center' },
+  wrap:        { marginHorizontal: 16, marginBottom: 20, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: GOLD + '33', padding: 20, alignItems: 'center' },
   context:     { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 2, marginBottom: 4 },
   timeParLabel:{ fontSize: 10, fontWeight: '700', color: GOLD, letterSpacing: 2, marginBottom: 16 },
   clockFace:   { alignItems: 'center', marginBottom: 12 },
   digits:      { fontSize: 56, fontWeight: '200', fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62 },
   overLabel:   { fontSize: 10, fontWeight: '700', color: RED, letterSpacing: 3, marginTop: 2 },
-  penaltyBadge:{ backgroundColor: 'rgba(232,93,74,0.12)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(232,93,74,0.3)', marginBottom: 8 },
+  penaltyBadge:{ backgroundColor: 'rgba(232,93,74,0.12)', borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(232,93,74,0.3)', marginBottom: 8 },
   penaltyText: { fontSize: 13, fontWeight: '700', color: RED, fontVariant: ['tabular-nums'] },
   controls:    { alignItems: 'center', marginTop: 4 },
-  startBtn:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: GREEN, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 28 },
+  startBtn:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: GREEN, borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: 28 },
   startBtnText:{ fontSize: 13, fontWeight: '700', color: BG, letterSpacing: 2 },
-  stopBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#3A1A1A', borderWidth: 1.5, borderColor: RED, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
+  stopBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#3A1A1A', borderWidth: 1.5, borderColor: RED, borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: 24 },
   stopBtnText: { fontSize: 13, fontWeight: '700', color: CREAM, letterSpacing: 2 },
   resultBlock: { alignItems: 'center', gap: 6 },
   resultText:  { fontSize: 14, fontWeight: '600', textAlign: 'center' },
@@ -300,7 +294,7 @@ const d = StyleSheet.create({
 
 // ─── Example styles ──────────────────────────────────────────────────────────
 const ex = StyleSheet.create({
-  card:          { marginHorizontal: 16, marginBottom: 20, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: GOLD + '22', padding: 16 },
+  card:          { marginHorizontal: 16, marginBottom: 20, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: GOLD + '22', padding: 16 },
   title:         { fontSize: 9, fontWeight: '700', color: GOLD, letterSpacing: 3, marginBottom: 8 },
   divider:       { height: 1, backgroundColor: BORDER, marginVertical: 10 },
   row:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
@@ -321,9 +315,6 @@ const ex = StyleSheet.create({
 // ─── Main styles ─────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  tabHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingTop: 6, paddingBottom: 6 },
-  backBtn:       { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  tabHeaderText: { fontSize: 12, fontWeight: '700', color: GOLD, letterSpacing: 3 },
   content:   { paddingBottom: 40 },
 
   hookBlock:    { alignItems: 'center', paddingHorizontal: 24, paddingTop: 28, paddingBottom: 20 },
@@ -332,10 +323,10 @@ const s = StyleSheet.create({
   hookItalic:   { fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 21, fontStyle: 'italic' },
 
   sectionHead:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, marginTop: 8, marginBottom: 10 },
-  sectionDot:   { width: 28, height: 28, borderRadius: 8, backgroundColor: '#1A2E1C', alignItems: 'center', justifyContent: 'center' },
+  sectionDot:   { width: 28, height: 28, borderRadius: RADIUS.sm, backgroundColor: COLOR.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: GOLD, letterSpacing: 2, textTransform: 'uppercase' },
 
-  card:       { marginHorizontal: 16, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 16 },
+  card:       { marginHorizontal: 16, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 16 },
   cardIntro:  { fontSize: 13, color: MUTED, marginBottom: 12 },
   cardBody:   { fontSize: 13, color: CREAM, lineHeight: 20, marginBottom: 10 },
 
@@ -347,7 +338,7 @@ const s = StyleSheet.create({
   statDividerLine: { width: 40, height: 1, backgroundColor: GOLD + '44' },
   statDividerText: { fontSize: 14, color: MUTED, textAlign: 'center', lineHeight: 22, marginVertical: 10, fontStyle: 'italic' },
 
-  tableWrap:      { backgroundColor: BG, borderRadius: 10, borderWidth: 1, borderColor: GOLD + '33', overflow: 'hidden', marginBottom: 14 },
+  tableWrap:      { backgroundColor: BG, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: GOLD + '33', overflow: 'hidden', marginBottom: 14 },
   tableHeaderRow: { flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: GOLD + '22' },
   tableHeaderCell:{ fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 2 },
   tableRow:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#7DC87A0D' },
@@ -368,6 +359,4 @@ const s = StyleSheet.create({
   closingItalic:{ fontSize: 14, color: MUTED, textAlign: 'center', fontStyle: 'italic' },
 
   ctaBlock:   { alignItems: 'center', paddingBottom: 36, paddingHorizontal: 20 },
-  ctaBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: GOLD, borderRadius: 16, paddingVertical: 18, paddingHorizontal: 36 },
-  ctaBtnTxt:  { fontSize: 13, fontWeight: '700', color: BG, letterSpacing: 2 },
 });

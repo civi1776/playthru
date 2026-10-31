@@ -16,22 +16,23 @@ import ClockedScoreCard from '../components/ClockedScoreCard';
 import RecentRoundsList from '../components/RecentRoundsList';
 import { fetchClockedRatingForUser } from '../lib/clockedRating';
 import { totalPointsFromHoleScores } from '../lib/clockedSport';
+import { COLOR, RADIUS } from '../lib/theme';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Aggregate 0–100 Clocked Score color — matches LeaderboardScreen's clockedColor().
 function clockedColor(score) {
-  if (score == null) return '#7A6E58';
-  if (score >= 70) return '#7DC87A';
-  if (score >= 40) return '#C9A84C';
-  return '#B8A882';
+  if (score == null) return COLOR.dim;
+  if (score >= 70) return COLOR.green;
+  if (score >= 40) return COLOR.gold;
+  return COLOR.muted;
 }
 
 // Per-round points color (raw PTS, not the 0–100 aggregate score).
 function ptsColor(pts) {
-  if (pts == null) return '#B8A882';
-  if (pts >= 8) return '#7DC87A';
-  if (pts >= 0) return '#C9A84C';
+  if (pts == null) return COLOR.muted;
+  if (pts >= 8) return COLOR.green;
+  if (pts >= 0) return COLOR.gold;
   return '#C07A6A';
 }
 
@@ -63,15 +64,15 @@ function timeAgo(isoStr) {
 
 function PubActRow({ item }) {
   const typeMap = {
-    round_logged:       { icon: 'golf',        color: '#7DC87A', label: c => `Logged a round at ${c?.course_name ?? '—'}` },
-    live_round_started: { icon: 'golf',        color: '#7DC87A', label: c => `Playing live at ${c?.course_name ?? 'a course'} right now` },
-    milestone:          { icon: 'trophy',      color: '#C9A84C', label: c => c?.title ?? 'Reached a milestone' },
-    leaderboard:        { icon: 'trending-up', color: '#C9A84C', label: c => c?.description ?? 'Moved on the leaderboard' },
-    course_review:      { icon: 'location',    color: '#7DC87A', label: c => `Reviewed ${c?.course_name ?? 'a course'}` },
-    user_post:          { icon: 'chatbubble',  color: '#B8A882', label: c => c?.text?.slice(0, 80) ?? 'Shared an update' },
-    course_leader:      { icon: 'trophy',      color: '#C9A84C', label: c => c?.description ?? 'Set a course record' },
+    round_logged:       { icon: 'golf',        color: COLOR.green, label: c => `Logged a round at ${c?.course_name ?? '—'}` },
+    live_round_started: { icon: 'golf',        color: COLOR.green, label: c => `Playing live at ${c?.course_name ?? 'a course'} right now` },
+    milestone:          { icon: 'trophy',      color: COLOR.gold, label: c => c?.title ?? 'Reached a milestone' },
+    leaderboard:        { icon: 'trending-up', color: COLOR.gold, label: c => c?.description ?? 'Moved on the leaderboard' },
+    course_review:      { icon: 'location',    color: COLOR.green, label: c => `Reviewed ${c?.course_name ?? 'a course'}` },
+    user_post:          { icon: 'chatbubble',  color: COLOR.muted, label: c => c?.text?.slice(0, 80) ?? 'Shared an update' },
+    course_leader:      { icon: 'trophy',      color: COLOR.gold, label: c => c?.description ?? 'Set a course record' },
   };
-  const info    = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: '#7A6E58', label: () => 'Activity' };
+  const info    = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: COLOR.dim, label: () => 'Activity' };
   const content = item.content ?? {};
   const pts     = content.team_score; // raw round points, set at save time (not the 0–100 aggregate)
   return (
@@ -210,10 +211,10 @@ export default function PublicProfileScreen({ navigation, route }) {
     return (
       <SafeAreaView style={s.container}>
         <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color="#C9A84C" />
+          <Ionicons name="chevron-back" size={20} color={COLOR.gold} />
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#C9A84C" />
+          <ActivityIndicator size="large" color={COLOR.gold} />
         </View>
       </SafeAreaView>
     );
@@ -223,10 +224,10 @@ export default function PublicProfileScreen({ navigation, route }) {
     return (
       <SafeAreaView style={s.container}>
         <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color="#C9A84C" />
+          <Ionicons name="chevron-back" size={20} color={COLOR.gold} />
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#7A6E58', fontSize: 16 }}>Couldn't load this profile. Check your connection and try again.</Text>
+          <Text style={{ color: COLOR.dim, fontSize: 16 }}>Couldn't load this profile. Check your connection and try again.</Text>
         </View>
       </SafeAreaView>
     );
@@ -236,10 +237,10 @@ export default function PublicProfileScreen({ navigation, route }) {
     return (
       <SafeAreaView style={s.container}>
         <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color="#C9A84C" />
+          <Ionicons name="chevron-back" size={20} color={COLOR.gold} />
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#7A6E58', fontSize: 16 }}>Profile not found.</Text>
+          <Text style={{ color: COLOR.dim, fontSize: 16 }}>Profile not found.</Text>
         </View>
       </SafeAreaView>
     );
@@ -269,9 +270,9 @@ export default function PublicProfileScreen({ navigation, route }) {
     <SafeAreaView style={s.container}>
       {/* Top bar */}
       <View style={s.topBar}>
-        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color="#C9A84C" />
-          <Text style={s.backText}>BACK</Text>
+        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7} accessibilityLabel="Back" hitSlop={8}>
+          <Ionicons name="chevron-back" size={22} color={COLOR.gold} />
+          <Text style={s.backText}>{profile?.username ? `@${profile.username}` : 'PLAYER'}</Text>
         </TouchableOpacity>
 
         {!isOwnProfile && (
@@ -282,7 +283,7 @@ export default function PublicProfileScreen({ navigation, route }) {
             disabled={followLoading}
           >
             {following
-              ? <Ionicons name="checkmark" size={13} color="#7DC87A" style={{ marginRight: 4 }} />
+              ? <Ionicons name="checkmark" size={13} color={COLOR.green} style={{ marginRight: 4 }} />
               : null}
             <Text style={[s.followBtnText, following && s.followingBtnText]}>
               {following ? 'FOLLOWING' : 'FOLLOW'}
@@ -300,7 +301,7 @@ export default function PublicProfileScreen({ navigation, route }) {
             activeOpacity={0.8}
             accessibilityLabel={`Head to head vs ${profile.username ?? 'this player'}`}
           >
-            <Ionicons name="stats-chart" size={11} color="#B8A882" />
+            <Ionicons name="stats-chart" size={11} color={COLOR.muted} />
             <Text style={s.vsBtnText}>VS</Text>
           </TouchableOpacity>
           <ChallengeButton
@@ -399,7 +400,7 @@ export default function PublicProfileScreen({ navigation, route }) {
 
       {pubTab === 'activity' && (
         activityLoading
-          ? <ActivityIndicator color="#C9A84C" style={{ marginTop: 60 }} />
+          ? <ActivityIndicator color={COLOR.gold} style={{ marginTop: 60 }} />
           : activityItems.length === 0
             ? <View style={s.actEmpty}>
                 <Ionicons name="time-outline" size={36} color="rgba(201,168,76,0.2)" />
@@ -417,65 +418,65 @@ export default function PublicProfileScreen({ navigation, route }) {
 }
 
 const s = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: '#090F0A' },
-  vsBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#7DC87A22', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
-  vsBtnText:      { fontSize: 11, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
+  container:      { flex: 1, backgroundColor: COLOR.bg },
+  vsBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#7DC87A22', borderRadius: RADIUS.sm, paddingVertical: 9, paddingHorizontal: 16 },
+  vsBtnText:      { fontSize: 11, fontWeight: '700', color: COLOR.muted, letterSpacing: 2 },
   topBar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
   backBtn:        { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  backText:       { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
-  followBtn:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#C9A84C', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 },
+  backText:       { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
+  followBtn:      { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.gold, borderRadius: RADIUS.sm, paddingVertical: 8, paddingHorizontal: 14 },
   followingBtn:   { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#7DC87A44' },
-  followBtnText:  { fontSize: 10, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
-  followingBtnText: { color: '#7DC87A' },
+  followBtnText:  { fontSize: 10, fontWeight: '700', color: COLOR.bg, letterSpacing: 1.5 },
+  followingBtnText: { color: COLOR.green },
   scroll:         { paddingHorizontal: 16, paddingBottom: 48 },
 
   identityRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#7DC87A11', marginBottom: 16 },
   avatar:         { width: 60, height: 60, borderRadius: 30, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C55', alignItems: 'center', justifyContent: 'center' },
-  avatarText:     { fontSize: 22, fontWeight: '600', color: '#C9A84C' },
+  avatarText:     { fontSize: 22, fontWeight: '600', color: COLOR.gold },
   identityInfo:   { flex: 1 },
-  fullName:       { fontSize: 20, fontWeight: '600', color: '#F5EDD8' },
-  username:       { fontSize: 12, color: '#C9A84C', marginTop: 2 },
-  homeCourse:     { fontSize: 11, color: '#7A6E58', marginTop: 2 },
+  fullName:       { fontSize: 20, fontWeight: '600', color: COLOR.cream },
+  username:       { fontSize: 12, color: COLOR.gold, marginTop: 2 },
+  homeCourse:     { fontSize: 11, color: COLOR.dim, marginTop: 2 },
 
-  gaugeCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 20, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, gap: 16, marginBottom: 14 },
+  gaugeCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: 20, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, gap: 16, marginBottom: 14 },
   gaugeLeft:      { alignItems: 'center', justifyContent: 'center' },
   gaugeRight:     { flex: 1 },
   credentialRow:  { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 14 },
-  credentialCard: { flex: 1, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
-  credentialLabel:{ fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
-  credentialValue:{ fontSize: 22, fontWeight: '300', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
-  tierLabel:      { fontSize: 11, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
+  credentialCard: { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center' },
+  credentialLabel:{ fontSize: 8, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 4 },
+  credentialValue:{ fontSize: 22, fontWeight: '300', color: COLOR.cream, fontVariant: ['tabular-nums'] },
+  tierLabel:      { fontSize: 11, fontWeight: '700', color: COLOR.green, letterSpacing: 1.5 },
   tierLabelMuted: { fontSize: 9, fontWeight: '700', color: '#C9A84C44', letterSpacing: 1.5 },
   scoreLabel:     { fontSize: 9, fontWeight: '700', color: '#C9A84C66', letterSpacing: 2, marginBottom: 2 },
-  scoreValue:     { fontSize: 30, fontWeight: '300', color: '#F5EDD8' },
+  scoreValue:     { fontSize: 30, fontWeight: '300', color: COLOR.cream },
 
   statRow:        { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  statCard:       { flex: 1, backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 16, paddingHorizontal: 10, alignItems: 'center' },
-  statLabel:      { fontSize: 9, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, textAlign: 'center', marginBottom: 8 },
-  statValue:      { fontSize: 22, fontWeight: '300', color: '#F5EDD8' },
+  statCard:       { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 16, paddingHorizontal: 10, alignItems: 'center' },
+  statLabel:      { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 1, textAlign: 'center', marginBottom: 8 },
+  statValue:      { fontSize: 22, fontWeight: '300', color: COLOR.cream },
 
   section:        { marginBottom: 20 },
-  sectionLabel:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 10 },
-  roundCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', padding: 12, marginBottom: 8, gap: 10 },
+  sectionLabel:   { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 10 },
+  roundCard:      { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 12, marginBottom: 8, gap: 10 },
   roundInfo:      { flex: 1 },
-  roundCourse:    { fontSize: 14, fontWeight: '500', color: '#F5EDD8', marginBottom: 2 },
-  roundMeta:      { fontSize: 11, color: '#B8A882' },
+  roundCourse:    { fontSize: 14, fontWeight: '500', color: COLOR.cream, marginBottom: 2 },
+  roundMeta:      { fontSize: 11, color: COLOR.muted },
   roundPop:       { fontSize: 22, fontWeight: '300' },
 
   emptyRounds:    { alignItems: 'center', paddingVertical: 40 },
-  emptyRoundsText:{ fontSize: 16, color: '#7A6E58' },
+  emptyRoundsText:{ fontSize: 16, color: COLOR.dim },
 
   pubTabBar:      { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 8, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
-  pubTabBtn:      { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A22' },
-  pubTabBtnActive:{ borderColor: '#C9A84C', backgroundColor: '#C9A84C22' },
-  pubTabText:     { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
-  pubTabTextActive: { color: '#C9A84C' },
+  pubTabBtn:      { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: RADIUS.sm, backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A22' },
+  pubTabBtnActive:{ borderColor: COLOR.gold, backgroundColor: '#C9A84C22' },
+  pubTabText:     { fontSize: 9, fontWeight: '700', color: COLOR.muted, letterSpacing: 2 },
+  pubTabTextActive: { color: COLOR.gold },
   actEmpty:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 10 },
-  actEmptyText:   { fontSize: 14, color: '#7A6E58' },
+  actEmptyText:   { fontSize: 14, color: COLOR.dim },
   actRow:         { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#7DC87A11', gap: 12 },
-  actIconWrap:    { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  actIconWrap:    { width: 32, height: 32, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
   actContent:     { flex: 1 },
-  actLabel:       { fontSize: 13, color: '#F5EDD8', fontWeight: '500', lineHeight: 18 },
+  actLabel:       { fontSize: 13, color: COLOR.cream, fontWeight: '500', lineHeight: 18 },
   actPop:         { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
   actTime:        { fontSize: 10, color: 'rgba(184,168,130,0.5)', marginTop: 3 },
 

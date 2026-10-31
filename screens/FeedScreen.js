@@ -15,8 +15,9 @@ import { useAuth } from '../context/AuthContext';
 import InitialsAvatar from '../components/InitialsAvatar';
 import CourseAvatar from '../components/CourseAvatar';
 import { sendPushToUser } from '../lib/notifications';
-import { scoreTier, COLOR } from '../lib/theme';
+import { scoreTier, COLOR, RADIUS } from '../lib/theme';
 import { useActiveRoundInset } from '../lib/activeRound';
+import ScreenHeader from '../components/ScreenHeader';
 
 // "Very recent" window for the live pulse indicator — purely presentational,
 // mirrors the freshness cue used on the live-round banner elsewhere in the app.
@@ -372,12 +373,12 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#090F0A' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: COLOR.bg }}>
         {/* Header */}
         <View style={cs.header}>
           <Text style={cs.title}>Comments</Text>
           <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="close" size={22} color="#B8A882" />
+            <Ionicons name="close" size={22} color={COLOR.muted} />
           </TouchableOpacity>
         </View>
 
@@ -398,7 +399,7 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
           contentContainerStyle={{ padding: 16, gap: 12, flexGrow: 1 }}
           ListEmptyComponent={
             loading
-              ? <ActivityIndicator color="#C9A84C" style={{ marginTop: 40 }} />
+              ? <ActivityIndicator color={COLOR.gold} style={{ marginTop: 40 }} />
               : <Text style={cs.emptyText}>No comments yet. Be first.</Text>
           }
           renderItem={({ item }) => {
@@ -424,7 +425,7 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
             <TextInput
               style={cs.input}
               placeholder="Add a comment\u2026"
-              placeholderTextColor="#7A6E58"
+              placeholderTextColor={COLOR.dim}
               value={draft}
               onChangeText={setDraft}
               maxLength={280}
@@ -437,8 +438,8 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
               style={[cs.sendBtn, draft.trim() && cs.sendBtnActive]}
             >
               {posting
-                ? <ActivityIndicator size="small" color="#090F0A" />
-                : <Ionicons name="arrow-up" size={16} color={draft.trim() ? '#090F0A' : '#7A6E58'} />}
+                ? <ActivityIndicator size="small" color={COLOR.bg} />
+                : <Ionicons name="arrow-up" size={16} color={draft.trim() ? COLOR.bg : COLOR.dim} />}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -449,19 +450,19 @@ function CommentSheet({ visible, activity, userId, onClose, onPosted }) {
 
 const cs = StyleSheet.create({
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
-  title:         { fontSize: 14, fontWeight: '600', color: '#F5EDD8' },
-  contextCard:   { marginHorizontal: 16, marginTop: 12, backgroundColor: '#0D1A0F', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#7DC87A14' },
-  contextCourse: { fontSize: 13, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
-  contextMeta:   { fontSize: 10, color: '#B8A882' },
-  emptyText:     { color: '#7A6E58', textAlign: 'center', marginTop: 40, fontSize: 14 },
-  bubble:        { flex: 1, backgroundColor: '#0D1A0F', borderRadius: 12, padding: 10 },
-  commenterName: { fontSize: 12, fontWeight: '700', color: '#F5EDD8' },
-  commentTime:   { fontSize: 9, color: '#7A6E58' },
-  commentBody:   { fontSize: 13, color: '#B8A882', lineHeight: 19 },
+  title:         { fontSize: 14, fontWeight: '600', color: COLOR.cream },
+  contextCard:   { marginHorizontal: 16, marginTop: 12, backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, padding: 10, borderWidth: 1, borderColor: '#7DC87A14' },
+  contextCourse: { fontSize: 13, fontWeight: '600', color: COLOR.cream, marginBottom: 2 },
+  contextMeta:   { fontSize: 10, color: COLOR.muted },
+  emptyText:     { color: COLOR.dim, textAlign: 'center', marginTop: 40, fontSize: 14 },
+  bubble:        { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, padding: 10 },
+  commenterName: { fontSize: 12, fontWeight: '700', color: COLOR.cream },
+  commentTime:   { fontSize: 9, color: COLOR.dim },
+  commentBody:   { fontSize: 13, color: COLOR.muted, lineHeight: 19 },
   composeRow:    { flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: '#7DC87A22', alignItems: 'flex-end' },
-  input:         { flex: 1, backgroundColor: '#0D1A0F', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, color: '#F5EDD8', fontSize: 13, maxHeight: 100, borderWidth: 1, borderColor: '#7DC87A22' },
-  sendBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1A2E1C', alignItems: 'center', justifyContent: 'center' },
-  sendBtnActive: { backgroundColor: '#C9A84C' },
+  input:         { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 10, color: COLOR.cream, fontSize: 13, maxHeight: 100, borderWidth: 1, borderColor: '#7DC87A22' },
+  sendBtn:       { width: 36, height: 36, borderRadius: RADIUS.lg, backgroundColor: COLOR.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  sendBtnActive: { backgroundColor: COLOR.gold },
 });
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -604,7 +605,7 @@ export default function FeedScreen({ navigation }) {
             <PulseDot color={COLOR.green} size={5} />
             <Text style={s.tourneyBannerEyebrow}>THE FIRST CLOCKED EVENT</Text>
           </View>
-          <Text style={s.tourneyBannerTitle}>Coming to South Florida — request an invitation</Text>
+          <Text style={s.tourneyBannerTitle}>Coming to South Florida. Request an invitation.</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={COLOR.green} />
       </TouchableOpacity>
@@ -623,23 +624,14 @@ export default function FeedScreen({ navigation }) {
   return (
     <SafeAreaView style={s.container}>
       {/* Header */}
-      <View style={s.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Image source={require('../assets/PlayThru_Logo.png')} style={s.logoMark} resizeMode="contain" accessibilityIgnoresInvertColors />
-          <Text style={s.wordmark}>CLOCKED</Text>
-        </View>
-        <View style={s.headerRight}>
-          <TouchableOpacity onPress={() => navigation.navigate('RulesScreen')} activeOpacity={0.7} accessibilityLabel="Rules of Clocked Golf" style={s.headerIcon}>
-            <Ionicons name="book-outline" size={20} color="#B8A882" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('Notifications')} activeOpacity={0.7} accessibilityLabel="Notifications" style={s.headerIcon}>
-            <Ionicons name="notifications-outline" size={20} color="#B8A882" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('SearchUsers')} activeOpacity={0.7} accessibilityLabel="Search" style={s.headerIcon}>
-            <Ionicons name="search-outline" size={20} color="#B8A882" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ScreenHeader
+        title="CLOCKED" brand
+        right={[
+          { icon: 'book-outline', onPress: () => navigation.navigate('RulesScreen'), label: 'Rules of Clocked Golf' },
+          { icon: 'notifications-outline', onPress: () => navigation.navigate('Notifications'), label: 'Notifications' },
+          { icon: 'search-outline', onPress: () => navigation.navigate('SearchUsers'), label: 'Search' },
+        ]}
+      />
 
 
       <FlatList
@@ -654,11 +646,11 @@ export default function FeedScreen({ navigation }) {
           />
         )}
         ItemSeparatorComponent={() => <View style={s.divider} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C9A84C" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLOR.gold} />}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.3}
         ListEmptyComponent={
-          loading ? <ActivityIndicator color="#C9A84C" style={{ marginTop: 40 }} />
+          loading ? <ActivityIndicator color={COLOR.gold} style={{ marginTop: 40 }} />
           : <View style={s.emptyState}>
               <Text style={s.emptyText}>No activity yet.</Text>
               <Text style={s.emptyHint}>Follow players or play a round to fill your feed.</Text>
@@ -668,7 +660,7 @@ export default function FeedScreen({ navigation }) {
               </TouchableOpacity>
             </View>
         }
-        ListFooterComponent={loadingMore ? <ActivityIndicator color="#C9A84C" style={{ paddingVertical: 20 }} /> : null}
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={COLOR.gold} style={{ paddingVertical: 20 }} /> : null}
         contentContainerStyle={{ paddingBottom: 20 + bannerInset, flexGrow: 1 }}
       />
 
@@ -688,106 +680,99 @@ export default function FeedScreen({ navigation }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#090F0A' },
+  container:   { flex: 1, backgroundColor: COLOR.bg },
 
   // Header — compact
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  wordmark:    { fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 5 },
-  tagline:     { fontSize: 8, color: '#C9A84C88', letterSpacing: 1.5, marginTop: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  logoMark:    { width: 30, height: 20, tintColor: '#C9A84C' },
-  headerIcon:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  wordmark:    { fontSize: 13, fontWeight: '700', color: COLOR.gold, letterSpacing: 5 },
 
   // Plus menu
-  plusMenu:     { flexDirection: 'row', justifyContent: 'flex-end', gap: 16, paddingHorizontal: 20, paddingBottom: 8 },
-  plusMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  plusMenuText: { fontSize: 11, color: '#7A6E58', fontWeight: '600' },
 
   // Resume banner
-  resumeBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 4, marginBottom: 4, backgroundColor: '#7DC87A0D', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#7DC87A22' },
-  resumeDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: '#7DC87A' },
-  resumeText:   { flex: 1, fontSize: 12, color: '#7DC87A', fontWeight: '600' },
+  resumeBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 4, marginBottom: 4, backgroundColor: '#7DC87A0D', borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#7DC87A22' },
+  resumeDot:    { width: 6, height: 6, borderRadius: RADIUS.xs, backgroundColor: COLOR.green },
+  resumeText:   { flex: 1, fontSize: 12, color: COLOR.green, fontWeight: '600' },
 
   // Tournament promo
-  tourneyBanner:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 8, marginBottom: 4, backgroundColor: 'rgba(125,200,122,0.08)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#7DC87A33' },
-  tourneyBannerEyebrow: { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5, marginBottom: 3 },
-  tourneyBannerTitle:   { fontSize: 13, fontWeight: '600', color: '#F5EDD8' },
+  tourneyBanner:        { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 8, marginBottom: 4, backgroundColor: 'rgba(125,200,122,0.08)', borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: '#7DC87A33' },
+  tourneyBannerEyebrow: { fontSize: 9, fontWeight: '700', color: COLOR.green, letterSpacing: 1.5, marginBottom: 3 },
+  tourneyBannerTitle:   { fontSize: 13, fontWeight: '600', color: COLOR.cream },
 
   // Tabs
   tabRow:      { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#7DC87A18' },
   tab:         { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  tabActive:   { borderBottomWidth: 2, borderBottomColor: '#C9A84C' },
-  tabText:     { fontSize: 10, fontWeight: '700', color: '#7A6E58', letterSpacing: 2 },
-  tabTextActive: { color: '#C9A84C' },
+  tabActive:   { borderBottomWidth: 2, borderBottomColor: COLOR.gold },
+  tabText:     { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 2 },
+  tabTextActive: { color: COLOR.gold },
 
   // Feed card — a telemetry tile, not a social post: flat surface, a colored
   // left edge keyed to what happened, no gradients.
   feedCard:      {
     marginHorizontal: 12, marginTop: 10, paddingHorizontal: 14, paddingVertical: 14,
-    backgroundColor: 'rgba(255,255,255,0.015)', borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.015)', borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: 'rgba(125,200,122,0.08)', borderLeftWidth: 3,
   },
   feedCardLive:  { backgroundColor: 'rgba(125,200,122,0.05)', borderColor: 'rgba(125,200,122,0.18)' },
   avatarLiveDot: {
     position: 'absolute', bottom: -2, right: -2, width: 13, height: 13, borderRadius: 6.5,
-    backgroundColor: '#090F0A', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLOR.bg, alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(125,200,122,0.5)',
   },
-  handle:        { fontSize: 13, fontWeight: '700', color: '#F5EDD8' },
+  handle:        { fontSize: 13, fontWeight: '700', color: COLOR.cream },
   timestamp:     { fontSize: 9, color: 'rgba(184,168,130,0.5)' },
-  actionLabel:   { fontSize: 12, color: '#B8A882', marginTop: 1, marginBottom: 6 },
-  postText:      { fontSize: 14, color: '#F5EDD8', lineHeight: 20, marginTop: 4, marginBottom: 6 },
+  actionLabel:   { fontSize: 12, color: COLOR.muted, marginTop: 1, marginBottom: 6 },
+  postText:      { fontSize: 14, color: COLOR.cream, lineHeight: 20, marginTop: 4, marginBottom: 6 },
   divider:       { height: 2 },
 
   // Round card — the inner readout panel
-  roundCard:      { marginTop: 6, backgroundColor: '#0D1A0F', borderRadius: 12, padding: 11, borderWidth: 1, borderColor: '#7DC87A14' },
+  roundCard:      { marginTop: 6, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, padding: 11, borderWidth: 1, borderColor: '#7DC87A14' },
   roundCardClocked: { borderColor: '#C9A84C44' },
-  roundCourse:    { fontSize: 13, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
-  roundDetails:   { fontSize: 10, color: '#B8A882' },
+  roundCourse:    { fontSize: 13, fontWeight: '600', color: COLOR.cream, marginBottom: 2 },
+  roundDetails:   { fontSize: 10, color: COLOR.muted },
   clockResult:    { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
-  clockTag:       { fontSize: 10, color: '#C9A84C', fontWeight: '700', letterSpacing: 1.5 },
+  clockTag:       { fontSize: 10, color: COLOR.gold, fontWeight: '700', letterSpacing: 1.5 },
 
   // Score badge — hero number treatment for a great round
-  scoreBadge:     { borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center', minWidth: 48, minHeight: 52, justifyContent: 'center' },
+  scoreBadge:     { borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 5, alignItems: 'center', minWidth: 48, minHeight: 52, justifyContent: 'center' },
   scoreBadgeHero: { paddingHorizontal: 13, paddingVertical: 7, borderWidth: 1.5 },
   scoreBadgeNum:  { fontWeight: '200', fontVariant: ['tabular-nums'], letterSpacing: -0.5 },
-  scoreBadgeLabel:{ fontSize: 7, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginTop: 1 },
+  scoreBadgeLabel:{ fontSize: 7, fontWeight: '700', color: COLOR.dim, letterSpacing: 1, marginTop: 1 },
 
   // Live banner
-  liveBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#7DC87A0D', borderRadius: 8, padding: 8, marginTop: 6, borderWidth: 1, borderColor: '#7DC87A22' },
-  liveLabel:     { fontSize: 12, color: '#F5EDD8', fontWeight: '600', flex: 1 },
-  liveTag:       { backgroundColor: 'rgba(125,200,122,0.15)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  liveTagText:   { fontSize: 8, fontWeight: '800', color: '#7DC87A', letterSpacing: 1.5 },
+  liveBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#7DC87A0D', borderRadius: RADIUS.sm, padding: 8, marginTop: 6, borderWidth: 1, borderColor: '#7DC87A22' },
+  liveLabel:     { fontSize: 12, color: COLOR.cream, fontWeight: '600', flex: 1 },
+  liveTag:       { backgroundColor: 'rgba(125,200,122,0.15)', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2 },
+  liveTagText:   { fontSize: 8, fontWeight: '800', color: COLOR.green, letterSpacing: 1.5 },
 
   // Milestone — a badge, not a text block
   milestoneCard:   {
-    marginTop: 6, backgroundColor: '#C9A84C14', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: 16, padding: 14,
+    marginTop: 6, backgroundColor: '#C9A84C14', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: RADIUS.lg, padding: 14,
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    shadowColor: '#C9A84C', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 3,
+    shadowColor: COLOR.gold, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 3,
   },
   milestoneBadgeRing: {
     width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: '#C9A84C77',
     alignItems: 'center', justifyContent: 'center',
   },
   milestoneBadgeCore: {
-    width: 38, height: 38, borderRadius: 19, backgroundColor: '#C9A84C',
+    width: 38, height: 38, borderRadius: 19, backgroundColor: COLOR.gold,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#F0CB5B', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 6, elevation: 2,
+    shadowColor: COLOR.goldBright, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 6, elevation: 2,
   },
-  milestoneEyebrow: { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 2, textTransform: 'uppercase' },
-  milestoneTitle:  { fontSize: 15, fontWeight: '800', color: '#F5EDD8', marginBottom: 2 },
-  milestoneBody:   { fontSize: 12, color: '#B8A882', lineHeight: 17 },
+  milestoneEyebrow: { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 2, marginBottom: 2, textTransform: 'uppercase' },
+  milestoneTitle:  { fontSize: 15, fontWeight: '800', color: COLOR.cream, marginBottom: 2 },
+  milestoneBody:   { fontSize: 12, color: COLOR.muted, lineHeight: 17 },
 
   // Actions
   actionBar:     { flexDirection: 'row', gap: 16, marginTop: 8 },
   actionBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 40, minHeight: 36, justifyContent: 'center' },
-  actionCount:   { fontSize: 12, color: '#7A6E58' },
+  actionCount:   { fontSize: 12, color: COLOR.dim },
 
   // States
   emptyState:      { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  emptyText:       { fontSize: 15, color: '#7A6E58', fontWeight: '500', marginBottom: 6 },
+  emptyText:       { fontSize: 15, color: COLOR.dim, fontWeight: '500', marginBottom: 6 },
   emptyHint:       { fontSize: 12, color: '#7A6E5888', textAlign: 'center', lineHeight: 18 },
-  emptyFollowHint: { fontSize: 13, color: '#7A6E58', textAlign: 'center', marginTop: 8, marginBottom: 20 },
-  emptyFollowBtn:  { backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
-  emptyFollowBtnText: { fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 1 },
+  emptyFollowHint: { fontSize: 13, color: COLOR.dim, textAlign: 'center', marginTop: 8, marginBottom: 20 },
+  emptyFollowBtn:  { backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C55', borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: 24 },
+  emptyFollowBtnText: { fontSize: 13, fontWeight: '700', color: COLOR.gold, letterSpacing: 1 },
 });

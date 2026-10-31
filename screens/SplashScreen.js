@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Image, Animated, StyleSheet } from 'react-native';
+import { COLOR } from '../lib/theme';
 
 export default function SplashScreen({ onFinish }) {
   const logoOpacity    = useRef(new Animated.Value(0)).current;
@@ -35,11 +36,12 @@ export default function SplashScreen({ onFinish }) {
     <Animated.View style={[s.container, { opacity: screenOpacity }]}>
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], alignItems: 'center' }}>
         <Image
-          source={require('../assets/PlayThru_AppIcon.png')}
+          source={require('../assets/PlayThru_Logo.png')}
           style={s.logo}
           resizeMode="contain"
+          accessibilityIgnoresInvertColors
         />
-        <Text style={s.wordmark}>Clocked</Text>
+        <Text style={s.wordmark}>CLOCKED</Text>
         <View style={s.divider} />
         <Animated.Text style={[s.tagline, { opacity: taglineOpacity }]}>
           THE WAY TO PLAY GOLF FOR ATHLETES.
@@ -52,21 +54,22 @@ export default function SplashScreen({ onFinish }) {
 const s = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#090F0A',
+    backgroundColor: COLOR.bg,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
   },
   logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 24,
+    width: 150,
+    height: 100,
+    marginBottom: 20,
+    tintColor: COLOR.gold,
   },
   wordmark: {
-    fontSize: 38,
-    fontWeight: '400',
-    color: '#F0CB5B',
-    letterSpacing: 8,
+    fontFamily: 'Montserrat_800ExtraBold',
+    fontSize: 34,
+    color: COLOR.goldBright,
+    letterSpacing: 10,
     marginBottom: 20,
   },
   divider: {
@@ -78,7 +81,7 @@ const s = StyleSheet.create({
   tagline: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#C9A84C',
+    color: COLOR.gold,
     letterSpacing: 3,
   },
 });

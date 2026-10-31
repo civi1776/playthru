@@ -46,7 +46,7 @@ export default function ArcadeHUD({ holeNumber, par, strokes, points, timePar, e
             <Text style={[st.clockDigits, { color }]}>{over ? `+${formatSeconds(-remaining)}` : formatSeconds(Math.max(0, remaining))}</Text>
           </CountdownRing>
         </Animated.View>
-        <Text style={st.clockLabel}>{clockLive ? (over ? 'OVER' : `TP ${formatSeconds(timePar)}`) : 'CLOCK ARMED'}</Text>
+        <Text style={st.clockLabel}>{clockLive ? (over ? 'OVER' : `PAR ${formatSeconds(timePar)}`) : 'CLOCK ARMED'}</Text>
       </View>
     </View>
   );

@@ -26,7 +26,7 @@ import {
   startActivity, updateActivity, endActivity,
   getPendingHoleCompletion, clearPendingHoleCompletion,
 } from '../modules/clocked-activity/src';
-import { COLOR, TYPE, MOTION, ringZone, ringColorForZone } from '../lib/theme';
+import { COLOR, TYPE, MOTION, ringZone, ringColorForZone, RADIUS } from '../lib/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -95,7 +95,7 @@ function GhostTick({ progress, size, radius }) {
       pointerEvents="none"
       style={{
         position: 'absolute', left: cx - 4, top: cy - 4,
-        width: 8, height: 8, borderRadius: 4,
+        width: 8, height: 8, borderRadius: RADIUS.xs,
         backgroundColor: DIM, borderWidth: 1.5, borderColor: CREAM,
       }}
     />
@@ -944,6 +944,14 @@ export default function ClockedRoundScreen({ navigation, route }) {
         </View>
       </View>
 
+      {/* ── Round context chips: course · format · transport · difficulty ── */}
+      <View style={st.chipRow}>
+        {!!course?.name && <Text style={[st.chip, st.chipCourse]} numberOfLines={1}>{course.name}</Text>}
+        <Text style={st.chip}>{formatBadge(playerCount)}</Text>
+        <Text style={st.chip}>{String(transport ?? '').toUpperCase()}</Text>
+        <Text style={st.chip}>{String(difficulty ?? '').toUpperCase()}</Text>
+      </View>
+
       {/* ── Scorecard overlay ── */}
       {showScorecard ? (
         <ScrollView style={st.scorecardWrap} contentContainerStyle={st.scorecardContent}>
@@ -1179,7 +1187,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
                 value={editTimeStr}
                 onChangeText={setEditTimeStr}
                 placeholder="m:ss"
-                placeholderTextColor="#7A6E58"
+                placeholderTextColor={COLOR.dim}
                 keyboardType="numbers-and-punctuation"
                 maxLength={5}
                 autoFocus
@@ -1195,10 +1203,10 @@ export default function ClockedRoundScreen({ navigation, route }) {
                 }
                 setEditingTime(false);
               }} activeOpacity={0.7}>
-                <Ionicons name="checkmark" size={18} color="#7DC87A" />
+                <Ionicons name="checkmark" size={18} color={COLOR.green} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setEditingTime(false)} activeOpacity={0.7}>
-                <Ionicons name="close" size={18} color="#7A6E58" />
+                <Ionicons name="close" size={18} color={COLOR.dim} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -1238,11 +1246,6 @@ export default function ClockedRoundScreen({ navigation, route }) {
         </ScrollView>
       )}
 
-      {/* ── Bottom info bar ── */}
-      <View style={st.bottomBar}>
-        <Text style={st.bottomText}>{course?.name ?? ''}</Text>
-        <Text style={st.bottomText}>{formatBadge(playerCount)}</Text>
-      </View>
 
       {/* ── Edit Past Hole Modal ── */}
       <EditHoleModal
@@ -1317,12 +1320,12 @@ function HolePickerModal({ visible, holeCount, currentHole, holeDataState, defau
 // ─── Hole Picker Modal Styles ─────────────────────────────────────────────────
 const hp = StyleSheet.create({
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
-  card:      { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: GOLD + '33', padding: 20, width: 320, maxHeight: 440 },
+  card:      { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: GOLD + '33', padding: 20, width: 320, maxHeight: 440 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title:     { fontSize: 12, fontWeight: '700', color: GOLD, letterSpacing: 3 },
   closeBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   grid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 4 },
-  tile:      { width: 66, height: 64, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
+  tile:      { width: 66, height: 64, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
   tileCurrent: { backgroundColor: '#1E4825', borderColor: GOLD, borderWidth: 2 },
   tileNum:   { fontSize: 18, fontWeight: '700', color: CREAM, fontVariant: ['tabular-nums'] },
   tileNumCurrent: { color: GOLD },
@@ -1405,23 +1408,23 @@ function EditHoleModal({ visible, holeResult, holeNumber, playerDefs, onSave, on
 // ─── Edit Modal Styles ───────────────────────────────────────────────────────
 const em = StyleSheet.create({
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center' },
-  card:      { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: GOLD + '33', padding: 20, width: 320 },
+  card:      { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: GOLD + '33', padding: 20, width: 320 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title:     { fontSize: 12, fontWeight: '700', color: GOLD, letterSpacing: 3 },
   closeBtn:  { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   label:     { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 2, marginBottom: 6, marginTop: 12 },
   pillRow:   { flexDirection: 'row', gap: 8 },
-  pill:      { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, alignItems: 'center' },
+  pill:      { flex: 1, paddingVertical: 10, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, alignItems: 'center' },
   pillOn:    { backgroundColor: '#1E4825', borderColor: GOLD },
   pillTxt:   { fontSize: 15, fontWeight: '600', color: DIM },
   pillTxtOn: { color: GOLD },
   strokeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
   strokeName:{ fontSize: 13, color: CREAM, flex: 1 },
-  strokeAdj: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#1A2E1C', borderWidth: 1, borderColor: GOLD + '44', alignItems: 'center', justifyContent: 'center' },
+  strokeAdj: { width: 34, height: 34, borderRadius: 17, backgroundColor: COLOR.surfaceAlt, borderWidth: 1, borderColor: GOLD + '44', alignItems: 'center', justifyContent: 'center' },
   strokeAdjTxt: { fontSize: 18, color: GOLD, fontWeight: '300' },
   strokeVal: { fontSize: 20, fontWeight: '300', color: CREAM, minWidth: 28, textAlign: 'center', fontVariant: ['tabular-nums'] },
-  timeInput: { backgroundColor: BG, borderWidth: 1, borderColor: GOLD + '33', borderRadius: 10, padding: 10, color: CREAM, fontSize: 16, textAlign: 'center', fontVariant: ['tabular-nums'] },
-  saveBtn:   { backgroundColor: GOLD, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
+  timeInput: { backgroundColor: BG, borderWidth: 1, borderColor: GOLD + '33', borderRadius: RADIUS.sm, padding: 10, color: CREAM, fontSize: 16, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  saveBtn:   { backgroundColor: GOLD, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
   saveBtnTxt:{ fontSize: 12, fontWeight: '700', color: BG, letterSpacing: 2 },
 });
 
@@ -1446,7 +1449,7 @@ const st = StyleSheet.create({
   clockDigits:   { fontSize: 56, fontWeight: '200', fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 60 },
   overLabel:     { fontSize: 11, fontWeight: '700', color: RED_WARN, letterSpacing: 3, marginTop: 2 },
   clockTimePar:  { fontSize: 11, fontWeight: '700', color: DIM, letterSpacing: 2.5, marginTop: 10 },
-  ghostPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10, borderWidth: 1, borderColor: BORDER, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  ghostPill:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 5 },
   ghostPillText: { fontSize: 9, fontWeight: '700', letterSpacing: 1.2 },
   // Holed-out verdict beat (ring center, ~MOTION.verdictHold)
   verdictCenter:   { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
@@ -1454,9 +1457,9 @@ const st = StyleSheet.create({
   verdictDeltaRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 4 },
   verdictBy:       { fontSize: 18, fontWeight: '300', letterSpacing: 0.5, opacity: 0.85 },
   verdictDelta:    { ...TYPE.heroNumber, fontSize: 56, lineHeight: 60 },
-  certifiedPill: { borderWidth: 1, borderColor: '#C9A84C', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginTop: 4 },
-  certifiedText: { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
-  penaltyBadge:  { marginTop: 8, backgroundColor: 'rgba(232,93,74,0.12)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(232,93,74,0.3)' },
+  certifiedPill: { borderWidth: 1, borderColor: COLOR.gold, borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2, marginTop: 4 },
+  certifiedText: { fontSize: 8, fontWeight: '700', color: COLOR.gold, letterSpacing: 1.5 },
+  penaltyBadge:  { marginTop: 8, backgroundColor: 'rgba(232,93,74,0.12)', borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: 'rgba(232,93,74,0.3)' },
   penaltyText:   { fontSize: 14, fontWeight: '700', color: RED_WARN, fontVariant: ['tabular-nums'] },
 
   // Holed Out button
@@ -1470,18 +1473,18 @@ const st = StyleSheet.create({
   parSelectorWrap:  { paddingBottom: 12 },
   parSelectorLabel: { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 2, marginBottom: 8 },
   parSelectorRow:   { flexDirection: 'row', gap: 8 },
-  parPill:          { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, alignItems: 'center' },
+  parPill:          { flex: 1, paddingVertical: 10, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, alignItems: 'center' },
   parPillOn:        { backgroundColor: '#1E4825', borderColor: GOLD, borderWidth: 2 },
   parPillTxt:       { fontSize: 15, fontWeight: '600', color: DIM },
   parPillTxtOn:     { color: GOLD },
 
   // Stroke entry
   strokeSection:    { gap: 10, marginBottom: 12 },
-  playerStrokeRow:  { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, paddingVertical: 12, paddingHorizontal: 14, gap: 10 },
+  playerStrokeRow:  { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingVertical: 12, paddingHorizontal: 14, gap: 10 },
   playerInfo:       { width: 72 },
   playerName:       { fontSize: 13, fontWeight: '600', color: CREAM },
   strokeControls:   { flexDirection: 'row', alignItems: 'center', flex: 1, justifyContent: 'center', gap: 12 },
-  adjBtn:           { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A2E1C', borderWidth: 1, borderColor: GOLD + '44', alignItems: 'center', justifyContent: 'center' },
+  adjBtn:           { width: 44, height: 44, borderRadius: 22, backgroundColor: COLOR.surfaceAlt, borderWidth: 1, borderColor: GOLD + '44', alignItems: 'center', justifyContent: 'center' },
   adjBtnDisabled:   { opacity: 0.3 },
   adjBtnText:       { fontSize: 22, color: GOLD, fontWeight: '300' },
   strokeDisplay:    { alignItems: 'center', minWidth: 36 },
@@ -1500,13 +1503,15 @@ const st = StyleSheet.create({
   settledRow:       { flexDirection: 'row', alignItems: 'center' },
   settledValue:     { ...TYPE.statNumber, fontSize: 20, fontWeight: '600', letterSpacing: 1 },
   settledDot:       { color: DIM, fontWeight: '400' },
-  frozenTimeInput:  { fontSize: 14, fontWeight: '600', color: CREAM, fontVariant: ['tabular-nums'], backgroundColor: BG, borderWidth: 1, borderColor: GOLD + '44', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, minWidth: 50, textAlign: 'center' },
+  frozenTimeInput:  { fontSize: 14, fontWeight: '600', color: CREAM, fontVariant: ['tabular-nums'], backgroundColor: BG, borderWidth: 1, borderColor: GOLD + '44', borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 4, minWidth: 50, textAlign: 'center' },
 
   // Next hole
-  nextHoleBtn:   { backgroundColor: GOLD, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
+  nextHoleBtn:   { backgroundColor: GOLD, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   nextHoleText:  { fontSize: 13, fontWeight: '700', color: BG, letterSpacing: 2 },
 
-  bottomBar:     { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: BORDER },
+  chipRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingBottom: 6, justifyContent: 'center' },
+  chip:          { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, color: MUTED, borderWidth: 1, borderColor: BORDER, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, overflow: 'hidden' },
+  chipCourse:    { color: CREAM, maxWidth: 180 },
   bottomText:    { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 1.5 },
 
   // Scorecard
@@ -1527,6 +1532,6 @@ const st = StyleSheet.create({
   scTotalText:      { fontSize: 12, fontWeight: '700' },
   scDimText:        { color: DIM },
   scRowCurrent:     { backgroundColor: '#C9A84C0F' },
-  abandonBtn:       { marginTop: 24, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E85D4A44', borderRadius: 12 },
+  abandonBtn:       { marginTop: 24, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E85D4A44', borderRadius: RADIUS.md },
   abandonBtnText:   { color: RED_WARN, fontSize: 13, fontWeight: '600', letterSpacing: 1 },
 });

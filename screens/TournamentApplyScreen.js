@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { COLOR, SPACING, RADIUS } from '../lib/theme';
+import ScreenHeader from '../components/ScreenHeader';
 
 function Field({ label, children, note }) {
   return (
@@ -106,10 +107,7 @@ export default function TournamentApplyScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-        <Ionicons name="chevron-back" size={20} color={COLOR.gold} />
-        <Text style={s.backText}>BACK</Text>
-      </TouchableOpacity>
+      <ScreenHeader title="REQUEST AN INVITATION" onBack={() => navigation.goBack()} borderless />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -126,7 +124,7 @@ export default function TournamentApplyScreen({ navigation }) {
             <TextInput style={s.input} value={email} onChangeText={setEmail} placeholder="your@email.com" placeholderTextColor="#3A5C3C" autoCapitalize="none" keyboardType="email-address" />
           </Field>
 
-          <Text style={s.groupHeader}>PLAYER 1 — YOU</Text>
+          <Text style={s.groupHeader}>PLAYER 1 · YOU</Text>
           <Field label="FULL NAME">
             <TextInput style={s.input} value={p1Name} onChangeText={setP1Name} placeholder="Full name" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
           </Field>
@@ -134,13 +132,13 @@ export default function TournamentApplyScreen({ navigation }) {
             <TextInput style={s.input} value={p1Handicap} onChangeText={setP1Handicap} placeholder="e.g. 4.2" placeholderTextColor="#3A5C3C" keyboardType="numbers-and-punctuation" />
           </Field>
           <Field label="SPORT YOU PLAYED" note="Any sport, any level. High school, college, club, rec league, or pro.">
-            <TextInput style={s.input} value={p1Sport} onChangeText={setP1Sport} placeholder="Lacrosse — college" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
+            <TextInput style={s.input} value={p1Sport} onChangeText={setP1Sport} placeholder="Lacrosse, college" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
           </Field>
           <Field label="INSTAGRAM (OPTIONAL)">
             <TextInput style={s.input} value={p1Instagram} onChangeText={setP1Instagram} placeholder="@handle" placeholderTextColor="#3A5C3C" autoCapitalize="none" />
           </Field>
 
-          <Text style={s.groupHeader}>PLAYER 2 — YOUR PARTNER</Text>
+          <Text style={s.groupHeader}>PLAYER 2 · YOUR PARTNER</Text>
           <Field label="FULL NAME">
             <TextInput style={s.input} value={p2Name} onChangeText={setP2Name} placeholder="Full name" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
           </Field>
@@ -148,7 +146,7 @@ export default function TournamentApplyScreen({ navigation }) {
             <TextInput style={s.input} value={p2Handicap} onChangeText={setP2Handicap} placeholder="e.g. 8.7" placeholderTextColor="#3A5C3C" keyboardType="numbers-and-punctuation" />
           </Field>
           <Field label="SPORT THEY PLAYED" note="Any sport, any level.">
-            <TextInput style={s.input} value={p2Sport} onChangeText={setP2Sport} placeholder="Soccer — high school" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
+            <TextInput style={s.input} value={p2Sport} onChangeText={setP2Sport} placeholder="Soccer, high school" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
           </Field>
           <Field label="INSTAGRAM (OPTIONAL)">
             <TextInput style={s.input} value={p2Instagram} onChangeText={setP2Instagram} placeholder="@handle" placeholderTextColor="#3A5C3C" autoCapitalize="none" />
@@ -191,8 +189,6 @@ export default function TournamentApplyScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: COLOR.bg },
-  backBtn:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, gap: SPACING.xs },
-  backText:     { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
   scroll:       { paddingHorizontal: SPACING.lg, paddingBottom: 60 },
 
   eyebrow:      { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 3, marginBottom: 10 },

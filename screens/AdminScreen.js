@@ -10,7 +10,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { COLOR } from '../lib/theme';
+import { COLOR, RADIUS } from '../lib/theme';
+import ScreenHeader from '../components/ScreenHeader';
 
 const { bg: BG, surface: CARD, gold: GOLD, cream: CREAM, muted: MUTED, dim: DIM, green: GREEN, red: RED_WARN, border: BORDER } = COLOR;
 
@@ -103,13 +104,7 @@ export default function AdminScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn}>
-          <Ionicons name="chevron-back" size={22} color={GOLD} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>ADMIN</Text>
-        <View style={s.headerBtn} />
-      </View>
+      <ScreenHeader title="REVIEW QUEUE" onBack={() => navigation.goBack()} borderless />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll} contentContainerStyle={s.tabBar}>
         {TABS.map(t => (
@@ -250,23 +245,20 @@ const s = StyleSheet.create({
   container:   { flex: 1, backgroundColor: BG },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   deniedText:  { fontSize: 13, color: DIM, fontWeight: '600' },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 10 },
-  headerBtn:   { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 12, fontWeight: '700', color: GOLD, letterSpacing: 4 },
 
   tabScroll:   { flexGrow: 0, marginBottom: 8 },
   tabBar:      { flexDirection: 'row', paddingHorizontal: 16, gap: 8 },
-  tab:         { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  tab:         { paddingVertical: 10, paddingHorizontal: 14, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   tabActive:   { backgroundColor: '#1E4825', borderColor: GOLD },
   tabText:     { fontSize: 10, fontWeight: '700', color: DIM, letterSpacing: 1 },
   tabTextActive: { color: GOLD },
 
   emptyText:   { textAlign: 'center', color: DIM, fontSize: 13, marginTop: 40 },
 
-  card:        { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 12 },
+  card:        { backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 12 },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 },
   cardTitle:   { flex: 1, fontSize: 14, fontWeight: '700', color: CREAM },
-  statusPill:  { borderWidth: 1, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  statusPill:  { borderWidth: 1, borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 3 },
   statusPillText: { fontSize: 8, fontWeight: '700', letterSpacing: 1 },
   cardLine:    { fontSize: 12, color: MUTED, fontWeight: '600', marginBottom: 2 },
   cardMeta:    { fontSize: 11, color: DIM, marginBottom: 6 },
@@ -274,6 +266,6 @@ const s = StyleSheet.create({
   cardDate:    { fontSize: 9, color: DIM, letterSpacing: 1 },
 
   actionsRow:  { flexDirection: 'row', gap: 8, marginTop: 12 },
-  actionBtn:   { flex: 1, borderWidth: 1, borderRadius: 8, paddingVertical: 9, alignItems: 'center', justifyContent: 'center', minHeight: 32 },
+  actionBtn:   { flex: 1, borderWidth: 1, borderRadius: RADIUS.sm, paddingVertical: 9, alignItems: 'center', justifyContent: 'center', minHeight: 32 },
   actionBtnText: { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
 });

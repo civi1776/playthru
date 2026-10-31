@@ -12,7 +12,8 @@ import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { CLOCKED_LAST_TRANSPORT_KEY } from '../lib/clockedRoundConstants';
-import { COLOR } from '../lib/theme';
+import { COLOR, RADIUS } from '../lib/theme';
+import ScreenHeader from '../components/ScreenHeader';
 
 const DIFFS = [
   { key: 'beginner',     label: 'BEGINNER', color: COLOR.green },
@@ -85,13 +86,7 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn} activeOpacity={0.7} accessibilityLabel="Back">
-          <Ionicons name="chevron-back" size={22} color={COLOR.gold} />
-        </TouchableOpacity>
-        <Text style={s.title}>SETTINGS</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <ScreenHeader title="SETTINGS" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={s.body} showsVerticalScrollIndicator={false}>
         <Text style={s.sectionLabel}>ACCOUNT</Text>
@@ -185,12 +180,10 @@ function Row({ icon, label, sub, onPress, chevron, external }) {
 
 const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: COLOR.bg },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLOR.border },
-  backBtn:      { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   title:        { fontSize: 12, fontWeight: '700', color: COLOR.gold, letterSpacing: 3 },
   body:         { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 48 },
   sectionLabel: { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginTop: 26, marginBottom: 10 },
-  card:         { backgroundColor: COLOR.surface, borderRadius: 14, borderWidth: 1, borderColor: COLOR.border, overflow: 'hidden' },
+  card:         { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, overflow: 'hidden' },
   row:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15 },
   rowIcon:      { marginRight: 14 },
   rowLabel:     { fontSize: 16, color: COLOR.cream },
@@ -200,12 +193,12 @@ const s = StyleSheet.create({
   prefBlock:    { paddingHorizontal: 16, paddingVertical: 14 },
   prefLabel:    { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 10 },
   segRow:       { flexDirection: 'row', gap: 8 },
-  seg:          { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: COLOR.border },
+  seg:          { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLOR.border },
   segOn:        { borderColor: COLOR.gold, backgroundColor: '#C9A84C14' },
-  segDot:       { width: 7, height: 7, borderRadius: 4 },
+  segDot:       { width: 7, height: 7, borderRadius: RADIUS.xs },
   segText:      { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 1 },
   segTextOn:    { color: COLOR.cream },
-  dangerCard:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A0F0F', borderRadius: 14, borderWidth: 1, borderColor: COLOR.red + '44', paddingHorizontal: 16, paddingVertical: 15 },
+  dangerCard:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A0F0F', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.red + '44', paddingHorizontal: 16, paddingVertical: 15 },
   dangerLabel:  { fontSize: 16, color: COLOR.red },
   dangerSub:    { fontSize: 12, color: COLOR.dim, marginTop: 2 },
 });

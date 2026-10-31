@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getCoursePhoto } from '../lib/googlePlaces';
+import { COLOR } from '../lib/theme';
 
 // Module-level session cache: "courseName|city" → url string.
 // Only successful lookups are cached — a null result usually just means
@@ -50,7 +51,7 @@ export default function CourseAvatar({ courseName, city, size = 40 }) {
     return (
       <Image
         source={{ uri: photoUrl }}
-        style={{ width: size, height: size, borderRadius: radius, backgroundColor: '#0D1A0F', marginRight: 10 }}
+        style={{ width: size, height: size, borderRadius: radius, backgroundColor: COLOR.surface, marginRight: 10 }}
         resizeMode="cover"
         accessibilityRole="image"
         accessibilityLabel={courseName ? `${courseName} course photo` : 'Course'}
@@ -63,7 +64,7 @@ export default function CourseAvatar({ courseName, city, size = 40 }) {
       width: size,
       height: size,
       borderRadius: radius,
-      backgroundColor: '#0D1A0F',
+      backgroundColor: COLOR.surface,
       borderWidth: 1,
       borderColor: '#7DC87A22',
       alignItems: 'center',

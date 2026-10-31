@@ -13,6 +13,8 @@ import { useAuth } from '../context/AuthContext';
 import { getReferralStats } from '../lib/referrals';
 import { supabase } from '../lib/supabase';
 import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import ScreenHeader from '../components/ScreenHeader';
+import { COLOR, RADIUS } from '../lib/theme';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -127,7 +129,7 @@ export default function ShareScreen({ navigation, route }) {
       await new Promise(r => setTimeout(r, 160));
       const base64 = await captureRef(statRef, { format: 'png', quality: 1, result: 'base64' });
       await Clipboard.setImageAsync(base64);
-      showToast('Sticker copied — paste onto any photo!');
+      showToast('Sticker copied. Paste it onto any photo.');
     } catch {
       Alert.alert('Sticker not copied', 'Try again, or save the card to Photos instead.');
     } finally {
@@ -170,13 +172,12 @@ export default function ShareScreen({ navigation, route }) {
   return (
     <SafeAreaView style={s.container}>
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={goHome} style={s.skipBtn}>
-          <Text style={s.skipText}>SKIP</Text>
-        </TouchableOpacity>
-        <Text style={s.title}>YOUR ROUND</Text>
-        <View style={{ width: 48 }} />
-      </View>
+      <ScreenHeader
+        title="YOUR ROUND"
+        onBack={goHome}
+        borderless
+        right={<TouchableOpacity onPress={goHome} style={s.skipBtn} accessibilityRole="button"><Text style={s.skipText}>SKIP</Text></TouchableOpacity>}
+      />
 
       {/* STAT / ROUND toggle */}
       <View style={s.toggleRow}>
@@ -223,20 +224,20 @@ export default function ShareScreen({ navigation, route }) {
       {!!referralCode && (
         <TouchableOpacity style={s.inviteCard} onPress={inviteFriend} activeOpacity={0.85}>
           <View style={s.inviteIconWrap}>
-            <Ionicons name="gift-outline" size={16} color="#C9A84C" />
+            <Ionicons name="gift-outline" size={16} color={COLOR.gold} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.inviteTitle}>Invite a friend to play</Text>
             <Text style={s.inviteSub}>Your code: {referralCode}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={16} color="#7A6E58" />
+          <Ionicons name="chevron-forward" size={16} color={COLOR.dim} />
         </TouchableOpacity>
       )}
 
       {/* Toast */}
       {!!toast && (
         <View style={s.toast}>
-          <Ionicons name="checkmark-circle" size={14} color="#7DC87A" style={{ marginRight: 6 }} />
+          <Ionicons name="checkmark-circle" size={14} color={COLOR.green} style={{ marginRight: 6 }} />
           <Text style={s.toastText}>{toast}</Text>
         </View>
       )}
@@ -245,15 +246,15 @@ export default function ShareScreen({ navigation, route }) {
       <View style={s.actions}>
         <View style={s.btnRow}>
           <TouchableOpacity style={[s.actionBtn, s.stickerBtn, saving && s.btnDisabled]} onPress={copySticker} disabled={saving} activeOpacity={0.8}>
-            <Ionicons name="copy-outline" size={18} color="#C9A84C" />
+            <Ionicons name="copy-outline" size={18} color={COLOR.gold} />
             <Text style={s.actionBtnTxt}>Copy{'\n'}Sticker</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.actionBtn, s.saveBtn, saving && s.btnDisabled]} onPress={saveToCameraRoll} disabled={saving} activeOpacity={0.8}>
-            <Ionicons name="download-outline" size={18} color="#090F0A" />
-            <Text style={[s.actionBtnTxt, { color: '#090F0A' }]}>Save to{'\n'}Photos</Text>
+            <Ionicons name="download-outline" size={18} color={COLOR.bg} />
+            <Text style={[s.actionBtnTxt, { color: COLOR.bg }]}>Save to{'\n'}Photos</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[s.actionBtn, s.shareBtn, saving && s.btnDisabled]} onPress={shareCard} disabled={saving} activeOpacity={0.8}>
-            <Ionicons name="share-outline" size={18} color="#C9A84C" />
+            <Ionicons name="share-outline" size={18} color={COLOR.gold} />
             <Text style={s.actionBtnTxt}>Share</Text>
           </TouchableOpacity>
         </View>
@@ -266,38 +267,37 @@ export default function ShareScreen({ navigation, route }) {
 }
 
 const s = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#090F0A' },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  container:    { flex: 1, backgroundColor: COLOR.bg },
   skipBtn:      { paddingVertical: 8, paddingHorizontal: 4 },
-  skipText:     { fontSize: 10, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
-  title:        { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 4 },
+  skipText:     { fontSize: 10, fontWeight: '700', color: COLOR.muted, letterSpacing: 2 },
+  title:        { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 4 },
 
   toggleRow:      { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 8 },
-  togglePill:     { paddingVertical: 6, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: '#C9A84C55' },
-  togglePillActive: { backgroundColor: '#C9A84C', borderColor: '#C9A84C' },
-  toggleText:     { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
-  toggleTextActive: { color: '#090F0A' },
+  togglePill:     { paddingVertical: 6, paddingHorizontal: 16, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#C9A84C55' },
+  togglePillActive: { backgroundColor: COLOR.gold, borderColor: COLOR.gold },
+  toggleText:     { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 1.5 },
+  toggleTextActive: { color: COLOR.bg },
 
   page:         { width: SW, alignItems: 'center', justifyContent: 'center', paddingVertical: 16 },
   dotsRow:      { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingTop: 10 },
-  dot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: '#C9A84C33' },
-  dotActive:    { backgroundColor: '#C9A84C', width: 18, borderRadius: 3 },
+  dot:          { width: 6, height: 6, borderRadius: RADIUS.xs, backgroundColor: '#C9A84C33' },
+  dotActive:    { backgroundColor: COLOR.gold, width: 18, borderRadius: RADIUS.xs },
 
-  toast:        { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A44', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
-  toastText:    { fontSize: 13, color: '#7DC87A', fontWeight: '500' },
+  toast:        { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A44', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, marginTop: 4 },
+  toastText:    { fontSize: 13, color: COLOR.green, fontWeight: '500' },
 
-  inviteCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#C9A84C33', borderRadius: 14, marginHorizontal: 20, marginTop: 10, paddingVertical: 12, paddingHorizontal: 14 },
-  inviteIconWrap:{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#C9A84C1A', alignItems: 'center', justifyContent: 'center' },
-  inviteTitle:   { fontSize: 13, fontWeight: '600', color: '#F5EDD8' },
-  inviteSub:     { fontSize: 11, color: '#B8A882', marginTop: 1 },
+  inviteCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#C9A84C33', borderRadius: RADIUS.md, marginHorizontal: 20, marginTop: 10, paddingVertical: 12, paddingHorizontal: 14 },
+  inviteIconWrap:{ width: 32, height: 32, borderRadius: RADIUS.lg, backgroundColor: '#C9A84C1A', alignItems: 'center', justifyContent: 'center' },
+  inviteTitle:   { fontSize: 13, fontWeight: '600', color: COLOR.cream },
+  inviteSub:     { fontSize: 11, color: COLOR.muted, marginTop: 1 },
 
   actions:      { paddingHorizontal: 20, paddingBottom: 24, paddingTop: 10, gap: 8 },
   btnRow:       { flexDirection: 'row', gap: 10 },
-  actionBtn:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 16, paddingVertical: 13 },
+  actionBtn:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: RADIUS.lg, paddingVertical: 13 },
   stickerBtn:   { borderWidth: 1, borderColor: '#C9A84C55', backgroundColor: 'transparent' },
-  saveBtn:      { backgroundColor: '#C9A84C' },
+  saveBtn:      { backgroundColor: COLOR.gold },
   shareBtn:     { borderWidth: 1, borderColor: '#C9A84C55', backgroundColor: 'transparent' },
-  actionBtnTxt: { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 1, textAlign: 'center' },
+  actionBtnTxt: { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 1, textAlign: 'center' },
   btnDisabled:  { opacity: 0.4 },
   laterBtn:     { alignItems: 'center', paddingVertical: 4 },
   laterText:    { fontSize: 13, color: '#B8A88266' },

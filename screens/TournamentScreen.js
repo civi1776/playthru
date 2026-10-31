@@ -5,6 +5,8 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLOR, SPACING, RADIUS } from '../lib/theme';
+import ScreenHeader from '../components/ScreenHeader';
+import Button from '../components/Button';
 
 const WHO_LIST = [
   'High school',
@@ -36,10 +38,7 @@ const TBA_ITEMS = [
 export default function TournamentScreen({ navigation }) {
   return (
     <SafeAreaView style={s.container}>
-      <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-        <Ionicons name="chevron-back" size={20} color={COLOR.gold} />
-        <Text style={s.backText}>BACK</Text>
-      </TouchableOpacity>
+      <ScreenHeader title="FIRST EVENT" onBack={() => navigation.goBack()} borderless />
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
@@ -170,13 +169,7 @@ export default function TournamentScreen({ navigation }) {
           <Text style={s.body}>
             Tell us what you played and why your team belongs in the field. We'll share details as they become available, and the first invitations go out from this list.
           </Text>
-          <TouchableOpacity
-            style={s.applyBtn}
-            onPress={() => navigation.navigate('TournamentApply')}
-            activeOpacity={0.85}
-          >
-            <Text style={s.applyBtnText}>REQUEST AN INVITATION {'\u2192'}</Text>
-          </TouchableOpacity>
+          <Button label="REQUEST AN INVITATION" icon="arrow-forward" size="lg" onPress={() => navigation.navigate('TournamentApply')} style={{ marginTop: 8 }} />
           <Text style={s.closing}>The game is yours. The clock is running.</Text>
         </View>
 
@@ -187,8 +180,6 @@ export default function TournamentScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container:    { flex: 1, backgroundColor: COLOR.bg },
-  backBtn:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, gap: SPACING.xs },
-  backText:     { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
   scroll:       { paddingHorizontal: SPACING.lg, paddingBottom: 60 },
 
   hero:             { paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: COLOR.border, marginBottom: 28 },
@@ -229,7 +220,5 @@ const s = StyleSheet.create({
   expItemLabel:     { fontSize: 9, color: COLOR.dim, letterSpacing: 1, textAlign: 'center', lineHeight: 14 },
 
   applySection:     { backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLOR.borderGold, padding: SPACING.xl, marginBottom: SPACING.lg },
-  applyBtn:         { borderWidth: 1, borderColor: COLOR.gold, borderRadius: RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center', marginTop: SPACING.lg, marginBottom: SPACING.lg },
-  applyBtnText:     { fontSize: 12, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
   closing:          { fontSize: 15, color: COLOR.cream, fontStyle: 'italic', textAlign: 'center', borderTopWidth: 1, borderTopColor: COLOR.border, paddingTop: SPACING.lg },
 });

@@ -28,12 +28,14 @@ import { sendLocalNotification, sendPushToUser } from '../lib/notifications';
 import SkeletonLoader from '../components/SkeletonLoader';
 import InitialsAvatar from '../components/InitialsAvatar';
 import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import ScreenHeader from '../components/ScreenHeader';
+import { COLOR, RADIUS } from '../lib/theme';
 
 function SearchSkeletons() {
   return (
     <>
       {[...Array(4)].map((_, i) => (
-        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10, gap: 12 }}>
+        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10, gap: 12 }}>
           <SkeletonLoader width={42} height={42} style={{ borderRadius: 21 }} />
           <View style={{ flex: 1, gap: 8 }}>
             <SkeletonLoader width="55%" height={14} />
@@ -41,7 +43,7 @@ function SearchSkeletons() {
           </View>
           <View style={{ alignItems: 'flex-end', gap: 6 }}>
             <SkeletonLoader width={36} height={28} />
-            <SkeletonLoader width={72} height={28} style={{ borderRadius: 8 }} />
+            <SkeletonLoader width={72} height={28} style={{ borderRadius: RADIUS.sm }} />
           </View>
         </View>
       ))}
@@ -51,10 +53,10 @@ function SearchSkeletons() {
 
 // Aggregate 0–100 Clocked Score color — matches LeaderboardScreen's clockedColor().
 function clockedColor(score) {
-  if (score == null) return '#7A6E58';
-  if (score >= 70) return '#7DC87A';
-  if (score >= 40) return '#C9A84C';
-  return '#B8A882';
+  if (score == null) return COLOR.dim;
+  if (score >= 70) return COLOR.green;
+  if (score >= 40) return COLOR.gold;
+  return COLOR.muted;
 }
 
 export default function SearchUsersScreen({ navigation }) {
@@ -165,13 +167,7 @@ export default function SearchUsersScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Text style={s.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={s.title}>FIND PLAYERS</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScreenHeader title="FIND PLAYERS" onBack={() => navigation.goBack()} borderless />
 
       <View style={s.searchWrap}>
         <TextInput
@@ -255,25 +251,22 @@ export default function SearchUsersScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#090F0A' },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  backBtn:         { width: 40, height: 40, justifyContent: 'center' },
-  backText:        { fontSize: 22, color: '#C9A84C' },
-  title:           { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 4 },
+  container:       { flex: 1, backgroundColor: COLOR.bg },
+  title:           { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 4 },
   searchWrap:      { paddingHorizontal: 16, paddingBottom: 12 },
-  searchInput:     { backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 14, padding: 14, color: '#F5EDD8', fontSize: 15 },
-  row:             { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10, gap: 12 },
+  searchInput:     { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.md, padding: 14, color: COLOR.cream, fontSize: 15 },
+  row:             { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10, gap: 12 },
   avatar:          { width: 42, height: 42, borderRadius: 21, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
-  avatarText:      { fontSize: 17, fontWeight: '600', color: '#C9A84C' },
+  avatarText:      { fontSize: 17, fontWeight: '600', color: COLOR.gold },
   info:            { flex: 1 },
-  name:            { fontSize: 15, fontWeight: '500', color: '#F5EDD8' },
-  handle:          { fontSize: 11, color: '#B8A882', marginTop: 2 },
+  name:            { fontSize: 15, fontWeight: '500', color: COLOR.cream },
+  handle:          { fontSize: 11, color: COLOR.muted, marginTop: 2 },
   right:           { alignItems: 'flex-end', gap: 6 },
   pop:             { fontSize: 22, fontWeight: '300' },
-  followBtn:       { backgroundColor: '#C9A84C', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 },
+  followBtn:       { backgroundColor: COLOR.gold, borderRadius: RADIUS.sm, paddingVertical: 6, paddingHorizontal: 12 },
   followingBtn:    { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#C9A84C44' },
-  followBtnText:   { fontSize: 9, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
-  followingBtnText:{ color: '#C9A84C' },
+  followBtnText:   { fontSize: 9, fontWeight: '700', color: COLOR.bg, letterSpacing: 1.5 },
+  followingBtnText:{ color: COLOR.gold },
   emptyState:      { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  emptyText:       { fontSize: 20, color: '#7A6E58', textAlign: 'center', lineHeight: 28 },
+  emptyText:       { fontSize: 20, color: COLOR.dim, textAlign: 'center', lineHeight: 28 },
 });

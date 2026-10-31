@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { computeFullRating, extractPlayerRoundStats, DEFAULT_PROVISIONAL_ROUNDS } from '../lib/clockedRating';
 import { COLOR, SPACING, RADIUS } from '../lib/theme';
+import ScreenHeader from '../components/ScreenHeader';
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 function LeaderboardSkeleton() {
@@ -17,9 +18,9 @@ function LeaderboardSkeleton() {
     <ScrollView contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
       <View style={{ paddingHorizontal: 16 }}>
         {[...Array(5)].map((_, i) => (
-          <View key={i} style={{ backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View key={i} style={{ backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <SkeletonLoader width={28} height={14} />
-            <SkeletonLoader width={36} height={36} style={{ borderRadius: 18 }} />
+            <SkeletonLoader width={36} height={36} style={{ borderRadius: RADIUS.lg }} />
             <View style={{ flex: 1, gap: 6 }}>
               <SkeletonLoader width="55%" height={14} />
               <SkeletonLoader width="40%" height={10} />
@@ -34,10 +35,10 @@ function LeaderboardSkeleton() {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function clockedColor(v) {
-  if (v == null) return '#7A6E58';
-  if (v >= 70) return '#7DC87A';
-  if (v >= 40) return '#C9A84C';
-  return '#B8A882';
+  if (v == null) return COLOR.dim;
+  if (v >= 70) return COLOR.green;
+  if (v >= 40) return COLOR.gold;
+  return COLOR.muted;
 }
 
 function formatAvgTime(minutes) {
@@ -104,11 +105,11 @@ function ClockedRow({ entry, navigation }) {
       activeOpacity={0.8}
     >
       <Text style={s.rowRank}>#{entry.rank}</Text>
-      <View style={[s.rowAvatar, isYou && { borderColor: '#C9A84C' }]}>
+      <View style={[s.rowAvatar, isYou && { borderColor: COLOR.gold }]}>
         <InitialsAvatar name={entry.name} size={34} avatarUrl={entry.avatarUrl} />
       </View>
       <View style={s.rowInfo}>
-        <Text style={[s.rowName, isYou && { color: '#C9A84C' }]} numberOfLines={1}>{entry.name}</Text>
+        <Text style={[s.rowName, isYou && { color: COLOR.gold }]} numberOfLines={1}>{entry.name}</Text>
         <View style={s.rowSubStats}>
           {entry.isLegacy ? (
             <Text style={s.rowSubStat}>Legacy{entry.roundsUsed != null ? ` · ${entry.roundsUsed} round${entry.roundsUsed === 1 ? '' : 's'}` : ''}</Text>
@@ -162,10 +163,10 @@ function TournamentEmptyState({ navigation }) {
       <Ionicons name="ribbon-outline" size={56} color="rgba(201,168,76,0.2)" style={{ marginBottom: 18 }} />
       <Text style={s.emptyTitle}>No tournaments completed yet.</Text>
       <Text style={s.emptyText}>
-        This is where tournament results will live once the first Clocked event is played. It's coming to South Florida — request an invitation and be among the first on the board.
+        This is where tournament results will live once the first Clocked event is played. It's coming to South Florida. Request an invitation and be among the first on the board.
       </Text>
       <TouchableOpacity style={s.ctaBtn} onPress={() => navigation.navigate('Tournament')} activeOpacity={0.85}>
-        <Ionicons name="trophy-outline" size={16} color="#090F0A" style={{ marginRight: 6 }} />
+        <Ionicons name="trophy-outline" size={16} color={COLOR.bg} style={{ marginRight: 6 }} />
         <Text style={s.ctaBtnText}>ABOUT THE FIRST EVENT</Text>
       </TouchableOpacity>
     </View>
@@ -238,10 +239,14 @@ export default function LeaderboardScreen({ navigation }) {
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
+  // Last rendered rows: a refetch on focus only shows the skeleton when there
+  // is nothing on screen yet, so tab switches stop flashing.
+  const dataRef = useRef([]);
+  dataRef.current = data;
 
   // ── Fetch player board (OVERALL) ──
   const fetchPlayerBoard = useCallback(async () => {
-    setLoading(true);
+    setLoading(prev => prev && dataRef.current.length === 0 ? true : dataRef.current.length === 0);
     setError(false);
     try {
       const { data: allClockedRounds, error: err } = await supabase
@@ -385,7 +390,7 @@ export default function LeaderboardScreen({ navigation }) {
   // current ClockedRoundScreen flow would otherwise never appear here no
   // matter how many rounds get logged.
   const fetchCourseBoard = useCallback(async () => {
-    setLoading(true);
+    setLoading(dataRef.current.length === 0);
     setError(false);
     setMyRank(null);
     setMyProjected(null);
@@ -447,7 +452,7 @@ export default function LeaderboardScreen({ navigation }) {
   // matches the table exactly: id, tournament_id, user_id, team_name,
   // division, placement, points, created_at.
   const fetchTournamentBoard = useCallback(async () => {
-    setLoading(true);
+    setLoading(dataRef.current.length === 0);
     setError(false);
     setMyRank(null);
     setMyProjected(null);
@@ -516,19 +521,11 @@ export default function LeaderboardScreen({ navigation }) {
   return (
     <SafeAreaView style={s.container}>
       {/* Header */}
-      <View style={s.header}>
-        {/* This screen is both the Ranks tab and a pushed stack route. Only
-            the pushed instance has somewhere to go back to. */}
-        {isTab ? (
-          <View style={{ width: 40 }} />
-        ) : (
-          <TouchableOpacity onPress={() => navigation.goBack()} style={{ width: 40, height: 40, justifyContent: 'center' }} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={20} color="#C9A84C" />
-          </TouchableOpacity>
-        )}
-        <Text style={s.wordmark}>RANKINGS</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      {/* This screen is both the Ranks tab and a pushed stack route. Only
+          the pushed instance has somewhere to go back to. */}
+      {isTab
+        ? <ScreenHeader title="RANKINGS" />
+        : <ScreenHeader title="RANKINGS" onBack={() => navigation.goBack()} borderless />}
 
       {/* Filters */}
       <View style={s.filterRow}>
@@ -559,7 +556,7 @@ export default function LeaderboardScreen({ navigation }) {
           <TextInput
             style={s.courseSearchInput}
             placeholder="Search courses..."
-            placeholderTextColor="#7A6E58"
+            placeholderTextColor={COLOR.dim}
             value={courseQuery}
             onChangeText={setCourseQuery}
             autoCapitalize="none"
@@ -603,7 +600,7 @@ export default function LeaderboardScreen({ navigation }) {
             if (root) root.navigate('ClockedSetup');
             else navigation.navigate('ClockedSetup');
           }} activeOpacity={0.85}>
-            <Ionicons name="timer-outline" size={16} color="#090F0A" style={{ marginRight: 6 }} />
+            <Ionicons name="timer-outline" size={16} color={COLOR.bg} style={{ marginRight: 6 }} />
             <Text style={s.ctaBtnText}>PLAY</Text>
           </TouchableOpacity>
         </View>
@@ -655,6 +652,7 @@ export default function LeaderboardScreen({ navigation }) {
 
           <View style={s.listSection}>
             <Text style={s.sectionLabel}>RANKINGS</Text>
+            <Text style={s.glossary}>CLK is the Clocked Score, 0 to 100. Legacy rows are pre-clock rounds.</Text>
             {data.map((entry, i) => (
               <ClockedRow key={entry.userId ?? i} entry={entry} navigation={navigation} />
             ))}
@@ -668,10 +666,9 @@ export default function LeaderboardScreen({ navigation }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   container:     { flex: 1, backgroundColor: COLOR.bg },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm, paddingBottom: SPACING.sm },
   // Same treatment as the Feed / Profile tab wordmarks — gold, tracked,
   // sans — so the tabs read as one app instead of one serif outlier.
-  wordmark:      { fontSize: 13, fontWeight: '700', color: COLOR.gold, letterSpacing: 5 },
+  glossary:      { fontSize: 11, color: COLOR.dim, marginTop: -4, marginBottom: 10, lineHeight: 15 },
 
   // Filters
   filterRow:       { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: 6, marginBottom: SPACING.sm },
@@ -697,14 +694,14 @@ const s = StyleSheet.create({
   podiumAvatar:  { borderWidth: 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   podiumName:    { fontSize: 11, fontWeight: '600', color: COLOR.cream, textAlign: 'center', marginBottom: 2 },
   podiumScore:   { fontSize: 22, fontWeight: '300', fontVariant: ['tabular-nums'], marginBottom: 6 },
-  podiumBase:    { width: '100%', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  podiumBase:    { width: '100%', borderRadius: RADIUS.xs, alignItems: 'center', justifyContent: 'center' },
   podiumRankText:{ fontSize: 16, fontWeight: '700' },
 
   // Player rows
   row:          { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, padding: SPACING.md, marginBottom: SPACING.sm, gap: 10 },
   rowYou:       { borderColor: '#C9A84C44', backgroundColor: '#C9A84C0A' },
   rowRank:      { fontSize: 12, fontWeight: '700', color: COLOR.muted, width: 28 },
-  rowAvatar:    { width: 36, height: 36, borderRadius: 18, backgroundColor: '#7DC87A11', borderWidth: 1, borderColor: '#7DC87A33', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  rowAvatar:    { width: 36, height: 36, borderRadius: RADIUS.lg, backgroundColor: '#7DC87A11', borderWidth: 1, borderColor: '#7DC87A33', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   rowInfo:      { flex: 1 },
   rowName:      { fontSize: 14, fontWeight: '500', color: COLOR.cream },
   rowRight:     { alignItems: 'flex-end', minWidth: 40 },
@@ -725,7 +722,7 @@ const s = StyleSheet.create({
   courseTime:    { fontSize: 18, fontWeight: '700', color: COLOR.gold, fontVariant: ['tabular-nums'] },
   courseRounds:  { fontSize: 10, color: COLOR.dim, marginTop: 2 },
   courseListHeader: { fontSize: 11, color: COLOR.dim, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md, letterSpacing: 1 },
-  noResults:    { fontSize: 13, color: '#7A6E58', textAlign: 'center', paddingVertical: 20 },
+  noResults:    { fontSize: 13, color: COLOR.dim, textAlign: 'center', paddingVertical: 20 },
 
   // Your rank
   yourRankCard:  { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: '#C9A84C44', paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, alignItems: 'center' },

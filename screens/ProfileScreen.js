@@ -17,7 +17,9 @@ import VerificationBadge from '../components/VerificationBadge';
 import RecentRoundsList from '../components/RecentRoundsList';
 import { computeFullRating, extractPlayerRoundStats, fetchClockedRatingForUser, computeNationalRank, DEFAULT_SCORING_BAND } from '../lib/clockedRating';
 import { totalPointsFromHoleScores } from '../lib/clockedSport';
-import { scoreTier, COLOR, SCORE_TIERS } from '../lib/theme';
+import { scoreTier, COLOR, SCORE_TIERS, RADIUS } from '../lib/theme';
+import ScreenHeader from '../components/ScreenHeader';
+import Button from '../components/Button';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -63,21 +65,21 @@ function timeAgo(isoStr) {
 
 // Same thresholds as LeaderboardScreen's clockedColor() — 0–100 scale.
 function clockedColor(score) {
-  if (score == null) return '#7A6E58';
-  if (score >= 70) return '#7DC87A';
-  if (score >= 40) return '#C9A84C';
-  return '#B8A882';
+  if (score == null) return COLOR.dim;
+  if (score >= 70) return COLOR.green;
+  if (score >= 40) return COLOR.gold;
+  return COLOR.muted;
 }
 
 function ptsColor(pts) {
-  if (pts == null) return '#7A6E58';
-  if (pts >= 8) return '#7DC87A';
-  if (pts >= 0) return '#C9A84C';
+  if (pts == null) return COLOR.dim;
+  if (pts >= 8) return COLOR.green;
+  if (pts >= 0) return COLOR.gold;
   return '#C07A6A';
 }
 
 const DELAY_DOT = {
-  none:     { color: '#7DC87A', label: 'No delay'       },
+  none:     { color: COLOR.green, label: 'No delay'       },
   few:      { color: '#D4B86A', label: 'Some delay'     },
   many:     { color: '#E8924C', label: 'Course delay'   },
   constant: { color: '#C07A6A', label: 'Constant delay' },
@@ -94,15 +96,15 @@ const DELAY_DOT = {
 
 function ActivityRow({ item }) {
   const typeMap = {
-    round_logged:       { icon: 'golf',        color: '#7DC87A', label: c => `Logged a round at ${c?.course_name ?? '—'}` },
-    live_round_started: { icon: 'golf',        color: '#7DC87A', label: c => `Playing live at ${c?.course_name ?? 'a course'} right now` },
-    milestone:          { icon: 'trophy',      color: '#C9A84C', label: c => c?.title ?? 'Reached a milestone' },
-    leaderboard:        { icon: 'trending-up', color: '#C9A84C', label: c => c?.description ?? 'Moved on the leaderboard' },
-    course_review:      { icon: 'location',    color: '#7DC87A', label: c => `Reviewed ${c?.course_name ?? 'a course'}` },
-    user_post:          { icon: 'chatbubble',  color: '#B8A882', label: c => c?.text?.slice(0, 80) ?? 'Shared an update' },
-    course_leader:      { icon: 'trophy',      color: '#C9A84C', label: c => c?.description ?? 'Set a course record' },
+    round_logged:       { icon: 'golf',        color: COLOR.green, label: c => `Logged a round at ${c?.course_name ?? '—'}` },
+    live_round_started: { icon: 'golf',        color: COLOR.green, label: c => `Playing live at ${c?.course_name ?? 'a course'} right now` },
+    milestone:          { icon: 'trophy',      color: COLOR.gold, label: c => c?.title ?? 'Reached a milestone' },
+    leaderboard:        { icon: 'trending-up', color: COLOR.gold, label: c => c?.description ?? 'Moved on the leaderboard' },
+    course_review:      { icon: 'location',    color: COLOR.green, label: c => `Reviewed ${c?.course_name ?? 'a course'}` },
+    user_post:          { icon: 'chatbubble',  color: COLOR.muted, label: c => c?.text?.slice(0, 80) ?? 'Shared an update' },
+    course_leader:      { icon: 'trophy',      color: COLOR.gold, label: c => c?.description ?? 'Set a course record' },
   };
-  const info    = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: '#7A6E58', label: () => 'Activity' };
+  const info    = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: COLOR.dim, label: () => 'Activity' };
   const content = item.content ?? {};
   const pts     = content.team_score;
   return (
@@ -147,7 +149,7 @@ function ActivityTab({ userId }) {
     }
   };
 
-  if (loading) return <ActivityIndicator color="#C9A84C" style={{ marginTop: 40 }} />;
+  if (loading) return <ActivityIndicator color={COLOR.gold} style={{ marginTop: 40 }} />;
   if (!items.length) return (
     <View style={s.activityEmpty}>
       <Ionicons name="time-outline" size={36} color="rgba(201,168,76,0.2)" style={{ marginBottom: 10 }} />
@@ -158,7 +160,7 @@ function ActivityTab({ userId }) {
     <FlatList
       data={items}
       keyExtractor={i => i.id}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C9A84C" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLOR.gold} />}
       renderItem={({ item }) => <ActivityRow item={item} />}
       contentContainerStyle={{ paddingBottom: 40 }}
     />
@@ -205,7 +207,7 @@ function ScoreTrendChart({ rounds }) {
   const half     = Math.max(1, Math.floor(n / 2));
   const avgFirst = data.slice(0, half).reduce((s, r) => s + r.avgPts, 0) / half;
   const avgLast  = data.slice(n - half).reduce((s, r) => s + r.avgPts, 0) / half;
-  const lineColor = avgLast > avgFirst + 0.1 ? '#7DC87A' : avgLast < avgFirst - 0.1 ? '#C07A6A' : '#C9A84C';
+  const lineColor = avgLast > avgFirst + 0.1 ? COLOR.green : avgLast < avgFirst - 0.1 ? '#C07A6A' : COLOR.gold;
 
   const tip = tooltipIdx != null ? data[tooltipIdx] : null;
 
@@ -231,7 +233,7 @@ function ScoreTrendChart({ rounds }) {
               key={i}
               cx={toX(i)} cy={toY(r.avgPts)}
               r={tooltipIdx === i ? 6 : 4}
-              fill={tooltipIdx === i ? lineColor : '#0D1A0F'}
+              fill={tooltipIdx === i ? lineColor : COLOR.surface}
               stroke={lineColor} strokeWidth={2}
               onPress={() => setTipIdx(tooltipIdx === i ? null : i)}
             />
@@ -290,7 +292,7 @@ function RoundsTab({ navigation, rounds = [], loading }) {
         {[...Array(3)].map((_, i) => (
           <View key={i} style={[s.roundCard, { paddingVertical: 22 }]}>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <SkeletonLoader width={36} height={36} style={{ borderRadius: 8 }} />
+              <SkeletonLoader width={36} height={36} style={{ borderRadius: RADIUS.sm }} />
               <View style={{ flex: 1, gap: 8 }}>
                 <SkeletonLoader width="65%" height={14} />
                 <SkeletonLoader width="50%" height={11} />
@@ -349,7 +351,7 @@ function RoundsTab({ navigation, rounds = [], loading }) {
               <VerificationBadge level={r.verification_level} />
               {delayInfo ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: delayInfo.color }} />
+                  <View style={{ width: 8, height: 8, borderRadius: RADIUS.xs, backgroundColor: delayInfo.color }} />
                   <Text style={[s.delayLabel, { color: delayInfo.color }]}>
                     {delayInfo.label.toUpperCase()}
                   </Text>
@@ -379,7 +381,7 @@ function RoundsTab({ navigation, rounds = [], loading }) {
               </View>
             )}
             <View style={s.seasonBetStat}>
-              <Text style={[s.seasonBetValue, { color: seasonBets.net >= 0 ? '#7DC87A' : '#C07A6A' }]}>
+              <Text style={[s.seasonBetValue, { color: seasonBets.net >= 0 ? COLOR.green : '#C07A6A' }]}>
                 {seasonBets.net >= 0 ? '+' : ''}{seasonBets.net.toFixed(0)}
               </Text>
               <Text style={s.seasonBetLabel}>NET ($)</Text>
@@ -400,7 +402,7 @@ function FriendsTab({ navigation }) {
   const [error, setError]     = useState(false);
 
   const fetchFriends = async () => {
-    setLoading(true);
+    setLoading(prev => prev && friends.length === 0);
     setError(false);
     try {
       const uid = user?.id;
@@ -649,17 +651,13 @@ export default function ProfileScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       {/* Header — fixed at top */}
       <View style={s.header}>
-        <View style={s.headerTop}>
-          <Text style={s.wordmark}>CLOCKED</Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity style={s.iconBtn} onPress={() => navigation.navigate('SearchUsers')} activeOpacity={0.7} accessibilityLabel="Search golfers" accessibilityRole="button">
-              <Ionicons name="search" size={18} color="#C9A84C" />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.iconBtn} onPress={handleSettings} activeOpacity={0.7} accessibilityLabel="Settings" accessibilityRole="button">
-              <Ionicons name="settings-outline" size={18} color="#C9A84C" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ScreenHeader
+          title="CLOCKED" brand
+          right={[
+            { icon: 'search-outline', onPress: () => navigation.navigate('SearchUsers'), label: 'Search golfers' },
+            { icon: 'settings-outline', onPress: handleSettings, label: 'Settings' },
+          ]}
+        />
         {loading
           ? <View style={{ paddingHorizontal: 22, paddingBottom: 16 }}>
               <SkeletonLoader width={140} height={14} style={{ marginTop: 6, marginBottom: 6 }} />
@@ -685,13 +683,13 @@ export default function ProfileScreen({ navigation }) {
         {(rounds.filter(r => r.flagged).length >= 3) && (
           <View style={s.reviewBanner}>
             <Ionicons name="warning-outline" size={14} color="#C07A6A" style={{ marginRight: 6 }} />
-            <Text style={s.reviewBannerText}>Account under review — contact hello@clocked.golf</Text>
+            <Text style={s.reviewBannerText}>Account under review. Contact hello@clocked.golf</Text>
           </View>
         )}
 
         {isCertified && (
           <View style={s.certifiedBanner}>
-            <Ionicons name="checkmark-circle" size={13} color="#090F0A" style={{ marginRight: 5 }} />
+            <Ionicons name="checkmark-circle" size={13} color={COLOR.bg} style={{ marginRight: 5 }} />
             <Text style={s.certifiedBannerText}>CLOCKED CERTIFIED</Text>
           </View>
         )}
@@ -713,10 +711,7 @@ export default function ProfileScreen({ navigation }) {
                 <Text style={s.heroLabel}>CLOCKED SCORE</Text>
                 <Text style={s.firstRoundTitle}>Your score starts with your first round.</Text>
                 <Text style={s.firstRoundSub}>One number, 0 to 100. Part how you score, part how you handle the clock.</Text>
-                <TouchableOpacity style={s.firstRoundBtn} onPress={() => navigation.navigate('ClockedSetup')} activeOpacity={0.85}>
-                  <Ionicons name="timer-outline" size={16} color="#090F0A" />
-                  <Text style={s.firstRoundBtnText}>START A ROUND</Text>
-                </TouchableOpacity>
+                <Button label="START A ROUND" icon="timer-outline" onPress={() => navigation.navigate('ClockedSetup')} style={{ marginTop: 16 }} />
               </View>
             );
           }
@@ -724,7 +719,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={s.heroScore}>
             <Text style={s.heroLabel}>CLOCKED SCORE</Text>
             <View style={s.heroRow}>
-              <Text style={[s.heroNum, { color: hasScore ? tier.color : '#7A6E58' }]}>
+              <Text style={[s.heroNum, { color: hasScore ? tier.color : COLOR.dim }]}>
                 {hasScore ? clockedRating.clockedScore : '\u2014'}
               </Text>
               {hasScore && (
@@ -743,7 +738,7 @@ export default function ProfileScreen({ navigation }) {
             {/* Gradient progress bar */}
             <View style={s.heroBarTrack}>
               <LinearGradient
-                colors={['#7DC87A', '#C9A84C', '#F0CB5B']}
+                colors={[COLOR.green, COLOR.gold, COLOR.goldBright]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[s.heroBarFill, { width: `${hasScore ? clockedRating.clockedScore : 0}%` }]}
@@ -896,181 +891,176 @@ export default function ProfileScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container:        { flex: 1, backgroundColor: '#090F0A' },
+  container:        { flex: 1, backgroundColor: COLOR.bg },
   header:           { borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
-  headerTop:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 22, paddingTop: 16, paddingBottom: 6 },
   headerIdentity:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, paddingBottom: 16 },
-  iconBtn:          { width: 44, height: 44, borderRadius: 22, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
 
   // Hero score section
-  heroScore:        { backgroundColor: '#0D1A0F', paddingHorizontal: 22, paddingTop: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
-  heroLabel:        { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 3, marginBottom: 8 },
+  heroScore:        { backgroundColor: COLOR.surface, paddingHorizontal: 22, paddingTop: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
+  heroLabel:        { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 3, marginBottom: 8 },
   heroRow:          { flexDirection: 'row', alignItems: 'baseline', marginBottom: 12 },
   heroNum:          { fontSize: 72, fontWeight: '200', fontVariant: ['tabular-nums'], lineHeight: 76 },
-  heroMax:          { fontSize: 22, fontWeight: '300', color: '#7A6E58', marginLeft: 4, marginBottom: 4 },
-  heroProv:         { marginLeft: 12, backgroundColor: '#C9A84C18', borderRadius: 6, borderWidth: 1, borderColor: '#C9A84C33', paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
-  heroProvText:     { fontSize: 8, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5 },
+  heroMax:          { fontSize: 22, fontWeight: '300', color: COLOR.dim, marginLeft: 4, marginBottom: 4 },
+  heroProv:         { marginLeft: 12, backgroundColor: '#C9A84C18', borderRadius: RADIUS.xs, borderWidth: 1, borderColor: '#C9A84C33', paddingHorizontal: 8, paddingVertical: 2, marginBottom: 4 },
+  heroProvText:     { fontSize: 8, fontWeight: '700', color: COLOR.gold, letterSpacing: 1.5 },
   heroTierName:     { fontSize: 11, fontWeight: '800', letterSpacing: 3, marginTop: -6, marginBottom: 12 },
-  heroBarTrack:     { height: 6, backgroundColor: '#1A2E1C', borderRadius: 3, marginTop: 12, marginBottom: 16, overflow: 'hidden' },
-  heroBarFill:      { height: 6, borderRadius: 3 },
+  heroBarTrack:     { height: 6, backgroundColor: COLOR.surfaceAlt, borderRadius: RADIUS.xs, marginTop: 12, marginBottom: 16, overflow: 'hidden' },
+  heroBarFill:      { height: 6, borderRadius: RADIUS.xs },
   heroSubRow:       { flexDirection: 'row', gap: 20 },
-  heroSubLabel:     { fontSize: 8, color: '#7A6E58', letterSpacing: 1.5, marginBottom: 2 },
-  heroSubVal:       { fontSize: 16, fontWeight: '600', color: '#F5EDD8' },
-  heroSubDot:       { fontSize: 16, color: '#7A6E58', alignSelf: 'flex-end', marginBottom: 2 },
-  heroProvHint:     { fontSize: 12, color: '#7A6E58', fontStyle: 'italic' },
+  heroSubLabel:     { fontSize: 8, color: COLOR.dim, letterSpacing: 1.5, marginBottom: 2 },
+  heroSubVal:       { fontSize: 16, fontWeight: '600', color: COLOR.cream },
+  heroSubDot:       { fontSize: 16, color: COLOR.dim, alignSelf: 'flex-end', marginBottom: 2 },
+  heroProvHint:     { fontSize: 12, color: COLOR.dim, fontStyle: 'italic' },
 
   // Stat chips
   statChipsRow:     { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
   statChip:         { alignItems: 'center', flex: 1 },
-  statChipGold:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 10, paddingVertical: 6 },
-  statChipLabel:    { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
-  statChipNum:      { fontSize: 20, fontWeight: '300', color: '#F5EDD8', fontVariant: ['tabular-nums'] },
+  statChipGold:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: RADIUS.sm, paddingVertical: 6 },
+  statChipLabel:    { fontSize: 8, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 4 },
+  statChipNum:      { fontSize: 20, fontWeight: '300', color: COLOR.cream, fontVariant: ['tabular-nums'] },
 
   // Sparkline
-  sparkCard:        { marginHorizontal: 16, marginTop: 8, marginBottom: 4, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, alignItems: 'center' },
-  sparkLabel:       { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 6, alignSelf: 'flex-start' },
+  sparkCard:        { marginHorizontal: 16, marginTop: 8, marginBottom: 4, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, alignItems: 'center' },
+  sparkLabel:       { fontSize: 8, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 6, alignSelf: 'flex-start' },
 
   // Tier progress
   tierProgressRow:  { paddingHorizontal: 22, marginBottom: 6 },
-  tierProgressText: { fontSize: 12, color: '#B8A882', fontStyle: 'italic' },
+  tierProgressText: { fontSize: 12, color: COLOR.muted, fontStyle: 'italic' },
 
   // Promo card
-  promoCard:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 14, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#C9A84C33', paddingVertical: 14, paddingHorizontal: 16 },
-  promoTitle:       { fontSize: 13, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
-  promoSub:         { fontSize: 11, color: '#B8A882' },
+  promoCard:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 14, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C9A84C33', paddingVertical: 14, paddingHorizontal: 16 },
+  promoTitle:       { fontSize: 13, fontWeight: '600', color: COLOR.cream, marginBottom: 2 },
+  promoSub:         { fontSize: 11, color: COLOR.muted },
 
   // Best round
-  bestRound:        { marginHorizontal: 16, marginBottom: 10, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#C9A84C22', paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  bestRoundLabel:   { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
-  bestRoundCourse:  { fontSize: 15, fontWeight: '600', color: '#F5EDD8' },
-  bestRoundMeta:    { fontSize: 12, color: '#7A6E58' },
-  bestRoundScore:   { fontSize: 24, fontWeight: '700', color: '#7DC87A' },
-  bestRoundScoreLabel: { fontSize: 9, color: '#7A6E58' },
+  bestRound:        { marginHorizontal: 16, marginBottom: 10, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C9A84C22', paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  bestRoundLabel:   { fontSize: 8, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 4 },
+  bestRoundCourse:  { fontSize: 15, fontWeight: '600', color: COLOR.cream },
+  bestRoundMeta:    { fontSize: 12, color: COLOR.dim },
+  bestRoundScore:   { fontSize: 24, fontWeight: '700', color: COLOR.green },
+  bestRoundScoreLabel: { fontSize: 9, color: COLOR.dim },
 
   // Rankings row
-  rankingsRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginBottom: 14, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, paddingHorizontal: 16 },
-  rankingsRowText:  { fontSize: 14, fontWeight: '500', color: '#F5EDD8' },
+  rankingsRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 16, marginBottom: 14, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, paddingHorizontal: 16 },
+  rankingsRowText:  { fontSize: 14, fontWeight: '500', color: COLOR.cream },
 
   // Empty rounds
   emptyRounds:      { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 10 },
-  emptyRoundsText:  { fontSize: 13, color: '#7A6E58' },
-  wordmark:         { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 2 },
-  username:         { fontSize: 11, color: '#C9A84C', fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },
-  name:             { fontSize: 22, fontWeight: '600', color: '#F5EDD8' },
-  handle:           { fontSize: 11, color: '#B8A882', marginTop: 3 },
-  avatarLarge:       { width: 52, height: 52, borderRadius: 26, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarLargeText:   { fontSize: 20, fontWeight: '600', color: '#C9A84C' },
-  avatarCameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: 9, backgroundColor: '#C9A84C', alignItems: 'center', justifyContent: 'center' },
+  emptyRoundsText:  { fontSize: 13, color: COLOR.dim },
+  username:         { fontSize: 11, color: COLOR.gold, fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },
+  name:             { fontSize: 22, fontWeight: '600', color: COLOR.cream },
+  handle:           { fontSize: 11, color: COLOR.muted, marginTop: 3 },
+  avatarLarge:       { width: 52, height: 52, borderRadius: 26, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: COLOR.gold, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarLargeText:   { fontSize: 20, fontWeight: '600', color: COLOR.gold },
+  avatarCameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: 9, backgroundColor: COLOR.gold, alignItems: 'center', justifyContent: 'center' },
   tabBar:           { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
-  tabBtn:           { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A22' },
-  tabBtnActive:     { borderColor: '#C9A84C', backgroundColor: '#C9A84C22' },
-  tabBtnText:       { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 2 },
-  tabBtnTextActive: { color: '#C9A84C' },
+  tabBtn:           { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: RADIUS.sm, backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A22' },
+  tabBtnActive:     { borderColor: COLOR.gold, backgroundColor: '#C9A84C22' },
+  tabBtnText:       { fontSize: 9, fontWeight: '700', color: COLOR.muted, letterSpacing: 2 },
+  tabBtnTextActive: { color: COLOR.gold },
   activityRow:       { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#7DC87A11', gap: 12 },
-  activityIconWrap:  { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  activityIconWrap:  { width: 32, height: 32, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
   activityContent:   { flex: 1 },
-  activityLabel:     { fontSize: 13, color: '#F5EDD8', fontWeight: '500', lineHeight: 18 },
+  activityLabel:     { fontSize: 13, color: COLOR.cream, fontWeight: '500', lineHeight: 18 },
   activityPop:       { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
   activityTime:      { fontSize: 10, color: 'rgba(184,168,130,0.5)', marginTop: 3 },
   activityEmpty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  activityEmptyText: { fontSize: 14, color: '#7A6E58' },
+  activityEmptyText: { fontSize: 14, color: COLOR.dim },
   challengeRow:       { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(125,200,122,0.07)', gap: 8 },
-  challengeOpponent:  { fontSize: 13, fontWeight: '700', color: '#F5EDD8' },
-  challengeBadge:     { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1 },
+  challengeOpponent:  { fontSize: 13, fontWeight: '700', color: COLOR.cream },
+  challengeBadge:     { borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1 },
   challengeBadgeText: { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
-  challengeCourse:    { fontSize: 11, color: '#B8A882', marginBottom: 1 },
-  challengeScores:    { fontSize: 11, fontWeight: '600', color: '#7DC87A' },
+  challengeCourse:    { fontSize: 11, color: COLOR.muted, marginBottom: 1 },
+  challengeScores:    { fontSize: 11, fontWeight: '600', color: COLOR.green },
   challengeExpiry:    { fontSize: 10, color: 'rgba(184,168,130,0.45)', marginTop: 1 },
-  gaugeCard:           { margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center' },
-  gaugeRow:            { flexDirection: 'row', alignItems: 'center', margin: 16, backgroundColor: '#0D1A0F', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#7DC87A22', gap: 16 },
+  gaugeCard:           { margin: 16, backgroundColor: COLOR.surface, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center' },
+  gaugeRow:            { flexDirection: 'row', alignItems: 'center', margin: 16, backgroundColor: COLOR.surface, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#7DC87A22', gap: 16 },
   gaugeCompact:        { alignItems: 'center', justifyContent: 'center' },
   gaugeInfo:           { flex: 1, justifyContent: 'center' },
   scoreRow:            { flexDirection: 'row', gap: 32, marginTop: 12 },
   scoreStat:           { alignItems: 'center' },
   scoreStatLabel:      { fontSize: 9, fontWeight: '700', color: '#C9A84C66', letterSpacing: 2, marginBottom: 2 },
-  scoreStatValue:      { fontSize: 16, fontWeight: '400', color: '#B8A882' },
-  scoreStatValueLg:    { fontSize: 32, fontWeight: '300', color: '#F5EDD8' },
-  tierLabel:           { fontSize: 11, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
+  scoreStatValue:      { fontSize: 16, fontWeight: '400', color: COLOR.muted },
+  scoreStatValueLg:    { fontSize: 32, fontWeight: '300', color: COLOR.cream },
+  tierLabel:           { fontSize: 11, fontWeight: '700', color: COLOR.green, letterSpacing: 1.5 },
   tierLabelMuted:      { fontSize: 9, fontWeight: '700', color: '#C9A84C44', letterSpacing: 1.5, lineHeight: 16 },
-  popInfoLink:         { fontSize: 11, color: '#C9A84C', textDecorationLine: 'underline' },
+  popInfoLink:         { fontSize: 11, color: COLOR.gold, textDecorationLine: 'underline' },
   trendRow:            { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  trendLabel:          { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  trendLabel:          { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
 statSection:         { paddingHorizontal: 16, marginBottom: 16 },
-  sectionLabel:        { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 10 },
+  sectionLabel:        { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 10 },
   statGrid:            { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statBox:             { width: '47%', backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 20, paddingHorizontal: 16, alignItems: 'center' },
-  statBoxLabel:        { fontSize: 10, fontWeight: '700', color: '#7A6E58', letterSpacing: 1, marginBottom: 8, textAlign: 'center' },
-  statBoxValue:        { fontSize: 28, fontWeight: '300', color: '#F5EDD8' },
-  statBoxSub:          { fontSize: 9, color: '#7A6E58', marginTop: 3, textAlign: 'center' },
-  chartCard:           { marginHorizontal: 16, marginBottom: 16, backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: '#7DC87A22', padding: 16 },
+  statBox:             { width: '47%', backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 20, paddingHorizontal: 16, alignItems: 'center' },
+  statBoxLabel:        { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 1, marginBottom: 8, textAlign: 'center' },
+  statBoxValue:        { fontSize: 28, fontWeight: '300', color: COLOR.cream },
+  statBoxSub:          { fontSize: 9, color: COLOR.dim, marginTop: 3, textAlign: 'center' },
+  chartCard:           { marginHorizontal: 16, marginBottom: 16, backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: '#7DC87A22', padding: 16 },
   chartAxisLabel:      { fontSize: 9, color: '#C9A84C88', fontWeight: '600' },
-  chartTooltip:        { position: 'absolute', backgroundColor: '#1A2E1C', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#7DC87A33', minWidth: 110 },
-  chartTooltipScore:   { fontSize: 18, fontWeight: '300', color: '#F5EDD8', marginBottom: 2 },
-  chartTooltipCourse:  { fontSize: 11, color: '#B8A882', marginBottom: 2 },
-  chartTooltipDate:    { fontSize: 10, color: '#7A6E58' },
-  infoCard:         { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', overflow: 'hidden' },
+  chartTooltip:        { position: 'absolute', backgroundColor: COLOR.surfaceAlt, borderRadius: RADIUS.sm, padding: 8, borderWidth: 1, borderColor: '#7DC87A33', minWidth: 110 },
+  chartTooltipScore:   { fontSize: 18, fontWeight: '300', color: COLOR.cream, marginBottom: 2 },
+  chartTooltipCourse:  { fontSize: 11, color: COLOR.muted, marginBottom: 2 },
+  chartTooltipDate:    { fontSize: 10, color: COLOR.dim },
+  infoCard:         { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', overflow: 'hidden' },
   statRow:          { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   statRowBorder:    { borderBottomWidth: 1, borderBottomColor: '#7DC87A11' },
-  statRowLabel:     { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  statRowLabel:     { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 2 },
   firstRound:       { paddingHorizontal: 20, paddingVertical: 22, borderBottomWidth: 1, borderBottomColor: '#7DC87A14' },
-  firstRoundTitle:  { fontSize: 20, fontWeight: '600', color: '#F5EDD8', marginTop: 10, lineHeight: 26 },
-  firstRoundSub:    { fontSize: 13, color: '#B8A882', marginTop: 6, lineHeight: 19 },
-  firstRoundBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 14, marginTop: 16 },
-  firstRoundBtnText:{ fontSize: 12, fontWeight: '800', color: '#090F0A', letterSpacing: 2.5 },
-  statRowValue:     { fontSize: 15, fontWeight: '500', color: '#F5EDD8' },
+  firstRoundTitle:  { fontSize: 20, fontWeight: '600', color: COLOR.cream, marginTop: 10, lineHeight: 26 },
+  firstRoundSub:    { fontSize: 13, color: COLOR.muted, marginTop: 6, lineHeight: 19 },
+  statRowValue:     { fontSize: 15, fontWeight: '500', color: COLOR.cream },
   barRow:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
-  barLabel:         { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 1, width: 32 },
-  barTrack:         { flex: 1, height: 6, backgroundColor: '#7DC87A22', borderRadius: 3, overflow: 'hidden' },
-  barFill:          { height: 6, borderRadius: 3 },
-  barValue:         { fontSize: 12, color: '#B8A882', width: 36, textAlign: 'right' },
-  roundCard:        { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, marginBottom: 10 },
+  barLabel:         { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 1, width: 32 },
+  barTrack:         { flex: 1, height: 6, backgroundColor: '#7DC87A22', borderRadius: RADIUS.xs, overflow: 'hidden' },
+  barFill:          { height: 6, borderRadius: RADIUS.xs },
+  barValue:         { fontSize: 12, color: COLOR.muted, width: 36, textAlign: 'right' },
+  roundCard:        { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, marginBottom: 10 },
   roundTop:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   roundInfo:        { flex: 1 },
-  roundCourse:      { fontSize: 16, fontWeight: '600', color: '#F5EDD8', marginBottom: 4 },
-  roundMeta:        { fontSize: 11, color: '#B8A882' },
+  roundCourse:      { fontSize: 16, fontWeight: '600', color: COLOR.cream, marginBottom: 4 },
+  roundMeta:        { fontSize: 11, color: COLOR.muted },
   roundScoreCol:    { alignItems: 'flex-end' },
   roundPop:         { fontSize: 28, fontWeight: '300' },
-  roundTime:        { fontSize: 11, color: '#B8A882' },
+  roundTime:        { fontSize: 11, color: COLOR.muted },
   delayLabel:       { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
-  friendCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10 },
+  friendCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10 },
   friendAvatar:     { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  friendInitial:    { fontSize: 16, fontWeight: '600', color: '#C9A84C' },
+  friendInitial:    { fontSize: 16, fontWeight: '600', color: COLOR.gold },
   friendInfo:       { flex: 1 },
-  friendName:       { fontSize: 15, fontWeight: '500', color: '#F5EDD8' },
-  friendHandle:     { fontSize: 11, color: '#B8A882', marginTop: 2 },
+  friendName:       { fontSize: 15, fontWeight: '500', color: COLOR.cream },
+  friendHandle:     { fontSize: 11, color: COLOR.muted, marginTop: 2 },
   friendRight:      { alignItems: 'flex-end', gap: 6 },
   friendPop:        { fontSize: 24, fontWeight: '300' },
-  unfollowBtn:      { borderWidth: 1, borderColor: '#C9A84C33', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
-  unfollowText:     { fontSize: 9, fontWeight: '700', color: '#B8A882', letterSpacing: 1.5 },
-  vsFriendBtn:      { borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10, marginBottom: 6 },
-  vsFriendText:     { fontSize: 9, fontWeight: '700', color: '#7DC87A', letterSpacing: 1.5 },
-  addFriendBtn:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 14, borderStyle: 'dashed', paddingVertical: 18, alignItems: 'center', marginTop: 4 },
-  addFriendText:    { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  unfollowBtn:      { borderWidth: 1, borderColor: '#C9A84C33', borderRadius: RADIUS.sm, paddingVertical: 4, paddingHorizontal: 10 },
+  unfollowText:     { fontSize: 9, fontWeight: '700', color: COLOR.muted, letterSpacing: 1.5 },
+  vsFriendBtn:      { borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.sm, paddingVertical: 4, paddingHorizontal: 10, marginBottom: 6 },
+  vsFriendText:     { fontSize: 9, fontWeight: '700', color: COLOR.green, letterSpacing: 1.5 },
+  addFriendBtn:     { borderWidth: 1, borderColor: '#C9A84C44', borderRadius: RADIUS.md, borderStyle: 'dashed', paddingVertical: 18, alignItems: 'center', marginTop: 4 },
+  addFriendText:    { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
   emptyState:       { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, paddingVertical: 60 },
-  emptyText:        { fontSize: 20, color: '#7A6E58', textAlign: 'center', marginBottom: 20, lineHeight: 28 },
-  emptyBtn:         { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24 },
-  emptyBtnText:     { fontSize: 11, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  emptyText:        { fontSize: 20, color: COLOR.dim, textAlign: 'center', marginBottom: 20, lineHeight: 28 },
+  emptyBtn:         { backgroundColor: COLOR.gold, borderRadius: RADIUS.md, paddingVertical: 14, paddingHorizontal: 24 },
+  emptyBtnText:     { fontSize: 11, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
   // Handicap card
-  underReviewBadge: { backgroundColor: 'rgba(192,122,106,0.15)', borderWidth: 1, borderColor: 'rgba(192,122,106,0.4)', borderRadius: 5, paddingHorizontal: 6, paddingVertical: 3 },
+  underReviewBadge: { backgroundColor: 'rgba(192,122,106,0.15)', borderWidth: 1, borderColor: 'rgba(192,122,106,0.4)', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 3 },
   underReviewText:  { fontSize: 9, fontWeight: '700', color: '#C07A6A', letterSpacing: 0.5 },
   reviewBanner:     { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(192,122,106,0.1)', borderBottomWidth: 1, borderBottomColor: 'rgba(192,122,106,0.25)', paddingHorizontal: 16, paddingVertical: 10 },
   reviewBannerText: { fontSize: 11, color: '#C07A6A', flex: 1, fontWeight: '500' },
-  referralCard:         { marginHorizontal: 16, marginBottom: 24, backgroundColor: '#0D1A0F', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(201,168,76,0.25)', padding: 20, gap: 10 },
+  referralCard:         { marginHorizontal: 16, marginBottom: 24, backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: 'rgba(201,168,76,0.25)', padding: 20, gap: 10 },
   referralCardHeader:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  referralCardTitle:    { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
-  referralCardSub:      { fontSize: 12, color: '#B8A882', lineHeight: 18 },
-  referralCodeRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(201,168,76,0.06)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(201,168,76,0.2)', paddingHorizontal: 16, paddingVertical: 12 },
-  referralCodeText:     { fontSize: 22, fontWeight: '600', color: '#C9A84C', letterSpacing: 4 },
-  referralShareBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#C9A84C', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
-  referralShareBtnText: { fontSize: 10, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
-  referralCountText:    { fontSize: 11, color: '#7DC87A', fontWeight: '500' },
+  referralCardTitle:    { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
+  referralCardSub:      { fontSize: 12, color: COLOR.muted, lineHeight: 18 },
+  referralCodeRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(201,168,76,0.06)', borderRadius: RADIUS.sm, borderWidth: 1, borderColor: 'rgba(201,168,76,0.2)', paddingHorizontal: 16, paddingVertical: 12 },
+  referralCodeText:     { fontSize: 22, fontWeight: '600', color: COLOR.gold, letterSpacing: 4 },
+  referralShareBtn:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLOR.gold, borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 8 },
+  referralShareBtnText: { fontSize: 10, fontWeight: '700', color: COLOR.bg, letterSpacing: 1.5 },
+  referralCountText:    { fontSize: 11, color: COLOR.green, fontWeight: '500' },
   upgradeNote:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   upgradeNoteText:      { fontSize: 11, color: '#C9A84C66', fontStyle: 'italic' },
-  seasonBetsCard:       { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#C9A84C22', padding: 16, marginTop: 10, marginBottom: 10 },
+  seasonBetsCard:       { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C9A84C22', padding: 16, marginTop: 10, marginBottom: 10 },
   seasonBetsRow:        { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
   seasonBetStat:        { alignItems: 'center' },
-  seasonBetValue:       { fontSize: 28, fontWeight: '300', color: '#F5EDD8' },
-  seasonBetLabel:       { fontSize: 8, fontWeight: '700', color: '#7A6E58', letterSpacing: 1.5, marginTop: 3 },
-  certifiedBanner:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#C9A84C', paddingVertical: 8 },
-  certifiedBannerText:  { fontSize: 10, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  seasonBetValue:       { fontSize: 28, fontWeight: '300', color: COLOR.cream },
+  seasonBetLabel:       { fontSize: 8, fontWeight: '700', color: COLOR.dim, letterSpacing: 1.5, marginTop: 3 },
+  certifiedBanner:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLOR.gold, paddingVertical: 8 },
+  certifiedBannerText:  { fontSize: 10, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
 });

@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { useFonts, Montserrat_700Bold } from '@expo-google-fonts/montserrat';
+import { useFonts, Montserrat_700Bold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
 import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './lib/supabase';
@@ -418,7 +418,7 @@ function AppNavigator() {
   const [updateRequired, setUpdateRequired] = useState(false);
   const notificationsSetupRef  = useRef(false);  // only run setupNotifications once per session
 
-  useFonts({ Montserrat_700Bold });
+  useFonts({ Montserrat_700Bold, Montserrat_800ExtraBold });
 
   // Warm Supabase schema cache for the rounds table so new columns (e.g.
   // active_game) are recognised without a manual PostgREST cache reload.

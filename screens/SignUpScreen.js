@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { generateReferralCode, applyReferralCode } from '../lib/referrals';
+import { COLOR, RADIUS } from '../lib/theme';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYS   = Array.from({ length: 31 }, (_, i) => String(i + 1));
@@ -196,7 +197,7 @@ export default function SignUpScreen({ navigation }) {
     return (
       <SafeAreaView style={s.container}>
         <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={22} color="#F5EDD8" />
+          <Ionicons name="chevron-back" size={22} color={COLOR.cream} />
         </TouchableOpacity>
         <View style={s.ageGateContent}>
           <Text style={s.ageTitle}>When were you born?</Text>
@@ -280,7 +281,7 @@ export default function SignUpScreen({ navigation }) {
             <TextInput
               style={s.input}
               placeholder="Your name"
-              placeholderTextColor="#7A6E58"
+              placeholderTextColor={COLOR.dim}
               autoCapitalize="words"
               value={fullName}
               onChangeText={setFullName}
@@ -293,7 +294,7 @@ export default function SignUpScreen({ navigation }) {
             <TextInput
               style={s.input}
               placeholder="@yourhandle"
-              placeholderTextColor="#7A6E58"
+              placeholderTextColor={COLOR.dim}
               autoCapitalize="none"
               autoCorrect={false}
               value={username}
@@ -318,7 +319,7 @@ export default function SignUpScreen({ navigation }) {
             <TextInput
               style={s.input}
               placeholder="you@email.com"
-              placeholderTextColor="#7A6E58"
+              placeholderTextColor={COLOR.dim}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -333,7 +334,7 @@ export default function SignUpScreen({ navigation }) {
             <TextInput
               style={s.input}
               placeholder="Min. 8 characters"
-              placeholderTextColor="#7A6E58"
+              placeholderTextColor={COLOR.dim}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
@@ -342,7 +343,7 @@ export default function SignUpScreen({ navigation }) {
 
           {/* Referral code (optional, subtle) */}
           <View style={s.inputWrap}>
-            <Text style={[s.inputLabel, { color: '#7A6E58' }]}>REFERRAL CODE (OPTIONAL)</Text>
+            <Text style={[s.inputLabel, { color: COLOR.dim }]}>REFERRAL CODE (OPTIONAL)</Text>
             <TextInput
               style={s.input}
               placeholder="Enter code"
@@ -361,7 +362,7 @@ export default function SignUpScreen({ navigation }) {
             activeOpacity={0.7}
           >
             <View style={[s.checkbox, petitionOptIn && s.checkboxChecked]}>
-              {petitionOptIn && <Ionicons name="checkmark" size={14} color="#090F0A" />}
+              {petitionOptIn && <Ionicons name="checkmark" size={14} color={COLOR.bg} />}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.checkboxLabel}>
@@ -391,7 +392,7 @@ export default function SignUpScreen({ navigation }) {
           {/* Sign in link */}
           <TouchableOpacity style={s.signInLink} onPress={() => navigation.navigate('SignIn')}>
             <Text style={s.signInText}>
-              Already have an account?<Text style={{ color: '#C9A84C' }}> Sign in</Text>
+              Already have an account?<Text style={{ color: COLOR.gold }}> Sign in</Text>
             </Text>
           </TouchableOpacity>
 
@@ -406,54 +407,54 @@ export default function SignUpScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#090F0A' },
+  container:    { flex: 1, backgroundColor: COLOR.bg },
   backBtn:      { position: 'absolute', top: 60, left: 16, zIndex: 10, width: 40, height: 40, justifyContent: 'center' },
 
   // Wordmark + headlines
-  wordmark:     { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 4, marginBottom: 48, textAlign: 'center' },
-  headline:     { fontSize: 28, fontWeight: '300', color: '#F5EDD8', marginBottom: 8, lineHeight: 36 },
-  subhead:      { fontSize: 14, color: '#7A6E58', marginBottom: 40 },
+  wordmark:     { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 4, marginBottom: 48, textAlign: 'center' },
+  headline:     { fontSize: 28, fontWeight: '300', color: COLOR.cream, marginBottom: 8, lineHeight: 36 },
+  subhead:      { fontSize: 14, color: COLOR.dim, marginBottom: 40 },
 
   // Inputs
   inputWrap:    { marginBottom: 20 },
-  inputLabel:   { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 8 },
-  input:        { backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, color: '#F5EDD8', fontSize: 15 },
-  fieldError:   { fontSize: 11, color: '#E85D4A', marginTop: 4 },
-  fieldOk:      { fontSize: 11, color: '#7DC87A', marginTop: 4 },
+  inputLabel:   { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 2, marginBottom: 8 },
+  input:        { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, color: COLOR.cream, fontSize: 15 },
+  fieldError:   { fontSize: 11, color: COLOR.red, marginTop: 4 },
+  fieldOk:      { fontSize: 11, color: COLOR.green, marginTop: 4 },
   fieldHint:    { fontSize: 11, color: '#C9A84C88', marginTop: 4 },
 
   // Error
-  error:        { color: '#E85D4A', fontSize: 13, marginBottom: 16 },
+  error:        { color: COLOR.red, fontSize: 13, marginBottom: 16 },
 
   // Primary button
-  primaryBtn:       { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  primaryBtn:       { backgroundColor: COLOR.gold, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   primaryBtnDisabled:{ opacity: 0.4 },
-  primaryBtnText:   { fontSize: 14, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5 },
+  primaryBtnText:   { fontSize: 14, fontWeight: '700', color: COLOR.bg, letterSpacing: 1.5 },
 
   // Links
   signInLink:   { marginTop: 24, alignItems: 'center' },
-  signInText:   { fontSize: 13, color: '#7A6E58' },
+  signInText:   { fontSize: 13, color: COLOR.dim },
   terms:        { fontSize: 10, color: '#7A6E5888', textAlign: 'center', marginTop: 24, lineHeight: 16 },
 
   // Petition checkbox
   checkboxRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 20, marginTop: 8 },
-  checkbox:       { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#7DC87A22', backgroundColor: '#0D1A0F', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  checkboxChecked:{ backgroundColor: '#7DC87A', borderColor: '#7DC87A' },
-  checkboxLabel:  { fontSize: 13, color: '#F5EDD8', lineHeight: 19 },
-  checkboxSub:    { fontSize: 11, color: '#7A6E58', marginTop: 4, lineHeight: 16 },
+  checkbox:       { width: 22, height: 22, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: '#7DC87A22', backgroundColor: COLOR.surface, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  checkboxChecked:{ backgroundColor: COLOR.green, borderColor: COLOR.green },
+  checkboxLabel:  { fontSize: 13, color: COLOR.cream, lineHeight: 19 },
+  checkboxSub:    { fontSize: 11, color: COLOR.dim, marginTop: 4, lineHeight: 16 },
 
   // Age gate
   ageGateContent: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
-  ageTitle:       { fontSize: 22, fontWeight: '600', color: '#F5EDD8', marginBottom: 12 },
-  ageNote:        { fontSize: 12, color: '#7A6E58', marginTop: 16, marginBottom: 24, lineHeight: 18 },
+  ageTitle:       { fontSize: 22, fontWeight: '600', color: COLOR.cream, marginBottom: 12 },
+  ageNote:        { fontSize: 12, color: COLOR.dim, marginTop: 16, marginBottom: 24, lineHeight: 18 },
 
   // DOB selectors
-  selectorBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0D1A0F', borderRadius: 10, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 14, paddingVertical: 12 },
-  selectorText:      { fontSize: 15, color: '#F5EDD8' },
-  selectorPlaceholder:{ color: '#7A6E58' },
-  dropdownList:      { backgroundColor: '#0D1A0F', borderRadius: 10, borderWidth: 1, borderColor: '#C9A84C33', marginTop: 8, overflow: 'hidden' },
+  selectorBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 14, paddingVertical: 12 },
+  selectorText:      { fontSize: 15, color: COLOR.cream },
+  selectorPlaceholder:{ color: COLOR.dim },
+  dropdownList:      { backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#C9A84C33', marginTop: 8, overflow: 'hidden' },
   dropdownItem:      { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#7DC87A11' },
   dropdownItemActive:{ backgroundColor: '#C9A84C22' },
-  dropdownItemText:  { fontSize: 14, color: '#F5EDD8' },
-  dropdownItemTextActive: { color: '#C9A84C', fontWeight: '600' },
+  dropdownItemText:  { fontSize: 14, color: COLOR.cream },
+  dropdownItemTextActive: { color: COLOR.gold, fontWeight: '600' },
 });

@@ -7,6 +7,7 @@
 import { useEffect, useRef } from 'react';
 import { View, Animated, Easing } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { COLOR } from '../lib/theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -14,8 +15,8 @@ export default function CountdownRing({
   progress = 0,       // 0–1
   size = 220,
   strokeWidth = 5,
-  color = '#C9A84C',
-  trackColor = '#0D1A0F',
+  color = COLOR.gold,
+  trackColor = COLOR.surface,
   duration = 500,
   children,
 }) {

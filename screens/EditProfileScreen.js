@@ -9,6 +9,8 @@ import { pickAndUploadAvatar as uploadAvatar } from '../lib/avatarUpload';
 import { supabase, supabaseUrl } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import InitialsAvatar from '../components/InitialsAvatar';
+import ScreenHeader from '../components/ScreenHeader';
+import { COLOR, RADIUS } from '../lib/theme';
 
 function Field({ label, children }) {
   return (
@@ -141,8 +143,8 @@ export default function EditProfileScreen({ navigation }) {
   };
 
   const usernameHint = () => {
-    if (usernameStatus === 'checking') return { text: 'Checking availability...', color: '#B8A882' };
-    if (usernameStatus === 'ok')       return { text: '✓ Available',              color: '#7DC87A' };
+    if (usernameStatus === 'checking') return { text: 'Checking availability...', color: COLOR.muted };
+    if (usernameStatus === 'ok')       return { text: '✓ Available',              color: COLOR.green };
     if (usernameStatus === 'taken')    return { text: '✗ Already taken',          color: '#E05252' };
     return null;
   };
@@ -150,13 +152,7 @@ export default function EditProfileScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={22} color="#C9A84C" />
-        </TouchableOpacity>
-        <Text style={s.title}>EDIT PROFILE</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <ScreenHeader title="EDIT PROFILE" onBack={() => navigation.goBack()} />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
@@ -167,8 +163,8 @@ export default function EditProfileScreen({ navigation }) {
               <InitialsAvatar name={profile?.full_name} size={80} avatarUrl={avatarUrl} username={profile?.username} />
               <View style={s.avatarCameraBadge}>
                 {uploading
-                  ? <ActivityIndicator size="small" color="#090F0A" />
-                  : <Ionicons name="camera" size={14} color="#090F0A" />
+                  ? <ActivityIndicator size="small" color={COLOR.bg} />
+                  : <Ionicons name="camera" size={14} color={COLOR.bg} />
                 }
               </View>
             </View>
@@ -265,7 +261,7 @@ export default function EditProfileScreen({ navigation }) {
             activeOpacity={0.8}
           >
             {saving
-              ? <ActivityIndicator color="#090F0A" />
+              ? <ActivityIndicator color={COLOR.bg} />
               : <Text style={s.saveBtnText}>SAVE CHANGES</Text>
             }
           </TouchableOpacity>
@@ -278,22 +274,20 @@ export default function EditProfileScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container:   { flex: 1, backgroundColor: '#0A1A0C' },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#1A2E1C' },
-  backBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  title:       { fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  title:       { fontSize: 13, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
   body:        { padding: 20, paddingBottom: 60 },
   avatarPicker:    { alignItems: 'center', marginBottom: 24 },
   avatarWrap:      { position: 'relative' },
-  avatarCameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: '#C9A84C', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#0A1A0C' },
-  avatarHint:      { fontSize: 11, color: '#C9A84C', marginTop: 8 },
+  avatarCameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: COLOR.gold, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#0A1A0C' },
+  avatarHint:      { fontSize: 11, color: COLOR.gold, marginTop: 8 },
   fieldGroup:  { marginBottom: 22 },
   fieldLabel:  { fontSize: 9, fontWeight: '700', color: '#5A7A5C', letterSpacing: 2, marginBottom: 8 },
-  input:       { backgroundColor: '#0F2312', borderWidth: 1, borderColor: '#1E3320', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: '#E8DCC8', fontSize: 15 },
+  input:       { backgroundColor: '#0F2312', borderWidth: 1, borderColor: '#1E3320', borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 13, color: '#E8DCC8', fontSize: 15 },
   inputMulti:  { height: 100, textAlignVertical: 'top', paddingTop: 13 },
   hint:        { fontSize: 11, marginTop: 6, marginLeft: 2 },
   fieldNote:   { fontSize: 10, color: '#5A7A5C', marginTop: 6, lineHeight: 15 },
   errorText:   { fontSize: 13, color: '#E05252', textAlign: 'center', marginBottom: 16, lineHeight: 19 },
-  successText: { fontSize: 13, color: '#7DC87A', textAlign: 'center', marginBottom: 16, lineHeight: 19 },
-  saveBtn:     { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 18, alignItems: 'center', marginTop: 8 },
-  saveBtnText: { fontSize: 12, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  successText: { fontSize: 13, color: COLOR.green, textAlign: 'center', marginBottom: 16, lineHeight: 19 },
+  saveBtn:     { backgroundColor: COLOR.gold, borderRadius: RADIUS.md, paddingVertical: 18, alignItems: 'center', marginTop: 8 },
+  saveBtnText: { fontSize: 12, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
 });

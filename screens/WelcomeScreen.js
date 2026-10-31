@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLOR, RADIUS } from '../lib/theme';
 
 export default function WelcomeScreen({ navigation }) {
   return (
@@ -55,7 +56,7 @@ export default function WelcomeScreen({ navigation }) {
 
 const s = StyleSheet.create({
   container: {
-    flex: 1, backgroundColor: '#090F0A',
+    flex: 1, backgroundColor: COLOR.bg,
     justifyContent: 'space-between',
     paddingBottom: 32,
   },
@@ -64,51 +65,51 @@ const s = StyleSheet.create({
     paddingTop: 60,
   },
   wordmark: {
-    fontSize: 13, fontWeight: '700', color: '#F5EDD8',
+    fontSize: 13, fontWeight: '700', color: COLOR.cream,
     letterSpacing: 6,
   },
   motto: {
-    fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2,
+    fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 2,
     marginTop: 8,
   },
   center: {
     paddingHorizontal: 28,
   },
   heroLight: {
-    fontSize: 40, fontWeight: '200', color: '#F5EDD8',
+    fontSize: 40, fontWeight: '200', color: COLOR.cream,
     lineHeight: 48,
   },
   heroBold: {
-    fontSize: 40, fontWeight: '700', color: '#F0CB5B',
+    fontSize: 40, fontWeight: '700', color: COLOR.goldBright,
     lineHeight: 48,
   },
   sub: {
-    fontSize: 15, color: '#B8A882', lineHeight: 22,
+    fontSize: 15, color: COLOR.muted, lineHeight: 22,
     marginTop: 16,
   },
   bottom: {
     paddingHorizontal: 28,
   },
   btnPrimary: {
-    backgroundColor: '#7DC87A', borderRadius: 14,
+    backgroundColor: COLOR.green, borderRadius: RADIUS.md,
     paddingVertical: 17, alignItems: 'center', width: '100%',
   },
   btnPrimaryText: {
-    fontSize: 13, fontWeight: '700', color: '#090F0A', letterSpacing: 1.5,
+    fontSize: 13, fontWeight: '700', color: COLOR.bg, letterSpacing: 1.5,
   },
   btnSecondary: {
-    borderRadius: 14, paddingVertical: 17, alignItems: 'center',
+    borderRadius: RADIUS.md, paddingVertical: 17, alignItems: 'center',
     width: '100%', borderWidth: 1, borderColor: '#C9A84C55',
     marginTop: 12,
   },
   btnSecondaryText: {
-    fontSize: 13, fontWeight: '700', color: '#C9A84C', letterSpacing: 1.5,
+    fontSize: 13, fontWeight: '700', color: COLOR.gold, letterSpacing: 1.5,
   },
   btnTertiary: {
     alignItems: 'center', paddingVertical: 12, marginTop: 6,
   },
   btnTertiaryText: {
-    fontSize: 12, fontWeight: '600', color: '#B8A882', letterSpacing: 0.5,
+    fontSize: 12, fontWeight: '600', color: COLOR.muted, letterSpacing: 0.5,
   },
   legal: {
     fontSize: 10, color: '#7A6E5888', textAlign: 'center',

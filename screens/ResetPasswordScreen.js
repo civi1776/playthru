@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { COLOR, RADIUS } from '../lib/theme';
 
 export default function ResetPasswordScreen({ navigation }) {
   const [password, setPassword]           = useState('');
@@ -59,7 +60,7 @@ export default function ResetPasswordScreen({ navigation }) {
 
         {success ? (
           <View style={s.successBox}>
-            <Ionicons name="checkmark-circle" size={48} color="#7DC87A" style={{ marginBottom: 12 }} />
+            <Ionicons name="checkmark-circle" size={48} color={COLOR.green} style={{ marginBottom: 12 }} />
             <Text style={s.successText}>Password updated!</Text>
             <Text style={s.successSub}>Taking you back to the app…</Text>
           </View>
@@ -78,7 +79,7 @@ export default function ResetPasswordScreen({ navigation }) {
                 autoCorrect={false}
               />
               <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={s.eyeBtn} activeOpacity={0.7}>
-                <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={18} color="#B8A882" />
+                <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={18} color={COLOR.muted} />
               </TouchableOpacity>
             </View>
 
@@ -95,7 +96,7 @@ export default function ResetPasswordScreen({ navigation }) {
                 autoCorrect={false}
               />
               <TouchableOpacity onPress={() => setShowConfirm(v => !v)} style={s.eyeBtn} activeOpacity={0.7}>
-                <Ionicons name={showConfirm ? 'eye' : 'eye-off'} size={18} color="#B8A882" />
+                <Ionicons name={showConfirm ? 'eye' : 'eye-off'} size={18} color={COLOR.muted} />
               </TouchableOpacity>
             </View>
 
@@ -117,20 +118,20 @@ export default function ResetPasswordScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#090F0A' },
+  container:   { flex: 1, backgroundColor: COLOR.bg },
   scroll:      { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
   header:      { marginTop: 80, marginBottom: 36 },
-  eyebrow:     { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 4, marginBottom: 8 },
-  title:       { fontSize: 24, fontWeight: '600', color: '#F5EDD8', marginBottom: 8 },
-  subtitle:    { fontSize: 14, color: '#B8A882', lineHeight: 20 },
-  inputRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: 'rgba(125,200,122,0.2)', borderRadius: 12, marginBottom: 12 },
-  input:       { flex: 1, padding: 16, color: '#F5EDD8', fontSize: 16 },
+  eyebrow:     { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 4, marginBottom: 8 },
+  title:       { fontSize: 24, fontWeight: '600', color: COLOR.cream, marginBottom: 8 },
+  subtitle:    { fontSize: 14, color: COLOR.muted, lineHeight: 20 },
+  inputRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderWidth: 1, borderColor: 'rgba(125,200,122,0.2)', borderRadius: RADIUS.md, marginBottom: 12 },
+  input:       { flex: 1, padding: 16, color: COLOR.cream, fontSize: 16 },
   eyeBtn:      { paddingHorizontal: 14, paddingVertical: 16 },
   errorText:   { fontSize: 13, color: '#C07A6A', marginBottom: 14, textAlign: 'center' },
-  btn:         { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 18, alignItems: 'center', marginTop: 8 },
+  btn:         { backgroundColor: COLOR.gold, borderRadius: RADIUS.md, paddingVertical: 18, alignItems: 'center', marginTop: 8 },
   btnDisabled: { opacity: 0.6 },
-  btnText:     { fontSize: 13, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  btnText:     { fontSize: 13, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
   successBox:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 },
-  successText: { fontSize: 22, fontWeight: '600', color: '#F5EDD8', marginBottom: 8 },
-  successSub:  { fontSize: 14, color: '#B8A882' },
+  successText: { fontSize: 22, fontWeight: '600', color: COLOR.cream, marginBottom: 8 },
+  successSub:  { fontSize: 14, color: COLOR.muted },
 });

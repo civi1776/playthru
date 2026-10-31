@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { sendPushToUser } from '../lib/notifications';
 import { useAuth } from '../context/AuthContext';
+import { COLOR } from '../lib/theme';
 
 export default function ChallengeButton({ targetUserId, targetUsername, courseName, challengerScore, variant }) {
   const { user, profile: myProfile } = useAuth();
@@ -75,8 +76,8 @@ export default function ChallengeButton({ targetUserId, targetUsername, courseNa
 }
 
 const c = StyleSheet.create({
-  btn:       { borderWidth: 1, borderColor: '#C9A84C', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 20, alignItems: 'center' },
+  btn:       { borderWidth: 1, borderColor: COLOR.gold, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 20, alignItems: 'center' },
   disabled:  { opacity: 0.4 },
-  txt:       { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
-  inlineTxt: { fontSize: 11, fontWeight: '700', color: '#C9A84C' },
+  txt:       { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
+  inlineTxt: { fontSize: 11, fontWeight: '700', color: COLOR.gold },
 });

@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import InitialsAvatar from '../components/InitialsAvatar';
 import CourseAvatar from '../components/CourseAvatar';
 import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import { COLOR, RADIUS } from '../lib/theme';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,17 +28,17 @@ function timeAgo(isoStr) {
 
 // Aggregate 0–100 Clocked Score color — matches LeaderboardScreen's clockedColor().
 function clockedColor(score) {
-  if (score == null) return '#7A6E58';
-  if (score >= 70) return '#7DC87A';
-  if (score >= 40) return '#C9A84C';
-  return '#B8A882';
+  if (score == null) return COLOR.dim;
+  if (score >= 70) return COLOR.green;
+  if (score >= 40) return COLOR.gold;
+  return COLOR.muted;
 }
 
 // Per-round points color (raw PTS, not the 0–100 aggregate score).
 function ptsColor(pts) {
-  if (pts == null) return '#B8A882';
-  if (pts >= 8) return '#7DC87A';
-  if (pts >= 0) return '#C9A84C';
+  if (pts == null) return COLOR.muted;
+  if (pts >= 8) return COLOR.green;
+  if (pts >= 0) return COLOR.gold;
   return '#C07A6A';
 }
 
@@ -94,7 +95,7 @@ function TopBanner({ onSignup }) {
 // ─── LEADERBOARD TAB ─────────────────────────────────────────────────────────
 
 function PodiumItem({ entry, rank, height, accentColor, onPress }) {
-  const trophyColor = rank === 1 ? '#C9A84C' : rank === 2 ? '#B8A882' : '#D4B86A';
+  const trophyColor = rank === 1 ? COLOR.gold : rank === 2 ? COLOR.muted : '#D4B86A';
   const marginTop   = rank === 1 ? 0 : rank === 2 ? 24 : 36;
   return (
     <TouchableOpacity style={[p.podiumItem, { marginTop }]} onPress={onPress} activeOpacity={0.8}>
@@ -199,7 +200,7 @@ function LeaderboardTab({ navigation, showGate }) {
   if (loading) {
     return (
       <View style={p.centered}>
-        <ActivityIndicator color="#C9A84C" />
+        <ActivityIndicator color={COLOR.gold} />
       </View>
     );
   }
@@ -218,10 +219,10 @@ function LeaderboardTab({ navigation, showGate }) {
       {first && (
         <View style={p.podiumRow}>
           {second && (
-            <PodiumItem entry={second} rank={2} height={48} accentColor="#B8A882"
+            <PodiumItem entry={second} rank={2} height={48} accentColor={COLOR.muted}
               onPress={() => showGate('Sign up to view full profiles')} />
           )}
-          <PodiumItem entry={first} rank={1} height={64} accentColor="#C9A84C"
+          <PodiumItem entry={first} rank={1} height={64} accentColor={COLOR.gold}
             onPress={() => showGate('Sign up to view full profiles')} />
           {third && (
             <PodiumItem entry={third} rank={3} height={36} accentColor="#D4B86A"
@@ -342,7 +343,7 @@ function PreviewFeedItem({ item, onLockedAction }) {
 
           {item.type === 'leaderboard' && (
             <View style={p.leaderBanner}>
-              <Ionicons name="trending-up" size={14} color="#C9A84C" />
+              <Ionicons name="trending-up" size={14} color={COLOR.gold} />
               <Text style={p.leaderBannerText}>{item.content?.description ?? 'Moved on the leaderboard'}</Text>
             </View>
           )}
@@ -350,13 +351,13 @@ function PreviewFeedItem({ item, onLockedAction }) {
           {/* Locked action bar */}
           <View style={p.lockedBar}>
             <TouchableOpacity style={p.lockedBtn} onPress={() => onLockedAction('Sign up to like and comment on posts')} activeOpacity={0.7}>
-              <Ionicons name="lock-closed" size={12} color="#7A6E58" />
-              <Ionicons name="thumbs-up-outline" size={15} color="#7A6E58" />
+              <Ionicons name="lock-closed" size={12} color={COLOR.dim} />
+              <Ionicons name="thumbs-up-outline" size={15} color={COLOR.dim} />
               {item.likes > 0 && <Text style={p.lockedCount}>{item.likes}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={p.lockedBtn} onPress={() => onLockedAction('Sign up to like and comment on posts')} activeOpacity={0.7}>
-              <Ionicons name="lock-closed" size={12} color="#7A6E58" />
-              <Ionicons name="chatbubble-outline" size={14} color="#7A6E58" />
+              <Ionicons name="lock-closed" size={12} color={COLOR.dim} />
+              <Ionicons name="chatbubble-outline" size={14} color={COLOR.dim} />
             </TouchableOpacity>
           </View>
         </View>
@@ -403,7 +404,7 @@ function ActivityTab({ showGate }) {
   const onRefresh = () => { setRefreshing(true); load(); };
 
   if (loading) {
-    return <View style={p.centered}><ActivityIndicator color="#C9A84C" /></View>;
+    return <View style={p.centered}><ActivityIndicator color={COLOR.gold} /></View>;
   }
 
   if (items.length === 0) {
@@ -422,7 +423,7 @@ function ActivityTab({ showGate }) {
         <PreviewFeedItem item={item} onLockedAction={showGate} />
       )}
       contentContainerStyle={{ paddingBottom: 40 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C9A84C" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLOR.gold} />}
     />
   );
 }
@@ -475,24 +476,24 @@ function CoursesTab({ navigation }) {
   return (
     <View style={{ flex: 1 }}>
       <View style={p.searchBar}>
-        <Ionicons name="search" size={16} color="#7A6E58" style={{ marginRight: 8 }} />
+        <Ionicons name="search" size={16} color={COLOR.dim} style={{ marginRight: 8 }} />
         <TextInput
           style={p.searchInput}
           placeholder="Search courses…"
-          placeholderTextColor="#7A6E58"
+          placeholderTextColor={COLOR.dim}
           value={query}
           onChangeText={handleSearch}
           autoCorrect={false}
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => { setQuery(''); setResults([]); }} activeOpacity={0.7}>
-            <Ionicons name="close-circle" size={16} color="#7A6E58" />
+            <Ionicons name="close-circle" size={16} color={COLOR.dim} />
           </TouchableOpacity>
         )}
       </View>
 
       {loading ? (
-        <View style={p.centered}><ActivityIndicator color="#C9A84C" /></View>
+        <View style={p.centered}><ActivityIndicator color={COLOR.gold} /></View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}>
           {displayList.map(course => (
@@ -560,7 +561,7 @@ export default function PreviewModeScreen({ navigation }) {
       {/* Back / close */}
       <View style={p.headerRow}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={p.backBtn} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={20} color="#C9A84C" />
+          <Ionicons name="arrow-back" size={20} color={COLOR.gold} />
         </TouchableOpacity>
         <View style={{ alignItems: 'center' }}>
           <Text style={p.headerTitle}>EXPLORE CLOCKED</Text>
@@ -583,7 +584,7 @@ export default function PreviewModeScreen({ navigation }) {
               <Ionicons
                 name={active ? tab.icon : tab.iconOff}
                 size={18}
-                color={active ? '#C9A84C' : 'rgba(184,168,130,0.4)'}
+                color={active ? COLOR.gold : 'rgba(184,168,130,0.4)'}
               />
               <Text style={[p.tabLabel, active && p.tabLabelActive]}>{tab.label}</Text>
               {active && <View style={p.tabUnderline} />}
@@ -619,87 +620,87 @@ export default function PreviewModeScreen({ navigation }) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const p = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#090F0A' },
+  container:  { flex: 1, backgroundColor: COLOR.bg },
 
   // Banner
   banner:     { backgroundColor: '#1E3D22', paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: 'rgba(201,168,76,0.3)' },
-  bannerText: { color: '#F5EDD8', fontSize: 12, flex: 1, lineHeight: 16 },
-  bannerBtn:  { backgroundColor: '#C9A84C', borderRadius: 6, paddingVertical: 6, paddingHorizontal: 12, marginLeft: 12 },
-  bannerBtnText: { color: '#090F0A', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  bannerText: { color: COLOR.cream, fontSize: 12, flex: 1, lineHeight: 16 },
+  bannerBtn:  { backgroundColor: COLOR.gold, borderRadius: RADIUS.xs, paddingVertical: 6, paddingHorizontal: 12, marginLeft: 12 },
+  bannerBtnText: { color: COLOR.bg, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
 
   // Header
   headerRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:   { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 2 },
+  headerTitle:   { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
   headerTagline: { fontSize: 8, fontWeight: '600', color: '#C9A84C88', letterSpacing: 2, marginTop: 2 },
 
   // Tab bar
   tabBar:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
   tabBtn:       { flex: 1, alignItems: 'center', paddingVertical: 10, gap: 3, position: 'relative' },
   tabLabel:     { fontSize: 8, fontWeight: '700', color: 'rgba(184,168,130,0.4)', letterSpacing: 1.5 },
-  tabLabelActive: { color: '#C9A84C' },
-  tabUnderline: { position: 'absolute', bottom: 0, left: '15%', right: '15%', height: 2, backgroundColor: '#C9A84C', borderRadius: 1 },
+  tabLabelActive: { color: COLOR.gold },
+  tabUnderline: { position: 'absolute', bottom: 0, left: '15%', right: '15%', height: 2, backgroundColor: COLOR.gold, borderRadius: 1 },
 
   // Gate modal
   gateOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  gateCard:    { backgroundColor: '#0D1A0F', borderRadius: 16, padding: 24, width: '100%', borderWidth: 1, borderColor: 'rgba(201,168,76,0.3)' },
-  gateTitle:   { fontSize: 22, fontWeight: '700', color: '#F5EDD8', marginBottom: 8, textAlign: 'center' },
-  gateSub:     { fontSize: 14, color: '#B8A882', textAlign: 'center', marginBottom: 24, lineHeight: 20 },
-  gateBtn:     { backgroundColor: '#C9A84C', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 10 },
-  gateBtnText: { color: '#090F0A', fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+  gateCard:    { backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, padding: 24, width: '100%', borderWidth: 1, borderColor: 'rgba(201,168,76,0.3)' },
+  gateTitle:   { fontSize: 22, fontWeight: '700', color: COLOR.cream, marginBottom: 8, textAlign: 'center' },
+  gateSub:     { fontSize: 14, color: COLOR.muted, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
+  gateBtn:     { backgroundColor: COLOR.gold, borderRadius: RADIUS.sm, padding: 14, alignItems: 'center', marginBottom: 10 },
+  gateBtnText: { color: COLOR.bg, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
   gateCancel:  { padding: 10, alignItems: 'center' },
-  gateCancelText: { color: '#B8A882', fontSize: 13 },
+  gateCancelText: { color: COLOR.muted, fontSize: 13 },
 
   // General
   centered:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-  emptyText:   { fontSize: 15, color: '#7A6E58', textAlign: 'center', lineHeight: 22 },
-  sectionLabel: { fontSize: 9, fontWeight: '700', color: '#C9A84C', letterSpacing: 2, marginBottom: 10 },
+  emptyText:   { fontSize: 15, color: COLOR.dim, textAlign: 'center', lineHeight: 22 },
+  sectionLabel: { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 2, marginBottom: 10 },
 
   // Leaderboard
-  lbCount:     { textAlign: 'center', fontSize: 11, color: '#B8A882', fontWeight: '600', paddingVertical: 10, letterSpacing: 0.5 },
+  lbCount:     { textAlign: 'center', fontSize: 11, color: COLOR.muted, fontWeight: '600', paddingVertical: 10, letterSpacing: 0.5 },
   podiumRow:   { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 8 },
   podiumItem:  { flex: 1, alignItems: 'center' },
   podiumAvatar: { borderWidth: 2, marginBottom: 4 },
-  podiumName:  { fontSize: 11, fontWeight: '600', color: '#F5EDD8', textAlign: 'center', marginBottom: 2 },
+  podiumName:  { fontSize: 11, fontWeight: '600', color: COLOR.cream, textAlign: 'center', marginBottom: 2 },
   podiumPop:   { fontWeight: '300', textAlign: 'center', marginBottom: 4 },
-  podiumBase:  { width: '100%', borderRadius: 6, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4 },
-  podiumRankText: { fontSize: 20, fontWeight: '200', color: '#B8A882' },
-  leaderRow:   { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  leaderRank:  { fontSize: 12, fontWeight: '700', color: '#7A6E58', width: 32 },
-  leaderAvatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#7DC87A33' },
-  leaderName:  { fontSize: 14, fontWeight: '600', color: '#F5EDD8' },
-  leaderSub:   { fontSize: 11, color: '#7A6E58', marginTop: 2 },
+  podiumBase:  { width: '100%', borderRadius: RADIUS.xs, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4 },
+  podiumRankText: { fontSize: 20, fontWeight: '200', color: COLOR.muted },
+  leaderRow:   { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  leaderRank:  { fontSize: 12, fontWeight: '700', color: COLOR.dim, width: 32 },
+  leaderAvatar: { width: 36, height: 36, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: '#7DC87A33' },
+  leaderName:  { fontSize: 14, fontWeight: '600', color: COLOR.cream },
+  leaderSub:   { fontSize: 11, color: COLOR.dim, marginTop: 2 },
   leaderPop:   { fontSize: 24, fontWeight: '300' },
 
   // Activity
   feedCard:    { borderBottomWidth: 1, borderBottomColor: '#7DC87A11', paddingHorizontal: 16, paddingVertical: 14 },
-  feedHandle:  { fontSize: 13, fontWeight: '700', color: '#F5EDD8' },
-  feedTime:    { fontSize: 11, color: '#7A6E58' },
-  feedAction:  { fontSize: 12, color: '#B8A882', marginBottom: 6 },
-  feedPostText: { fontSize: 14, color: '#F5EDD8', lineHeight: 20, marginBottom: 8 },
-  roundCard:   { backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', padding: 12, marginVertical: 6 },
-  roundCourse: { fontSize: 14, fontWeight: '600', color: '#F5EDD8' },
-  roundDetails: { fontSize: 11, color: '#B8A882', marginTop: 2 },
-  popBadge:    { alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 10 },
+  feedHandle:  { fontSize: 13, fontWeight: '700', color: COLOR.cream },
+  feedTime:    { fontSize: 11, color: COLOR.dim },
+  feedAction:  { fontSize: 12, color: COLOR.muted, marginBottom: 6 },
+  feedPostText: { fontSize: 14, color: COLOR.cream, lineHeight: 20, marginBottom: 8 },
+  roundCard:   { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 12, marginVertical: 6 },
+  roundCourse: { fontSize: 14, fontWeight: '600', color: COLOR.cream },
+  roundDetails: { fontSize: 11, color: COLOR.muted, marginTop: 2 },
+  popBadge:    { alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 10 },
   popScore:    { fontSize: 20, fontWeight: '300' },
   popLabel:    { fontSize: 8, fontWeight: '700', letterSpacing: 1 },
-  milestoneBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(201,168,76,0.08)', borderRadius: 10, padding: 10, marginVertical: 6 },
+  milestoneBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(201,168,76,0.08)', borderRadius: RADIUS.sm, padding: 10, marginVertical: 6 },
   milestoneEmoji:  { fontSize: 20 },
   milestoneText:   { fontSize: 13, color: '#D4B86A', flex: 1, lineHeight: 18 },
-  leaderBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(201,168,76,0.06)', borderRadius: 10, padding: 10, marginVertical: 6 },
-  leaderBannerText: { fontSize: 13, color: '#C9A84C', flex: 1 },
+  leaderBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(201,168,76,0.06)', borderRadius: RADIUS.sm, padding: 10, marginVertical: 6 },
+  leaderBannerText: { fontSize: 13, color: COLOR.gold, flex: 1 },
   lockedBar:   { flexDirection: 'row', gap: 16, marginTop: 10 },
   lockedBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.6 },
-  lockedCount: { fontSize: 12, color: '#7A6E58' },
+  lockedCount: { fontSize: 12, color: COLOR.dim },
 
   // Courses
-  searchBar:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginVertical: 12, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 14, paddingVertical: 10 },
-  searchInput: { flex: 1, fontSize: 14, color: '#F5EDD8' },
-  courseCard:  { backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10 },
-  courseName:  { fontSize: 15, fontWeight: '600', color: '#F5EDD8' },
-  courseLocation: { fontSize: 11, color: '#B8A882', marginTop: 2 },
-  coursePopBadge: { alignItems: 'center', borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 },
-  coursePopText:  { fontSize: 14, fontWeight: '500', color: '#F5EDD8' },
-  coursePopLabel: { fontSize: 7, fontWeight: '700', letterSpacing: 1, color: '#C9A84C', marginTop: 2 },
-  courseRounds:   { fontSize: 10, color: '#7A6E58', marginTop: 8, fontWeight: '500' },
+  searchBar:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginVertical: 12, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 14, paddingVertical: 10 },
+  searchInput: { flex: 1, fontSize: 14, color: COLOR.cream },
+  courseCard:  { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10 },
+  courseName:  { fontSize: 15, fontWeight: '600', color: COLOR.cream },
+  courseLocation: { fontSize: 11, color: COLOR.muted, marginTop: 2 },
+  coursePopBadge: { alignItems: 'center', borderWidth: 1, borderColor: '#C9A84C44', borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 6 },
+  coursePopText:  { fontSize: 14, fontWeight: '500', color: COLOR.cream },
+  coursePopLabel: { fontSize: 7, fontWeight: '700', letterSpacing: 1, color: COLOR.gold, marginTop: 2 },
+  courseRounds:   { fontSize: 10, color: COLOR.dim, marginTop: 8, fontWeight: '500' },
 });

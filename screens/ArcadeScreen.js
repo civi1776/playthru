@@ -152,7 +152,7 @@ function Start({ navigation, difficulty, setDifficulty, onPlay }) {
           <Text style={st.sectionQ}>HOW IT PLAYS</Text>
           <HowRow icon="locate-outline"   text="Drag from the ball to aim. Release to start the power meter, tap to lock." />
           <HowRow icon="timer-outline"    text="Stand over the ball too long and your shot cone widens. Hesitation costs accuracy and clock." />
-          <HowRow icon="car-outline"      text="After every shot, drive the cart to your ball. Carts can't enter the green — park and walk." />
+          <HowRow icon="car-outline"      text="After every shot, drive the cart to your ball. Carts can't enter the green. Park and walk." />
           <HowRow icon="trophy-outline"   text="Real Clocked scoring: par 1, birdie 3, eagle 6. Over time par costs half a point per 30s." />
         </View>
 
@@ -414,7 +414,7 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
                 <Text style={st.readout}><Text style={[st.readoutNum, { color: turbo.active ? COLOR.goldBright : COLOR.cream }]}>{mph}</Text> MPH</Text>
                 <Text style={st.readout}><Text style={st.readoutNum}>{toBall}</Text> YDS</Text>
               </View>
-              <Text style={st.subHint}>Steer with the stick. Rough and sand slide. Green's off-limits — park and walk.</Text>
+              <Text style={st.subHint}>Steer with the stick. Rough and sand slide. Green's off-limits. Park and walk.</Text>
             </View>
             <TurboButton
               charge={turbo.charge} active={turbo.active} ready={turbo.ready}
@@ -502,7 +502,7 @@ function Summary({ summary, onPlayAgain, onBack }) {
           <Text style={st.sectionQ}>ARCADE SCORE</Text>
           <Text style={[st.heroScore, { color: tier.color }]}>{summary.arcadeScore ?? '--'}</Text>
           <Text style={[st.tierLabel, { color: tier.color }]}>{tier.name}</Text>
-          <Text style={st.footnote}>Arcade only — not your real Clocked Score.</Text>
+          <Text style={st.footnote}>Arcade only. Not your real Clocked Score.</Text>
         </View>
 
         <View style={st.statGrid}>
@@ -537,7 +537,7 @@ function Summary({ summary, onPlayAgain, onBack }) {
               </View>
             );
           })}
-          <Text style={[st.footnote, { textAlign: 'left', marginTop: 8 }]}>* picked up at double bogey — the real Clocked cap.</Text>
+          <Text style={[st.footnote, { textAlign: 'left', marginTop: 8 }]}>* picked up at double bogey, the real Clocked cap.</Text>
         </View>
 
         <TouchableOpacity style={st.primaryBtn} onPress={onPlayAgain} activeOpacity={0.85}>
@@ -581,9 +581,9 @@ const st = StyleSheet.create({
 
   sectionQ: { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 8, marginTop: 20 },
   difficultyRow: { flexDirection: 'row', gap: 10 },
-  diffBtn: { flex: 1, backgroundColor: COLOR.surface, borderRadius: 14, borderWidth: 1, borderColor: COLOR.border, paddingVertical: 14, alignItems: 'center', gap: 4 },
+  diffBtn: { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, paddingVertical: 14, alignItems: 'center', gap: 4 },
   diffBtnActive: { borderColor: COLOR.gold, backgroundColor: '#C9A84C0F' },
-  diffDot: { width: 8, height: 8, borderRadius: 4, marginBottom: 2 },
+  diffDot: { width: 8, height: 8, borderRadius: RADIUS.xs, marginBottom: 2 },
   diffLabel: { fontSize: 11, fontWeight: '700', color: COLOR.dim, letterSpacing: 1 },
   diffLabelActive: { color: COLOR.cream },
   diffSub: { fontSize: 10, color: COLOR.dim },

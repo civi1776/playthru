@@ -21,7 +21,7 @@ import { searchCourses } from '../lib/courses';
 import CountdownRing from '../components/CountdownRing';
 import InitialsAvatar from '../components/InitialsAvatar';
 import { pickAndUploadAvatar } from '../lib/avatarUpload';
-import { COLOR } from '../lib/theme';
+import { COLOR, RADIUS } from '../lib/theme';
 
 const { bg: BG, surface: CARD, gold: GOLD, goldBright: GOLD_BRIGHT, cream: CREAM, muted: MUTED, dim: DIM, green: GREEN, red: RED_WARN, border: BORDER } = COLOR;
 
@@ -343,7 +343,7 @@ function StepRules({ onNext }) {
       <View style={st.rulesList}>
         <RuleRow label="CLOCKED SCORE" value="Scoring 65% + Clock 35% = one number, 0–100" />
         <RuleRow label="TIERS" value="APEX 80+ · CONTENDER 65+ · GRINDER 40+ · ON TRIAL for your first 5 rounds" />
-        <RuleRow label="COURSES" value="Ranked by real, verified pace — not popularity" />
+        <RuleRow label="COURSES" value="Ranked by real, verified pace, not popularity" />
         <RuleRow label="LEADERBOARD" value="One national board. Same rules, every course, every golfer" />
       </View>
     </StepShell>
@@ -392,7 +392,7 @@ function StepWelcomeFinal({ onEnter }) {
         </View>
         <Text style={st.eyebrow}>YOU'RE ON THE CLOCK</Text>
         <Text style={st.headline}>Welcome to Clocked Golf.</Text>
-        <Text style={st.line}>You're on the national board — provisional until your first 5 rounds. Go log one.</Text>
+        <Text style={st.line}>You're on the national board, provisional until your first 5 rounds. Go log one.</Text>
       </ScrollView>
       <TouchableOpacity style={[st.ctaBtn, { backgroundColor: GOLD }]} onPress={onEnter} activeOpacity={0.85}>
         <Text style={st.ctaText}>ENTER THE CLUBHOUSE →</Text>
@@ -424,7 +424,7 @@ const st = StyleSheet.create({
   splitNum:   { fontSize: 36, fontWeight: '200', color: GOLD, fontVariant: ['tabular-nums'] },
   splitLabel: { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 2, marginTop: 4 },
 
-  searchWrap:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 12, marginTop: 20 },
+  searchWrap:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 12, marginTop: 20 },
   searchInput:  { flex: 1, color: CREAM, fontSize: 15 },
   courseRow:    { paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: BORDER },
   courseName:   { fontSize: 14, color: CREAM, fontWeight: '600' },
@@ -432,7 +432,7 @@ const st = StyleSheet.create({
   skipInline:   { alignItems: 'center', paddingVertical: 14 },
   skipInlineText: { fontSize: 10, fontWeight: '700', color: DIM, letterSpacing: 1.5 },
 
-  leagueCard:   { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, padding: 16 },
+  leagueCard:   { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, padding: 16 },
   leagueLabel:  { fontSize: 13, fontWeight: '800', letterSpacing: 1.5, marginBottom: 4 },
   leagueDesc:   { fontSize: 12, color: MUTED, lineHeight: 17, maxWidth: 200 },
   leaguePace:   { fontSize: 20, fontWeight: '200', fontVariant: ['tabular-nums'] },
@@ -448,10 +448,10 @@ const st = StyleSheet.create({
   finalRingWrap: { alignItems: 'center', marginBottom: 8 },
 
   photoWrap:  { alignSelf: 'center', marginTop: 32, position: 'relative' },
-  photoBadge: { position: 'absolute', bottom: 2, right: 2, width: 36, height: 36, borderRadius: 18, backgroundColor: GOLD, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: BG },
+  photoBadge: { position: 'absolute', bottom: 2, right: 2, width: 36, height: 36, borderRadius: RADIUS.lg, backgroundColor: GOLD, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: BG },
   photoHint:  { alignSelf: 'center', marginTop: 14, fontSize: 10, fontWeight: '700', color: GOLD, letterSpacing: 2 },
   photoError: { alignSelf: 'center', marginTop: 10, fontSize: 12, color: RED_WARN, textAlign: 'center' },
 
-  ctaBtn:   { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
+  ctaBtn:   { borderRadius: RADIUS.md, paddingVertical: 17, alignItems: 'center' },
   ctaText:  { fontSize: 13, fontWeight: '700', color: BG, letterSpacing: 1.5 },
 });

@@ -1,12 +1,13 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLOR, RADIUS } from '../lib/theme';
 
 // level: 'self_reported' | 'gps_tracked'
 export default function VerificationBadge({ level }) {
   if (level === 'gps_tracked') {
     return (
       <View style={[b.badge, b.gps]}>
-        <Ionicons name="navigate" size={10} color="#7DC87A" style={{ marginRight: 3 }} />
+        <Ionicons name="navigate" size={10} color={COLOR.green} style={{ marginRight: 3 }} />
         <Text style={[b.text, b.gpsText]}>GPS Tracked</Text>
       </View>
     );
@@ -20,10 +21,10 @@ export default function VerificationBadge({ level }) {
 }
 
 const b = StyleSheet.create({
-  badge:     { flexDirection: 'row', alignItems: 'center', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  badge:     { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2 },
   text:      { fontSize: 9, fontWeight: '700', letterSpacing: 0.4 },
   self:      { backgroundColor: 'rgba(122,110,88,0.12)' },
-  selfText:  { color: '#7A6E58' },
+  selfText:  { color: COLOR.dim },
   gps:       { backgroundColor: 'rgba(125,200,122,0.08)', opacity: 0.6 },
-  gpsText:   { color: '#7DC87A' },
+  gpsText:   { color: COLOR.green },
 });

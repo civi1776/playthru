@@ -8,15 +8,17 @@ import { useAuth } from '../context/AuthContext';
 import { formatSeconds } from '../lib/clockedSport';
 import { sendPushToUser } from '../lib/notifications';
 import CourseAvatar from '../components/CourseAvatar';
+import ScreenHeader from '../components/ScreenHeader';
+import { COLOR, RADIUS } from '../lib/theme';
 
-const BG     = '#090F0A';
-const CARD   = '#0D1A0F';
-const GOLD   = '#C9A84C';
-const CREAM  = '#F5EDD8';
-const MUTED  = '#B8A882';
-const DIM    = '#7A6E58';
-const GREEN  = '#7DC87A';
-const RED    = '#E85D4A';
+const BG     = COLOR.bg;
+const CARD   = COLOR.surface;
+const GOLD   = COLOR.gold;
+const CREAM  = COLOR.cream;
+const MUTED  = COLOR.muted;
+const DIM    = COLOR.dim;
+const GREEN  = COLOR.green;
+const RED    = COLOR.red;
 const BORDER = '#7DC87A22';
 
 function pointsColor(pts) {
@@ -154,13 +156,7 @@ export default function ConfirmRoundScreen({ navigation, route }) {
   return (
     <SafeAreaView style={s.container}>
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn}>
-          <Ionicons name="arrow-back" size={20} color={GOLD} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>CONFIRM ROUND</Text>
-        <View style={{ width: 44 }} />
-      </View>
+      <ScreenHeader title="CONFIRM ROUND" onBack={() => navigation.goBack()} borderless />
 
       <ScrollView contentContainerStyle={s.content}>
         {/* Round info */}
@@ -186,7 +182,7 @@ export default function ConfirmRoundScreen({ navigation, route }) {
         {/* Your scorecard */}
         {!hasScores && (
           <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, color: '#7A6E58', textAlign: 'center', lineHeight: 19 }}>
+            <Text style={{ fontSize: 13, color: COLOR.dim, textAlign: 'center', lineHeight: 19 }}>
               Your scores weren't recorded for this round.{'\n'}You can still confirm your participation.
             </Text>
           </View>
@@ -248,23 +244,19 @@ const s = StyleSheet.create({
   container:   { flex: 1, backgroundColor: BG },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   errorText:   { fontSize: 14, color: DIM },
-  backBtn:     { backgroundColor: GOLD, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20 },
+  backBtn:     { backgroundColor: GOLD, borderRadius: RADIUS.sm, paddingVertical: 10, paddingHorizontal: 20 },
   backBtnText: { fontSize: 12, fontWeight: '700', color: BG, letterSpacing: 2 },
-
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10 },
-  headerBtn:   { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 12, fontWeight: '700', color: GOLD, letterSpacing: 3 },
 
   content:     { paddingHorizontal: 16, paddingBottom: 40 },
   courseName:  { fontSize: 22, fontWeight: '600', color: CREAM, textAlign: 'center', marginTop: 8, marginBottom: 4 },
   meta:        { fontSize: 12, color: DIM, textAlign: 'center', marginBottom: 16 },
 
-  statusBadge: { alignSelf: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16 },
+  statusBadge: { alignSelf: 'center', borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16 },
   statusText:  { fontSize: 10, fontWeight: '700', letterSpacing: 2 },
 
   sectionLabel:{ fontSize: 9, fontWeight: '700', color: GOLD, letterSpacing: 3, marginBottom: 8 },
 
-  card:        { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 20 },
+  card:        { backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: 12, marginBottom: 20 },
   scHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, paddingBottom: 6, marginBottom: 4 },
   scRow:       { flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#7DC87A0D' },
   scTotalRow:  { flexDirection: 'row', paddingVertical: 6, borderTopWidth: 1, borderTopColor: GOLD + '44', marginTop: 4 },
@@ -278,7 +270,7 @@ const s = StyleSheet.create({
 
   actions:     { alignItems: 'center', gap: 12 },
   actionsHint: { fontSize: 12, color: DIM, textAlign: 'center', marginBottom: 4, lineHeight: 18 },
-  confirmBtn:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: GREEN, borderRadius: 14, paddingVertical: 16, paddingHorizontal: 36, width: '100%', justifyContent: 'center' },
+  confirmBtn:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: GREEN, borderRadius: RADIUS.md, paddingVertical: 16, paddingHorizontal: 36, width: '100%', justifyContent: 'center' },
   confirmBtnText: { fontSize: 13, fontWeight: '700', color: BG, letterSpacing: 2 },
   declineBtn:  { paddingVertical: 10 },
   declineBtnText: { fontSize: 13, color: DIM },

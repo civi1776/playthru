@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, Image } from 'react-native';
+import { COLOR } from '../lib/theme';
 
 const BG_COLORS = ['#1E3D22', '#1A2E3D', '#2D1A3D', '#3D2A1A', '#1A3D35', '#3D1A2A', '#252030', '#2A2D1A'];
 function avatarBg(name) {
@@ -46,7 +47,7 @@ function InitialsAvatar({ name, size = 40, avatarUrl, username }) {
           onError={() => setImgError(true)}
         />
       ) : initials ? (
-        <Text style={{ color: '#F5EDD8', fontSize: Math.round(size * 0.35), fontWeight: '600' }}>{initials}</Text>
+        <Text style={{ color: COLOR.cream, fontSize: Math.round(size * 0.35), fontWeight: '600' }}>{initials}</Text>
       ) : (
         <View style={{ width: size * 0.5, height: size * 0.5, borderRadius: size * 0.25, backgroundColor: '#C9A84C33', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: '#C9A84C88', fontSize: Math.round(size * 0.28) }}>{'\u{1F464}'}</Text>

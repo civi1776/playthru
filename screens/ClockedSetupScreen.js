@@ -15,15 +15,17 @@ import CourseAvatar from '../components/CourseAvatar';
 import { fetchClockedConfig } from '../lib/clockedConfig';
 import { isPar3Course } from '../lib/popScore';
 import InitialsAvatar from '../components/InitialsAvatar';
+import Button from '../components/Button';
+import { COLOR, RADIUS } from '../lib/theme';
 
 // ─── Tee colors (reused from LiveRoundScreen pattern) ────────────────────────
 const TEE_COLORS = {
-  black: '#2A2A2A', blue: '#3B6FB6', white: '#E8E8E8', gold: '#C9A84C',
+  black: '#2A2A2A', blue: '#3B6FB6', white: '#E8E8E8', gold: COLOR.gold,
   red: '#C07A6A', green: '#4A7A50', yellow: '#D4B86A', silver: '#A8A8A8',
   bronze: '#B87333', orange: '#D4844A',
 };
 
-const PHASE = { COURSE: 0, HOLES: 1, TEE: 2, MODE: 3, PLAYERS: 4, TRANSPORT: 5, CONFIRM: 6 };
+const PHASE = { COURSE: 0, HOLES: 1, TEE: 2, MODE: 3, PLAYERS: 4, TRANSPORT: 5 };
 // Dots are built from the steps this round will actually show (see visibleSteps).
 
 export default function ClockedSetupScreen({ navigation }) {
@@ -186,7 +188,6 @@ export default function ClockedSetupScreen({ navigation }) {
     setPhase(PHASE.TRANSPORT);
   };
 
-  const handleTransportNext = () => setPhase(PHASE.CONFIRM);
 
   const handleStartRound = async () => {
     const config = await fetchClockedConfig();
@@ -258,7 +259,6 @@ export default function ClockedSetupScreen({ navigation }) {
       setPhase(mode === 1 ? PHASE.MODE : PHASE.PLAYERS);
       return;
     }
-    if (phase === PHASE.CONFIRM) { setPhase(PHASE.TRANSPORT); return; }
   };
 
   // ── Tee picker helpers ──
@@ -273,23 +273,22 @@ export default function ClockedSetupScreen({ navigation }) {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={handleBack} style={s.backBtn} accessibilityLabel="Go back" accessibilityRole="button">
-          <Ionicons name={phase === PHASE.COURSE ? 'close' : 'arrow-back'} size={20} color="#C9A84C" />
+          <Ionicons name={phase === PHASE.COURSE ? 'close' : 'arrow-back'} size={20} color={COLOR.gold} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>CLOCKED</Text>
         <TouchableOpacity onPress={() => navigation.navigate('RulesScreen')} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }} activeOpacity={0.7}>
-          <Ionicons name="help-circle-outline" size={22} color="#C9A84C" />
+          <Ionicons name="help-circle-outline" size={22} color={COLOR.gold} />
         </TouchableOpacity>
       </View>
 
       {/* Step dots */}
-      {phase <= PHASE.CONFIRM && (() => {
+      {phase <= PHASE.TRANSPORT && (() => {
         const visibleSteps = [
           PHASE.COURSE,
           (courseTees?.length ?? 0) > 0 ? PHASE.TEE : null,
           PHASE.MODE,
           mode > 1 ? PHASE.PLAYERS : null,
           PHASE.TRANSPORT,
-          PHASE.CONFIRM,
         ].filter(p => p != null);
         const at = Math.max(0, visibleSteps.indexOf(phase));
         return (
@@ -337,7 +336,7 @@ export default function ClockedSetupScreen({ navigation }) {
               activeOpacity={0.8}
               accessibilityLabel="Play Clocked Arcade"
             >
-              <Ionicons name="game-controller-outline" size={20} color="#C9A84C" />
+              <Ionicons name="game-controller-outline" size={20} color={COLOR.gold} />
               <View style={{ flex: 1 }}>
                 <Text style={s.arcadeTitle}>Not at a course? Play Clocked Arcade →</Text>
                 <Text style={s.arcadeSub}>Same rules, same clock. Never touches your real stats.</Text>
@@ -390,7 +389,7 @@ export default function ClockedSetupScreen({ navigation }) {
               const sel = selectedTeeIdx === i || (selectedTeeIdx != null && courseTees[selectedTeeIdx] === tee);
               const actualIdx = courseTees.indexOf(tee);
               const colorKey = tee.tee_name?.toLowerCase().split(' ')[0];
-              const dotColor = TEE_COLORS[colorKey] ?? '#B8A882';
+              const dotColor = TEE_COLORS[colorKey] ?? COLOR.muted;
               return (
                 <TouchableOpacity
                   key={i}
@@ -406,7 +405,7 @@ export default function ClockedSetupScreen({ navigation }) {
                       {tee.course_rating ? `  ·  ${tee.course_rating}/${tee.slope_rating}` : ''}
                     </Text>
                   </View>
-                  {sel && <Ionicons name="checkmark" size={16} color="#C9A84C" />}
+                  {sel && <Ionicons name="checkmark" size={16} color={COLOR.gold} />}
                 </TouchableOpacity>
               );
             })}
@@ -434,13 +433,13 @@ export default function ClockedSetupScreen({ navigation }) {
                 activeOpacity={0.8}
               >
                 <View style={s.modeIcon}>
-                  <Ionicons name={v === 1 ? 'person' : 'people'} size={20} color="#C9A84C" />
+                  <Ionicons name={v === 1 ? 'person' : 'people'} size={20} color={COLOR.gold} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.modeName}>{label}</Text>
                   <Text style={s.modeSub}>{sub}</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color="#7A6E58" />
+                <Ionicons name="chevron-forward" size={16} color={COLOR.dim} />
               </TouchableOpacity>
             ))}
           </View>
@@ -497,12 +496,12 @@ export default function ClockedSetupScreen({ navigation }) {
                       onPress={() => { setPlayerSearchIdx(i); setPlayerQuery(''); setPlayerResults([]); }}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="person-add-outline" size={16} color="#C9A84C" />
+                      <Ionicons name="person-add-outline" size={16} color={COLOR.gold} />
                     </TouchableOpacity>
                   )}
                   <TextInput
                     style={[s.playerInput, s.hcpInput]}
-                    placeholder="HCP"
+                    placeholder="Hcp"
                     placeholderTextColor="#B8A88266"
                     value={pl.handicap}
                     onChangeText={v => {
@@ -538,7 +537,7 @@ export default function ClockedSetupScreen({ navigation }) {
                       </TouchableOpacity>
                     ))}
                     <TouchableOpacity onPress={() => setPlayerSearchIdx(null)} style={{ paddingVertical: 8, alignItems: 'center' }}>
-                      <Text style={{ fontSize: 11, color: '#7A6E58' }}>Cancel</Text>
+                      <Text style={{ fontSize: 11, color: COLOR.dim }}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -562,6 +561,13 @@ export default function ClockedSetupScreen({ navigation }) {
           <View>
             <Text style={s.stepTitle}>Set up the round</Text>
             <Text style={s.stepSub}>Holes, how you're getting around, and the clock. Walking earns more time per hole.</Text>
+            <View style={s.summaryStrip}>
+              <Text style={s.summaryMain} numberOfLines={1}>{course?.name ?? 'No course · manual par'}</Text>
+              <Text style={s.summaryMeta} numberOfLines={1}>
+                {mode === 1 ? 'Solo' : `${mode} players · ${players.map(p => p.name || '—').join(', ')}`}
+                {selectedTee ? ` · ${selectedTee.tee_name} tees` : ''}
+              </Text>
+            </View>
             <Text style={s.sectionQ}>HOLES</Text>
             <View style={s.btnGroup}>
               {[{ label: '9 Holes', v: '9' }, { label: '18 Holes', v: '18' }].map(({ label, v }) => (
@@ -587,7 +593,7 @@ export default function ClockedSetupScreen({ navigation }) {
                   <Ionicons
                     name={t === 'Walking' ? 'walk-outline' : 'car-outline'}
                     size={18}
-                    color={transport === t ? '#C9A84C' : '#7A6E58'}
+                    color={transport === t ? COLOR.gold : COLOR.dim}
                     style={{ marginRight: 8 }}
                   />
                   <Text style={[s.groupBtnTxt, transport === t && s.groupBtnTxtOn]}>{t}</Text>
@@ -598,9 +604,9 @@ export default function ClockedSetupScreen({ navigation }) {
             <Text style={[s.sectionQ, { marginTop: 24 }]}>SHOT CLOCK DIFFICULTY</Text>
             <View style={s.difficultyRow}>
               {[
-                { key: 'beginner',     label: 'BEGINNER', sub: '~4:30 round', color: '#7DC87A' },
-                { key: 'intermediate', label: 'INTER.',   sub: '~3:30 round', color: '#D9954C' },
-                { key: 'pro',          label: 'PRO',      sub: '~3:00 round', color: '#E85D4A' },
+                { key: 'beginner',     label: 'BEGINNER', sub: '~4:30 round', color: COLOR.green },
+                { key: 'intermediate', label: 'INTER.',   sub: '~3:30 round', color: COLOR.amber },
+                { key: 'pro',          label: 'PRO',      sub: '~3:00 round', color: COLOR.red },
               ].map(d => (
                 <TouchableOpacity
                   key={d.key}
@@ -615,71 +621,11 @@ export default function ClockedSetupScreen({ navigation }) {
               ))}
             </View>
 
-            <TouchableOpacity
-              style={[s.primaryBtn, { marginTop: 32 }, !transport && s.primaryBtnDisabled]}
-              onPress={handleTransportNext}
-              disabled={!transport}
-              activeOpacity={0.8}
-            >
-              <Text style={s.primaryBtnText}>CONTINUE</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ── CONFIRM ── */}
-        {phase === PHASE.CONFIRM && (
-          <View style={s.confirmWrap}>
-            <Text style={[s.confirmCourse, !course && { color: '#B8A882', fontWeight: '500' }]}>{course?.name ?? 'No course selected'}</Text>
-            {!course && (
-              <TouchableOpacity onPress={() => setPhase(PHASE.COURSE)} style={{ marginBottom: 12 }}>
-                <Text style={s.backLink}>Pick a course</Text>
-              </TouchableOpacity>
-            )}
-
-            <View style={s.confirmGrid}>
-              <View style={s.confirmItem}>
-                <Text style={s.confirmLabel}>HOLES</Text>
-                <Text style={s.confirmValue}>{holes}</Text>
-              </View>
-              <View style={s.confirmItem}>
-                <Text style={s.confirmLabel}>MODE</Text>
-                <Text style={s.confirmValue}>{mode === 1 ? 'Solo' : `${mode}-Player`}</Text>
-              </View>
-              <View style={s.confirmItem}>
-                <Text style={s.confirmLabel}>TRANSPORT</Text>
-                <Text style={s.confirmValue}>{transport}</Text>
-              </View>
-              <View style={s.confirmItem}>
-                <Text style={s.confirmLabel}>DIFFICULTY</Text>
-                <Text style={s.confirmValue}>{difficulty === 'pro' ? 'Pro' : difficulty === 'beginner' ? 'Beginner' : 'Intermediate'}</Text>
-              </View>
-            </View>
-
-            {selectedTee && (
-              <View style={s.confirmItem}>
-                <Text style={s.confirmLabel}>TEE</Text>
-                <Text style={s.confirmValue}>{selectedTee.tee_name}{selectedTee.total_yards ? ` · ${selectedTee.total_yards} yds` : ''}</Text>
-              </View>
-            )}
-
-            {mode > 1 && (
-              <View style={[s.confirmItem, { marginTop: 8 }]}>
-                <Text style={s.confirmLabel}>PLAYERS</Text>
-                <Text style={s.confirmValue}>{players.map(p => p.name || '—').join(', ')}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity style={s.startBtn} onPress={handleStartRound} activeOpacity={0.85}>
-              <Ionicons name="timer-outline" size={22} color="#090F0A" style={{ marginRight: 10 }} />
-              <Text style={s.startBtnTxt}>START ROUND</Text>
-            </TouchableOpacity>
+            <Button label="START ROUND" icon="timer-outline" size="lg" onPress={handleStartRound} disabled={!transport} style={{ marginTop: 28 }} />
             <Text style={s.startSub}>Your shot clock begins on hole 1</Text>
-
-            <TouchableOpacity onPress={() => setPhase(PHASE.TRANSPORT)} style={{ marginTop: 12 }}>
-              <Text style={s.backLink}>← Edit details</Text>
-            </TouchableOpacity>
           </View>
         )}
+
       </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -688,92 +634,95 @@ export default function ClockedSetupScreen({ navigation }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: '#090F0A' },
+  container:   { flex: 1, backgroundColor: COLOR.bg },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   backBtn:     { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 4 },
+  headerTitle: { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 4 },
   dotsRow:     { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingBottom: 12 },
-  dot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: '#1A2E1C' },
-  dotActive:   { backgroundColor: '#C9A84C', width: 18 },
+  dot:         { width: 8, height: 8, borderRadius: RADIUS.xs, backgroundColor: COLOR.surfaceAlt },
+  dotActive:   { backgroundColor: COLOR.gold, width: 18 },
   dotDone:     { backgroundColor: '#4A7A50' },
   content:     { paddingHorizontal: 20, paddingBottom: 40 },
 
-  stepTitle:   { fontSize: 22, fontWeight: '600', color: '#F5EDD8', marginBottom: 6, marginTop: 8 },
-  stepSub:     { fontSize: 13, color: '#B8A882', marginBottom: 20, lineHeight: 19 },
-  sectionQ:    { fontSize: 10, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 8, marginTop: 12 },
+  stepTitle:   { fontSize: 22, fontWeight: '600', color: COLOR.cream, marginBottom: 6, marginTop: 8 },
+  stepSub:     { fontSize: 13, color: COLOR.muted, marginBottom: 20, lineHeight: 19 },
+  sectionQ:    { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 8, marginTop: 12 },
 
-  searchInput: { backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#7DC87A33', borderRadius: 14, padding: 14, color: '#F5EDD8', fontSize: 15, marginBottom: 12 },
+  searchInput: { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.md, padding: 14, color: COLOR.cream, fontSize: 15, marginBottom: 12 },
   skipCourseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: 12 },
   skipCourseText:{ fontSize: 12, color: '#C9A84C88', fontWeight: '500' },
-  arcadeCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#C9A84C33', paddingVertical: 12, paddingHorizontal: 14, marginBottom: 14 },
-  arcadeTitle:   { fontSize: 13, color: '#F5EDD8', fontWeight: '600' },
-  arcadeSub:     { fontSize: 11, color: '#7A6E58', marginTop: 2 },
-  courseRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', padding: 12, marginBottom: 8, gap: 12 },
-  courseName:  { fontSize: 14, fontWeight: '500', color: '#F5EDD8' },
-  courseSub:   { fontSize: 11, color: '#B8A882', marginTop: 2 },
+  arcadeCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C9A84C33', paddingVertical: 12, paddingHorizontal: 14, marginBottom: 14 },
+  arcadeTitle:   { fontSize: 13, color: COLOR.cream, fontWeight: '600' },
+  arcadeSub:     { fontSize: 11, color: COLOR.dim, marginTop: 2 },
+  courseRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 12, marginBottom: 8, gap: 12 },
+  courseName:  { fontSize: 14, fontWeight: '500', color: COLOR.cream },
+  courseSub:   { fontSize: 11, color: COLOR.muted, marginTop: 2 },
 
   btnGroup:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  groupBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A33', backgroundColor: '#0D1A0F' },
+  groupBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 18, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A33', backgroundColor: COLOR.surface },
   groupBtnWide:{ flex: 1 },
-  groupBtnOn:  { backgroundColor: '#1E4825', borderColor: '#C9A84C' },
-  groupBtnTxt: { fontSize: 14, color: '#B8A882', fontWeight: '500' },
-  groupBtnTxtOn: { color: '#C9A84C', fontWeight: '700' },
+  groupBtnOn:  { backgroundColor: '#1E4825', borderColor: COLOR.gold },
+  groupBtnTxt: { fontSize: 14, color: COLOR.muted, fontWeight: '500' },
+  groupBtnTxtOn: { color: COLOR.gold, fontWeight: '700' },
 
-  primaryBtn:     { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  primaryBtn:     { backgroundColor: COLOR.gold, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center' },
   primaryBtnDisabled: { backgroundColor: '#C9A84C44' },
-  primaryBtnText: { fontSize: 12, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
+  primaryBtnText: { fontSize: 12, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
 
-  backLink:    { fontSize: 13, color: '#C9A84C', textAlign: 'center' },
+  backLink:    { fontSize: 13, color: COLOR.gold, textAlign: 'center' },
 
   // Tee picker
-  teeCard:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 12, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, gap: 12 },
-  teeCardOn:   { borderColor: '#C9A84C', backgroundColor: '#1A2E1C' },
-  teeDot:      { width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: '#ffffff33' },
-  teeName:     { fontSize: 14, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
-  teeNameOn:   { color: '#C9A84C' },
-  teeMeta:     { fontSize: 11, color: '#B8A882' },
+  teeCard:     { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, gap: 12 },
+  teeCardOn:   { borderColor: COLOR.gold, backgroundColor: COLOR.surfaceAlt },
+  teeDot:      { width: 14, height: 14, borderRadius: RADIUS.xs, borderWidth: 1.5, borderColor: '#ffffff33' },
+  teeName:     { fontSize: 14, fontWeight: '600', color: COLOR.cream, marginBottom: 2 },
+  teeNameOn:   { color: COLOR.gold },
+  teeMeta:     { fontSize: 11, color: COLOR.muted },
 
   // Mode cards
-  modeCard:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, marginBottom: 10, gap: 14 },
-  modeIcon:    { width: 44, height: 44, borderRadius: 12, backgroundColor: '#1A2E1C', alignItems: 'center', justifyContent: 'center' },
-  modeName:    { fontSize: 16, fontWeight: '600', color: '#F5EDD8', marginBottom: 2 },
-  modeSub:     { fontSize: 12, color: '#B8A882' },
+  modeCard:    { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 16, marginBottom: 10, gap: 14 },
+  modeIcon:    { width: 44, height: 44, borderRadius: RADIUS.md, backgroundColor: COLOR.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  modeName:    { fontSize: 16, fontWeight: '600', color: COLOR.cream, marginBottom: 2 },
+  modeSub:     { fontSize: 12, color: COLOR.muted },
 
   // Player entry
   playerRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  playerNum:   { width: 30, height: 30, borderRadius: 15, backgroundColor: '#1A2E1C', alignItems: 'center', justifyContent: 'center' },
-  playerNumTxt:{ fontSize: 13, fontWeight: '700', color: '#C9A84C' },
-  playerInput: { backgroundColor: '#0D1A0F', borderWidth: 1, borderColor: '#C9A84C22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#F5EDD8', fontSize: 14 },
+  playerNum:   { width: 30, height: 30, borderRadius: 15, backgroundColor: COLOR.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  playerNumTxt:{ fontSize: 13, fontWeight: '700', color: COLOR.gold },
+  playerInput: { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#C9A84C22', borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, color: COLOR.cream, fontSize: 14 },
   hcpInput:    { width: 64, textAlign: 'center' },
-  linkedPlayer:{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0D1A0F', borderRadius: 10, borderWidth: 1, borderColor: '#7DC87A44', paddingHorizontal: 10, paddingVertical: 8 },
-  linkedName:  { fontSize: 14, fontWeight: '500', color: '#F5EDD8' },
-  linkedHandle:{ fontSize: 10, color: '#B8A882' },
-  linkBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1A2E1C', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
-  searchDropdown:     { backgroundColor: '#0D1A0F', borderRadius: 10, borderWidth: 1, borderColor: '#C9A84C33', marginBottom: 8, marginLeft: 38, overflow: 'hidden' },
-  searchDropdownInput:{ padding: 10, color: '#F5EDD8', fontSize: 13, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
+  linkedPlayer:{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#7DC87A44', paddingHorizontal: 10, paddingVertical: 8 },
+  linkedName:  { fontSize: 14, fontWeight: '500', color: COLOR.cream },
+  linkedHandle:{ fontSize: 10, color: COLOR.muted },
+  linkBtn:     { width: 36, height: 36, borderRadius: RADIUS.lg, backgroundColor: COLOR.surfaceAlt, borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
+  searchDropdown:     { backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#C9A84C33', marginBottom: 8, marginLeft: 38, overflow: 'hidden' },
+  searchDropdownInput:{ padding: 10, color: COLOR.cream, fontSize: 13, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
   searchResultRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderBottomWidth: 1, borderBottomColor: '#7DC87A11' },
-  searchResultName:   { fontSize: 13, fontWeight: '500', color: '#F5EDD8' },
-  searchResultHandle: { fontSize: 10, color: '#B8A882' },
+  searchResultName:   { fontSize: 13, fontWeight: '500', color: COLOR.cream },
+  searchResultHandle: { fontSize: 10, color: COLOR.muted },
   hcpWarning:  { fontSize: 11, color: '#D4844A', marginTop: 8, fontStyle: 'italic' },
 
   // Difficulty picker
   difficultyRow:  { flexDirection: 'row', gap: 10 },
-  diffBtn:        { flex: 1, backgroundColor: '#0D1A0F', borderRadius: 14, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, alignItems: 'center', gap: 4 },
-  diffBtnActive:  { borderColor: '#C9A84C', backgroundColor: '#C9A84C0F' },
-  diffDot:        { width: 10, height: 10, borderRadius: 5 },
-  diffLabel:      { fontSize: 11, fontWeight: '700', color: '#7A6E58', letterSpacing: 1 },
-  diffLabelActive:{ color: '#F5EDD8' },
-  diffSub:        { fontSize: 9, color: '#7A6E58' },
+  diffBtn:        { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, alignItems: 'center', gap: 4 },
+  diffBtnActive:  { borderColor: COLOR.gold, backgroundColor: '#C9A84C0F' },
+  diffDot:        { width: 10, height: 10, borderRadius: RADIUS.xs },
+  diffLabel:      { fontSize: 11, fontWeight: '700', color: COLOR.dim, letterSpacing: 1 },
+  diffLabelActive:{ color: COLOR.cream },
+  diffSub:        { fontSize: 9, color: COLOR.dim },
 
   // Confirm
+  summaryStrip: { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 14, paddingVertical: 10, marginBottom: 6 },
+  summaryMain:  { fontSize: 14, fontWeight: '600', color: COLOR.cream },
+  summaryMeta:  { fontSize: 11, color: COLOR.dim, marginTop: 2 },
   confirmWrap:   { alignItems: 'center', paddingTop: 12 },
-  confirmCourse: { fontSize: 24, fontWeight: '600', color: '#C9A84C', textAlign: 'center', marginBottom: 16, letterSpacing: 0.5 },
+  confirmCourse: { fontSize: 24, fontWeight: '600', color: COLOR.gold, textAlign: 'center', marginBottom: 16, letterSpacing: 0.5 },
   confirmGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12, width: '100%' },
-  confirmItem:   { flex: 1, minWidth: '40%', backgroundColor: '#0D1A0F', borderRadius: 10, borderWidth: 1, borderColor: '#7DC87A22', padding: 12 },
-  confirmLabel:  { fontSize: 9, fontWeight: '700', color: '#7A6E58', letterSpacing: 2, marginBottom: 4 },
-  confirmValue:  { fontSize: 15, fontWeight: '500', color: '#F5EDD8' },
+  confirmItem:   { flex: 1, minWidth: '40%', backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#7DC87A22', padding: 12 },
+  confirmLabel:  { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 4 },
+  confirmValue:  { fontSize: 15, fontWeight: '500', color: COLOR.cream },
 
-  startBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#C9A84C', borderRadius: 16, paddingVertical: 18, width: '100%', marginTop: 20 },
-  startBtnTxt: { fontSize: 14, fontWeight: '700', color: '#090F0A', letterSpacing: 3 },
-  startSub:    { fontSize: 11, color: '#7A6E58', marginTop: 8 },
+  startBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLOR.gold, borderRadius: RADIUS.lg, paddingVertical: 18, width: '100%', marginTop: 20 },
+  startBtnTxt: { fontSize: 14, fontWeight: '700', color: COLOR.bg, letterSpacing: 3 },
+  startSub:    { fontSize: 11, color: COLOR.dim, marginTop: 10, textAlign: 'center' },
 });

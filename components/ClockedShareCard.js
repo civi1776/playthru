@@ -4,7 +4,7 @@
 // readable at thumbnail size on social media.
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLOR, scoreTier } from '../lib/theme';
+import { COLOR, scoreTier, RADIUS } from '../lib/theme';
 
 const LOGO = require('../assets/PlayThru_Logo.png');
 
@@ -52,7 +52,7 @@ export function StatCard({ score, courseName, players, holes, clockedScore, date
 }
 
 const stat = StyleSheet.create({
-  card:       { width: 340, backgroundColor: COLOR.bg, borderWidth: 0.5, borderColor: COLOR.gold, borderRadius: 16, padding: 20, alignSelf: 'center' },
+  card:       { width: 340, backgroundColor: COLOR.bg, borderWidth: 0.5, borderColor: COLOR.gold, borderRadius: RADIUS.lg, padding: 20, alignSelf: 'center' },
   topBar:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   logo:       { width: 30, height: 30, tintColor: COLOR.gold },
   topRight:   { fontSize: 9, color: COLOR.dim, letterSpacing: 1 },
@@ -170,15 +170,15 @@ export function RoundCard({ score, courseName, players, holes, clockedScore, dat
 }
 
 const rnd = StyleSheet.create({
-  card:              { width: 340, backgroundColor: COLOR.surface, borderWidth: 0.5, borderColor: COLOR.green + '44', borderRadius: 16, overflow: 'hidden', alignSelf: 'center' },
+  card:              { width: 340, backgroundColor: COLOR.surface, borderWidth: 0.5, borderColor: COLOR.green + '44', borderRadius: RADIUS.lg, overflow: 'hidden', alignSelf: 'center' },
   photoWrap:         { height: 120, position: 'relative' },
   photo:             { width: '100%', height: 120 },
   photoPlaceholder:  { width: '100%', height: 120, backgroundColor: COLOR.surfaceAlt, justifyContent: 'center', alignItems: 'center' },
   photoLogo:         { width: 44, height: 44, tintColor: COLOR.green + '66' },
   scrim:             { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 },
   photoBadgeRow:     { position: 'absolute', top: 12, left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between' },
-  badge:             { backgroundColor: '#00000066', borderWidth: 0.5, borderColor: '#FFFFFF33', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-  brandBadge:        { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#00000066', borderWidth: 0.5, borderColor: '#FFFFFF33', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  badge:             { backgroundColor: '#00000066', borderWidth: 0.5, borderColor: '#FFFFFF33', borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 4 },
+  brandBadge:        { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#00000066', borderWidth: 0.5, borderColor: '#FFFFFF33', borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 4 },
   brandBadgeLogo:    { width: 12, height: 12, tintColor: COLOR.cream },
   badgeText:         { fontSize: 8, fontWeight: '700', color: COLOR.cream, letterSpacing: 1.5 },
   body:              { padding: 16 },
@@ -189,7 +189,7 @@ const rnd = StyleSheet.create({
   scoreUnit:         { fontSize: 9, fontWeight: '700', letterSpacing: 2, marginBottom: 2 },
   gridLabel:         { fontSize: 8, color: COLOR.dim, letterSpacing: 2, marginBottom: 6 },
   holeGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 12 },
-  holeCell:          { width: 30, height: 30, borderRadius: 6, borderWidth: 0.5, alignItems: 'center', justifyContent: 'center' },
+  holeCell:          { width: 30, height: 30, borderRadius: RADIUS.xs, borderWidth: 0.5, alignItems: 'center', justifyContent: 'center' },
   holeCellTop:       { fontSize: 7, lineHeight: 10 },
   holeCellScore:     { fontSize: 10, fontWeight: '700', lineHeight: 12 },
   divider:           { height: 0.5, backgroundColor: COLOR.border, marginBottom: 10 },

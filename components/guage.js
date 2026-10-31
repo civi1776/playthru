@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { COLOR } from '../lib/theme';
 
 export default function Gauge({ score = 65, max = 100, size = 220 }) {
   const scale = size / 220;
@@ -14,7 +15,7 @@ export default function Gauge({ score = 65, max = 100, size = 220 }) {
 
   // Same thresholds as LeaderboardScreen's clockedColor() — 70/40 on the 0–100 scale.
   const pct = max > 0 ? score / max : 0;
-  const color = score >= 0.7 * max ? '#7DC87A' : score >= 0.4 * max ? '#C9A84C' : '#B8A882';
+  const color = score >= 0.7 * max ? COLOR.green : score >= 0.4 * max ? COLOR.gold : COLOR.muted;
 
   // Count-up animation for the score number (setInterval — works in Expo Go)
   const [displayScore, setDisplayScore] = useState(0);
@@ -96,6 +97,6 @@ export default function Gauge({ score = 65, max = 100, size = 220 }) {
 const styles = StyleSheet.create({
   container: { alignItems: 'center', justifyContent: 'center' },
   center:    { position: 'absolute', alignItems: 'center' },
-  score:     { fontWeight: '300', color: '#F5EDD8' },
-  label:     { fontWeight: '700', color: '#C9A84C', letterSpacing: 3 },
+  score:     { fontWeight: '300', color: COLOR.cream },
+  label:     { fontWeight: '700', color: COLOR.gold, letterSpacing: 3 },
 });

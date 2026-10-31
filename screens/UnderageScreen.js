@@ -1,13 +1,14 @@
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { COLOR } from '../lib/theme';
 
 export default function UnderageScreen() {
   return (
     <SafeAreaView style={s.container}>
       <View style={s.content}>
         <View style={s.iconWrap}>
-          <Ionicons name="flag" size={52} color="#C9A84C" />
+          <Ionicons name="flag" size={52} color={COLOR.gold} />
         </View>
         <Text style={s.eyebrow}>CLOCKED GOLF</Text>
         <Text style={s.title}>Age Requirement</Text>
@@ -30,12 +31,12 @@ export default function UnderageScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#090F0A' },
+  container: { flex: 1, backgroundColor: COLOR.bg },
   content:   { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   iconWrap:  { marginBottom: 20 },
-  eyebrow:   { fontSize: 10, fontWeight: '700', color: '#C9A84C', letterSpacing: 5, marginBottom: 16 },
-  title:     { fontSize: 26, color: '#F5EDD8', fontWeight: '600', marginBottom: 14, textAlign: 'center' },
-  body:      { fontSize: 16, color: '#F5EDD8', textAlign: 'center', lineHeight: 26, marginBottom: 14 },
+  eyebrow:   { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 5, marginBottom: 16 },
+  title:     { fontSize: 26, color: COLOR.cream, fontWeight: '600', marginBottom: 14, textAlign: 'center' },
+  body:      { fontSize: 16, color: COLOR.cream, textAlign: 'center', lineHeight: 26, marginBottom: 14 },
   sub:       { fontSize: 13, color: 'rgba(245,237,216,0.45)', textAlign: 'center', lineHeight: 21, marginBottom: 36 },
-  link:      { fontSize: 13, color: '#C9A84C', textDecorationLine: 'underline', textAlign: 'center' },
+  link:      { fontSize: 13, color: COLOR.gold, textDecorationLine: 'underline', textAlign: 'center' },
 });
