@@ -3,7 +3,7 @@
     "name": "Clocked Golf",
     "slug": "playthru",
     "scheme": "playthru",
-    "version": "1.5.5",
+    "version": "1.6.0",
     "orientation": "portrait",
     "icon": "./assets/PlayThru_AppIcon.png",
     "userInterfaceStyle": "light",
@@ -30,7 +30,7 @@
         "NSSupportsLiveActivities": true
       },
       "buildNumber": "9",
-      "version": "1.5.5",
+      "version": "1.6.0",
       "entitlements": {
         "com.apple.security.application-groups": ["group.com.civiswings.playthru"]
       }
