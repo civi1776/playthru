@@ -9,6 +9,8 @@ import { PROFILE_COLUMNS } from '../lib/profileColumns';
 import { useAuth } from '../context/AuthContext';
 import { sendLocalNotification, sendPushToUser } from '../lib/notifications';
 import ChallengeButton from '../components/ChallengeButton';
+import { createArcadeChallenge } from '../lib/arcade/challenges';
+import { loadArcadeDifficulty } from '../lib/arcade/avatar';
 import Gauge from '../components/guage';
 import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
@@ -291,6 +293,27 @@ export default function PublicProfileScreen({ navigation, route }) {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Arcade duel — any visitor, no rounds required */}
+      {!isOwnProfile && myUid && (
+        <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 6, justifyContent: 'flex-end' }}>
+          <TouchableOpacity
+            style={s.vsBtn}
+            onPress={async () => {
+              try {
+                const difficulty = await loadArcadeDifficulty('intermediate');
+                await createArcadeChallenge({ me: myUid, myUsername: myProfile?.username, opponentId: userId, opponentUsername: profile.username, difficulty });
+                Alert.alert('Challenge sent', `${profile.username ? '@' + profile.username : 'They'} will get a notification. Same nine holes, ${difficulty}, seven days. Track it on the Arcade tab.`);
+              } catch (e) { Alert.alert('Challenge not sent', e?.message ?? 'Check your connection and try again.'); }
+            }}
+            activeOpacity={0.8}
+            accessibilityLabel={`Challenge ${profile.username ?? 'this player'} in the Arcade`}
+          >
+            <Ionicons name="game-controller-outline" size={11} color={COLOR.muted} />
+            <Text style={s.vsBtnText}>ARCADE DUEL</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Challenge + Rivalry — visitors only, golfers only */}
       {!isOwnProfile && myUid && rounds.length > 0 && (

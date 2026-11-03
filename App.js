@@ -500,6 +500,10 @@ function AppNavigator() {
       case 'challenge_result':
         navRef.current.navigate('Notifications');
         break;
+      case 'arcade_challenge':
+      case 'arcade_qualifier':
+        navRef.current.navigate('Main', { screen: 'Arcade' });
+        break;
       case 'milestone':
       case 'clocked_score':
         navRef.current.navigate('You');

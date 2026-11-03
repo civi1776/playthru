@@ -24,6 +24,8 @@ const ICON = {
   friend_activity:    { name: 'flag',             color: COLOR.green },
   course_update:      { name: 'location',         color: COLOR.green },
   course_leader:      { name: 'trophy',           color: COLOR.gold },
+  arcade_challenge:   { name: 'game-controller',  color: COLOR.gold },
+  arcade_qualifier:   { name: 'ribbon',           color: COLOR.goldBright },
   new_follower:       { name: 'person-add',       color: COLOR.green },
   comment:            { name: 'chatbubble',       color: COLOR.green },
   like:               { name: 'heart',            color: '#e05c5c' },

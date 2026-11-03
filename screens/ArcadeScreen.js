@@ -24,6 +24,8 @@ import {
 import { turboState, cartMph } from '../lib/arcade/physics';
 import { randomSeed, dist } from '../lib/arcade/course';
 import { DEFAULT_AVATAR, loadAvatar } from '../lib/arcade/avatar';
+import { submitArcadeChallengeScore } from '../lib/arcade/challenges';
+import { fetchSeasonBoard, QUALIFY_TOP, QUALIFYING_DIFFICULTIES } from '../lib/arcade/season';
 import HoleMap, { cameraTargetFor, lerpCamera, screenToWorld } from '../components/arcade/HoleMap';
 import PowerMeter from '../components/arcade/PowerMeter';
 import DriveControls from '../components/arcade/DriveControls';
@@ -46,11 +48,13 @@ export default function ArcadeScreen({ navigation, route }) {
   const [mode, setMode] = useState(autostart ? 'play' : 'start');   // 'start' | 'play' | 'summary'
   const [difficulty, setDifficulty] = useState(() => route?.params?.difficulty ?? profile?.preferred_difficulty ?? 'intermediate');
   const [avatar, setAvatar] = useState(() => route?.params?.avatar ?? DEFAULT_AVATAR);
-  const [seed, setSeed] = useState(() => randomSeed());
+  const challenge = route?.params?.challenge ?? null;
+  const [seed, setSeed] = useState(() => route?.params?.seed ?? randomSeed());
   const [summary, setSummary] = useState(null);
 
   useEffect(() => { if (!route?.params?.avatar) loadAvatar().then(setAvatar); }, [route?.params?.avatar]);
 
+  // A challenge run is one shot at one seed: 'play again' starts a free run.
   const startGame = () => { setSeed(randomSeed()); setSummary(null); setMode('play'); };
   const leave = () => { if (autostart) navigation.goBack(); else setMode('start'); };
 
@@ -67,7 +71,7 @@ export default function ArcadeScreen({ navigation, route }) {
     );
   }
   if (mode === 'summary' && summary) {
-    return <Summary summary={summary} onPlayAgain={startGame} onBack={leave} />;
+    return <Summary summary={summary} challenge={challenge} onPlayAgain={startGame} onBack={leave} />;
   }
   return (
     <Start
@@ -463,17 +467,20 @@ function Readout({ label, value, unit, color = COLOR.cream }) {
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
-function Summary({ summary, onPlayAgain, onBack }) {
-  const { user } = useAuth();
+function Summary({ summary, challenge, onPlayAgain, onBack }) {
+  const { user, profile } = useAuth();
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(false);
+  const [duel, setDuel] = useState(null);        // settled challenge row after posting
+  const [seasonRank, setSeasonRank] = useState(null);
   const tier = scoreTier(summary.arcadeScore, false);
+  const qualifying = QUALIFYING_DIFFICULTIES.includes(summary.difficulty);
 
   const post = async () => {
     if (!user?.id) { Alert.alert('Sign in to post', 'Arcade scores are tied to your account.'); return; }
     setPosting(true);
     try {
-      const { error } = await supabase.from('arcade_scores').insert({
+      const { data: row, error } = await supabase.from('arcade_scores').insert({
         user_id: user.id,
         holes: 9,
         difficulty: summary.difficulty,
@@ -482,15 +489,26 @@ function Summary({ summary, onPlayAgain, onBack }) {
         points: summary.totalScore,
         clocked_score: summary.arcadeScore,
         holes_under_clock: summary.holesUnderClock,
-        seed: summary.seed,
-      });
+        seed: String(summary.seed),
+        challenge_id: challenge?.id ?? null,
+      }).select('id').single();
       if (error) throw error;
       setPosted(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (challenge) {
+        try { setDuel(await submitArcadeChallengeScore(challenge, user.id, profile?.username, row.id)); }
+        catch (e) { Alert.alert('Run posted, duel not updated', e?.message ?? 'Open the Arcade tab to check the challenge.'); }
+      }
+      if (qualifying) {
+        fetchSeasonBoard().then(b => { const mine = b.find(r => r.user_id === user.id); setSeasonRank(mine?.rank ?? null); }).catch(() => {});
+      }
     } catch (e) {
       Alert.alert('Could not post', e?.message ?? 'Try again in a moment.');
     } finally { setPosting(false); }
   };
+
+  // Challenge runs post themselves: the run is the answer to the duel.
+  useEffect(() => { if (challenge && !posted && !posting) post(); }, []);
 
   return (
     <SafeAreaView style={st.screen}>
@@ -544,20 +562,49 @@ function Summary({ summary, onPlayAgain, onBack }) {
           <Text style={[st.footnote, { textAlign: 'left', marginTop: 8 }]}>* picked up at double bogey, the real Clocked cap.</Text>
         </View>
 
+        {challenge && (
+          <View style={st.duelCard}>
+            <Text style={st.sectionQ}>ARCADE DUEL</Text>
+            {!duel ? (
+              <Text style={st.duelText}>{posting ? 'Posting your run…' : 'Your run is in.'}</Text>
+            ) : duel.status === 'complete' ? (
+              <>
+                <Text style={[st.duelResult, { color: !duel.winner_id ? COLOR.amber : duel.winner_id === user?.id ? COLOR.green : COLOR.red }]}>
+                  {!duel.winner_id ? 'DEAD HEAT' : duel.winner_id === user?.id ? 'YOU WON' : 'YOU LOST'}
+                </Text>
+                <Text style={st.duelText}>
+                  You {summary.totalScore > 0 ? '+' : ''}{summary.totalScore} · {formatSeconds(summary.totalSeconds)}   vs   {(() => { const tp = duel.challenger_id === user?.id ? duel.challenged_points : duel.challenger_points; const ts = duel.challenger_id === user?.id ? duel.challenged_seconds : duel.challenger_seconds; return `${tp > 0 ? '+' : ''}${tp} · ${formatSeconds(ts)}`; })()}
+                </Text>
+              </>
+            ) : (
+              <Text style={st.duelText}>Your run is in. Waiting on your opponent. You'll get a notification when it's settled.</Text>
+            )}
+          </View>
+        )}
+        {posted && qualifying && seasonRank != null && (
+          <Text style={[st.footnote, { color: seasonRank <= QUALIFY_TOP ? COLOR.green : COLOR.muted, marginTop: 10 }]}>
+            {seasonRank <= QUALIFY_TOP ? `#${seasonRank} this month. Inside the qualifying line.` : `#${seasonRank} this month. Top ${QUALIFY_TOP} at month end qualify.`}
+          </Text>
+        )}
+        {posted && !qualifying && (
+          <Text style={[st.footnote, { marginTop: 10 }]}>Beginner runs post to the all-time board but don't count toward qualifying.</Text>
+        )}
         <TouchableOpacity style={st.primaryBtn} onPress={onPlayAgain} activeOpacity={0.85}>
           <Text style={st.primaryBtnText}>PLAY AGAIN</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[st.secondaryBtn, (posted || posting) && { opacity: 0.6 }]}
-          onPress={post}
-          disabled={posted || posting}
-          activeOpacity={0.85}
-        >
-          {posting ? <ActivityIndicator color={COLOR.gold} /> : (
-            <Text style={st.secondaryBtnText}>{posted ? 'POSTED TO ARCADE BOARD' : 'POST TO FEED'}</Text>
-          )}
-        </TouchableOpacity>
-        <Text style={st.footnote}>Posting adds this run to the Arcade Leaderboard only.</Text>
+        {!challenge && (
+          <TouchableOpacity
+            style={[st.secondaryBtn, (posted || posting) && { opacity: 0.6 }]}
+            onPress={post}
+            disabled={posted || posting}
+            activeOpacity={0.85}
+          >
+            {posting ? <ActivityIndicator color={COLOR.gold} /> : (
+              <Text style={st.secondaryBtnText}>{posted ? 'POSTED TO ARCADE BOARD' : 'POST TO ARCADE BOARD'}</Text>
+            )}
+          </TouchableOpacity>
+        )}
+        <Text style={st.footnote}>Posting adds this run to the Arcade boards only.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -644,6 +691,9 @@ const st = StyleSheet.create({
   bigStat: { ...CARD, width: '48%', flexGrow: 1, paddingVertical: 14 },
   bigStatValue: { ...TYPE.statNumber, fontSize: 26, marginTop: 4 },
   holesCard: { ...CARD, marginTop: 12 },
+  duelCard: { ...CARD, marginTop: 12, borderColor: COLOR.borderGold },
+  duelResult: { ...TYPE.heroNumber, fontSize: 28, fontWeight: '700', letterSpacing: 2, marginTop: 4 },
+  duelText: { color: COLOR.muted, fontSize: 13, marginTop: 6, lineHeight: 18 },
   holeHead: { flexDirection: 'row', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: COLOR.border },
   holeRow: { flexDirection: 'row', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLOR.border },
   holeCell: { flex: 1 },

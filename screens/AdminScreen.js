@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { COLOR, RADIUS } from '../lib/theme';
+import { closeSeason, previousSeason, seasonLabel } from '../lib/arcade/season';
 import ScreenHeader from '../components/ScreenHeader';
 
 const { bg: BG, surface: CARD, gold: GOLD, cream: CREAM, muted: MUTED, dim: DIM, green: GREEN, red: RED_WARN, border: BORDER } = COLOR;
@@ -21,10 +22,11 @@ const TABS = [
   { key: 'courses',      label: 'COURSES',      table: 'course_certification_inquiries' },
   { key: 'sponsors',     label: 'SPONSORS',     table: 'sponsor_inquiries' },
   { key: 'inbox',        label: 'INBOX',        table: 'website_inquiries', kind: 'contact' },
+  { key: 'qualifiers',   label: 'QUALIFIERS',   table: 'arcade_qualifiers' },
 ];
 
 function statusColor(status) {
-  if (['accepted', 'certified', 'contacted', 'invited'].includes(status)) return GREEN;
+  if (['accepted', 'certified', 'contacted', 'invited', 'claimed'].includes(status)) return GREEN;
   if (['rejected', 'declined', 'closed'].includes(status)) return RED_WARN;
   if (status === 'waitlisted') return GOLD;
   return MUTED; // pending
@@ -48,10 +50,31 @@ export default function AdminScreen({ navigation }) {
       .limit(100);
     if (activeTab.kind) q = q.eq('kind', activeTab.kind);
     const { data, error } = await q;
-    if (!error) setItems(data ?? []);
+    let rows = data ?? [];
+    if (!error && activeTab.key === 'qualifiers' && rows.length) {
+      const ids = [...new Set(rows.map(r => r.user_id))];
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, username').in('id', ids);
+      const pmap = {}; (profiles ?? []).forEach(p => { pmap[p.id] = p; });
+      rows = rows.map(r => ({ ...r, profile: pmap[r.user_id] }));
+    }
+    if (!error) setItems(rows);
     setLoading(false);
     setRefreshing(false);
-  }, [activeTab.table, activeTab.kind]);
+  }, [activeTab.table, activeTab.kind, activeTab.key]);
+
+  const [closing, setClosing] = useState(false);
+  const closeLastSeason = () => {
+    const season = previousSeason();
+    Alert.alert(`Close ${seasonLabel(season)}?`, 'Freezes the top 10 of that month\'s Arcade board as qualifiers and notifies them. Safe to run again; existing qualifiers are kept.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Close season', onPress: async () => {
+        setClosing(true);
+        try { const n = await closeSeason(season); Alert.alert('Season closed', `${n} new qualifier${n === 1 ? '' : 's'} for ${seasonLabel(season)}.`); load(); }
+        catch (e) { Alert.alert('Could not close season', e?.message ?? 'Try again.'); }
+        finally { setClosing(false); }
+      } },
+    ]);
+  };
 
   useEffect(() => { setLoading(true); load(); }, [tab]);
 
@@ -121,6 +144,9 @@ export default function AdminScreen({ navigation }) {
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={GOLD} />}
         >
+          {tab === 'qualifiers' && (
+            <ActionBtn label={closing ? 'CLOSING…' : `CLOSE ${seasonLabel(previousSeason()).toUpperCase()}`} color={GOLD} busy={closing} onPress={closeLastSeason} />
+          )}
           {items.length === 0 && (
             <Text style={s.emptyText}>Nothing here yet.</Text>
           )}
@@ -131,6 +157,7 @@ export default function AdminScreen({ navigation }) {
                   {tab === 'applications' ? item.team_name
                     : tab === 'sponsors' ? item.company
                     : tab === 'courses' ? item.course_name
+                    : tab === 'qualifiers' ? `#${item.rank} · ${item.profile?.full_name || item.profile?.username || item.user_id.slice(0, 8)}`
                     : `${item.first_name ?? ''} ${item.last_name ?? ''}`.trim() || item.email}
                 </Text>
                 <View style={[s.statusPill, { borderColor: statusColor(item.status) }]}>
@@ -162,6 +189,12 @@ export default function AdminScreen({ navigation }) {
                   {!!item.message && <Text style={s.cardBody} numberOfLines={4}>{item.message}</Text>}
                 </>
               )}
+              {tab === 'qualifiers' && (
+                <>
+                  <Text style={s.cardLine}>{seasonLabel(item.season)} · {item.points > 0 ? '+' : ''}{item.points} pts · {Math.floor(item.total_seconds / 60)}:{String(item.total_seconds % 60).padStart(2, '0')}</Text>
+                  <Text style={s.cardMeta}>{item.profile?.username ? '@' + item.profile.username : ''}</Text>
+                </>
+              )}
               {tab === 'inbox' && (
                 <>
                   <Text style={s.cardLine}>{item.inquiry_type || 'Message'}</Text>
@@ -182,7 +215,7 @@ export default function AdminScreen({ navigation }) {
 
               <Text style={s.cardDate}>{new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
 
-              {item.status === 'pending' && (
+              {(item.status === 'pending' || item.status === 'earned') && (
                 <View style={s.actionsRow}>
                   {tab === 'applications' && (
                     <>
@@ -202,6 +235,12 @@ export default function AdminScreen({ navigation }) {
                       <ActionBtn label="INVITED" color={GREEN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'invited')} />
                       <ActionBtn label="WAITLIST" color={GOLD} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'waitlisted')} />
                       <ActionBtn label="CLOSE" color={RED_WARN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'closed')} />
+                    </>
+                  )}
+                  {tab === 'qualifiers' && (
+                    <>
+                      <ActionBtn label="INVITED" color={GREEN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'invited')} />
+                      <ActionBtn label="DECLINE" color={RED_WARN} busy={busyId === item.id} onPress={() => updateStatus(item.id, 'declined')} />
                     </>
                   )}
                   {tab === 'inbox' && (
