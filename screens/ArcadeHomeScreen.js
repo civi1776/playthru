@@ -180,9 +180,10 @@ export default function ArcadeHomeScreen({ navigation }) {
         {/* How it plays */}
         <Text style={st.sectionQ}>HOW IT PLAYS</Text>
         <View style={st.card}>
-          <HowRow icon="locate-outline" text="Drag from the ball to aim. Release to start the meter — your golfer's backswing grows with the power. Tap to swing." />
+          <HowRow icon="locate-outline" text="Drag from the ball to aim. Release to start the meter, and your golfer's backswing grows with the power. Tap to swing. Tap the club readout to pick any club, from a chip to the driver." />
           <HowRow icon="timer-outline"  text="Stand over the ball too long and the shot cone widens. Hesitation costs accuracy and clock." />
-          <HowRow icon="car-sport-outline" text="Drive to your ball. The cart has real momentum: it drifts wide at speed and slides in sand. Hit TURBO when it's charged. Hole out and you're already on the next tee." />
+          <HowRow icon="car-sport-outline" text="Drive to your ball. The cart has real momentum: it drifts wide at speed and slides in sand. Turbo with the button, or drop a second finger while you steer. Hole out and you're already on the next tee." />
+          <HowRow icon="flag-outline" text="The flagstick is real. Hit it hard and the ball bounces off; catch it right and it drops in." />
           <HowRow icon="trophy-outline" text="Real Clocked scoring: par 1, birdie 3, eagle 6. Over time par costs half a point per 30s. Pick up at double." />
         </View>
 

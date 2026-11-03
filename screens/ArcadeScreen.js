@@ -18,7 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { COLOR, TYPE, SPACING, RADIUS, CARD, scoreTier } from '../lib/theme';
 import { formatSeconds, formatSecondsLong } from '../lib/clockedSport';
 import {
-  createGame, tick, setAim, releaseAim, lockPower, drainEvents, requestTurbo, swingPose,
+  createGame, tick, setAim, releaseAim, lockPower, drainEvents, requestTurbo, swingPose, cycleClub,
   holeElapsed, roundElapsed, runningPoints, currentDispersion, hintFor, VERDICT_HOLD_MS,
 } from '../lib/arcade/engine';
 import { turboState, cartMph } from '../lib/arcade/physics';
@@ -252,6 +252,12 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
         case 'water':
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
           break;
+        case 'flagstick':
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => {});
+          break;
+        case 'club':
+          Haptics.selectionAsync().catch(() => {});
+          break;
         case 'expired':
           playBuzzer();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
@@ -407,7 +413,7 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
       <View style={st.controls}>
         {g.phase === 'drive' || g.phase === 'transition' ? (
           <View style={st.driveRow}>
-            <Joystick onChange={(v) => { joyRef.current = v; }} disabled={g.phase !== 'drive'} />
+            <Joystick onChange={(v) => { joyRef.current = v; }} onTurbo={() => requestTurbo(gameRef.current, Date.now())} disabled={g.phase !== 'drive'} />
             <View style={{ flex: 1, marginHorizontal: 14 }}>
               <Text style={st.hint}>{hintFor(g)}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 16, marginTop: 6 }}>
@@ -434,7 +440,9 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
                 <View style={st.aimRow}>
                   <Readout label="TO PIN" value={`${toPin}`} unit="YDS" />
                   <Readout label="LIE" value={g.lie.toUpperCase()} />
-                  <Readout label="CLUB" value={g.club.name} />
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => { cycleClub(gameRef.current); }} disabled={g.phase !== 'aim'} activeOpacity={0.6} accessibilityRole="button" accessibilityLabel={`Club: ${g.club.name}. Tap to change.`}>
+                    <Readout label="CLUB ▸" value={g.club.name} color={g.clubManual ? COLOR.gold : COLOR.cream} />
+                  </TouchableOpacity>
                   <Readout label="CONE" value={`${dispersion.toFixed(1)}°`} color={dispersion > 7 ? COLOR.red : dispersion > 4 ? COLOR.amber : COLOR.green} />
                 </View>
               )}
