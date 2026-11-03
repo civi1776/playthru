@@ -25,9 +25,8 @@ import { turboState, cartMph } from '../lib/arcade/physics';
 import { randomSeed, dist } from '../lib/arcade/course';
 import { DEFAULT_AVATAR, loadAvatar } from '../lib/arcade/avatar';
 import HoleMap, { cameraTargetFor, lerpCamera, screenToWorld } from '../components/arcade/HoleMap';
-import Joystick from '../components/arcade/Joystick';
 import PowerMeter from '../components/arcade/PowerMeter';
-import TurboButton from '../components/arcade/TurboButton';
+import DriveControls from '../components/arcade/DriveControls';
 import { SwingStage } from '../components/arcade/Golfer';
 import ArcadeHUD, { VerdictOverlay } from '../components/arcade/ArcadeHUD';
 import InitialsAvatar from '../components/InitialsAvatar';
@@ -412,22 +411,19 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
 
       <View style={st.controls}>
         {g.phase === 'drive' || g.phase === 'transition' ? (
-          <View style={st.driveRow}>
-            <Joystick onChange={(v) => { joyRef.current = v; }} onTurbo={() => requestTurbo(gameRef.current, Date.now())} disabled={g.phase !== 'drive'} />
-            <View style={{ flex: 1, marginHorizontal: 14 }}>
-              <Text style={st.hint}>{hintFor(g)}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 16, marginTop: 6 }}>
-                <Text style={st.readout}><Text style={[st.readoutNum, { color: turbo.active ? COLOR.goldBright : COLOR.cream }]}>{mph}</Text> MPH</Text>
-                <Text style={st.readout}><Text style={st.readoutNum}>{toBall}</Text> YDS</Text>
-              </View>
-              <Text style={st.subHint}>Steer with the stick. Rough and sand slide. Green's off-limits. Park and walk.</Text>
+          <DriveControls
+            onChange={(v) => { joyRef.current = v; }}
+            onTurbo={() => requestTurbo(gameRef.current, Date.now())}
+            turbo={turbo}
+            disabled={g.phase !== 'drive'}
+          >
+            <Text style={st.hint}>{hintFor(g)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 16, marginTop: 6 }}>
+              <Text style={st.readout}><Text style={[st.readoutNum, { color: turbo.active ? COLOR.goldBright : COLOR.cream }]}>{mph}</Text> MPH</Text>
+              <Text style={st.readout}><Text style={st.readoutNum}>{toBall}</Text> YDS</Text>
             </View>
-            <TurboButton
-              charge={turbo.charge} active={turbo.active} ready={turbo.ready}
-              disabled={g.phase !== 'drive'}
-              onPress={() => requestTurbo(gameRef.current, Date.now())}
-            />
-          </View>
+            <Text style={st.subHint}>Rough and sand slide. Green's off-limits. Park and walk.</Text>
+          </DriveControls>
         ) : showStage ? (
           <View style={st.stageRow}>
             <View style={st.stageBox}>
