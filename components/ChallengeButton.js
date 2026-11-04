@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { sendPushToUser } from '../lib/notifications';
 import { useAuth } from '../context/AuthContext';
-import { COLOR } from '../lib/theme';
+import { COLOR, RADIUS } from '../lib/theme';
 
 export default function ChallengeButton({ targetUserId, targetUsername, courseName, challengerScore, variant }) {
   const { user, profile: myProfile } = useAuth();
@@ -65,6 +65,15 @@ export default function ChallengeButton({ targetUserId, targetUsername, courseNa
     );
   }
 
+  if (variant === 'profile') {
+    return (
+      <TouchableOpacity style={[c.profileBtn, sending && c.disabled]} onPress={onPress} activeOpacity={0.8} disabled={sending} accessibilityLabel={`Challenge ${targetUsername ?? 'this player'}`} accessibilityRole="button">
+        <Ionicons name="flash" size={13} color={COLOR.gold} />
+        <Text style={c.profileTxt}>CHALLENGE</Text>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <TouchableOpacity style={[c.btn, sending && c.disabled]} onPress={onPress} activeOpacity={0.8} disabled={sending} accessibilityLabel={`Challenge ${targetUsername ?? 'this player'}`} accessibilityRole="button">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -76,6 +85,8 @@ export default function ChallengeButton({ targetUserId, targetUsername, courseNa
 }
 
 const c = StyleSheet.create({
+  profileBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: COLOR.borderGold, borderRadius: RADIUS.sm, paddingVertical: 10, paddingHorizontal: 8 },
+  profileTxt: { fontSize: 10, fontWeight: '800', color: COLOR.gold, letterSpacing: 1.5 },
   btn:       { borderWidth: 1, borderColor: COLOR.gold, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 20, alignItems: 'center' },
   disabled:  { opacity: 0.4 },
   txt:       { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },

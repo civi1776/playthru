@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { fetchClockedRatingForUser } from '../lib/clockedRating';
 import { totalPointsFromHoleScores } from '../lib/clockedSport';
+import { fetchHeadToHead } from '../lib/headToHead';
 import InitialsAvatar from '../components/InitialsAvatar';
 import ChallengeButton from '../components/ChallengeButton';
 import { COLOR, scoreTier, RADIUS } from '../lib/theme';
@@ -49,6 +50,7 @@ export default function RivalryScreen({ navigation, route }) {
   const [rivalRating, setRivalRating] = useState(null);
   const [headToHead, setHeadToHead] = useState([]); // [{ course, myPts, rivalPts }]
   const [challengeRecord, setChallengeRecord] = useState({ wins: 0, losses: 0, pending: 0 });
+  const [h2h, setH2h] = useState(null); // rounds together, arcade duels
 
   const load = useCallback(async () => {
     if (!myId || !rivalId) return;
@@ -77,17 +79,9 @@ export default function RivalryScreen({ navigation, route }) {
           .sort((a, b) => Math.abs(b.myPts - b.rivalPts) - Math.abs(a.myPts - a.rivalPts))
       );
 
-      const { data: challenges } = await supabase
-        .from('challenges')
-        .select('challenger_id, challenged_id, winner_id, status')
-        .or(`and(challenger_id.eq.${myId},challenged_id.eq.${rivalId}),and(challenger_id.eq.${rivalId},challenged_id.eq.${myId})`);
-      let wins = 0, losses = 0, pending = 0;
-      for (const c of challenges ?? []) {
-        if (c.status === 'pending' || c.status === 'accepted') { pending++; continue; }
-        if (c.winner_id === myId) wins++;
-        else if (c.winner_id === rivalId) losses++;
-      }
-      setChallengeRecord({ wins, losses, pending });
+      const record = await fetchHeadToHead(myId, rivalId, meProfile?.full_name || meProfile?.username, rivalProfile?.full_name || rivalProfile?.username);
+      setH2h(record);
+      setChallengeRecord(record.challenges);
     } catch { /* rivalry data is a bonus layer — fail quiet */ }
     setLoading(false);
   }, [myId, rivalId]);
@@ -102,13 +96,21 @@ export default function RivalryScreen({ navigation, route }) {
     );
   }
 
-  const myTier = scoreTier(myRating?.clockedScore, myRating?.isProvisional);
-  const rivalTier = scoreTier(rivalRating?.clockedScore, rivalRating?.isProvisional);
-  const scoreDiff = (myRating?.clockedScore ?? 0) - (rivalRating?.clockedScore ?? 0);
+  // No rounds → no earned score. computeFullRating returns a cold-start
+  // baseline for zero rounds; never show it as if it were a Clocked Score.
+  const myScore = (myRating?.roundsUsed ?? 0) > 0 ? myRating?.clockedScore : null;
+  const rivalScore = (rivalRating?.roundsUsed ?? 0) > 0 ? rivalRating?.clockedScore : null;
+  const myTier = scoreTier(myScore, myRating?.isProvisional || myScore == null);
+  const rivalTier = scoreTier(rivalScore, rivalRating?.isProvisional || rivalScore == null);
+  const scoreDiff = myScore != null && rivalScore != null ? myScore - rivalScore : 0;
   const coursesWon = headToHead.filter(h => h.myPts > h.rivalPts).length;
   const coursesLost = headToHead.filter(h => h.myPts < h.rivalPts).length;
   const coursesTied = headToHead.length - coursesWon - coursesLost;
   const mostRecentSharedCourse = headToHead[0]?.course ?? rival.home_course ?? null;
+  const together = h2h ? h2h.wins + h2h.losses + h2h.ties : 0;
+  const arcadeTotal = h2h ? h2h.arcade.wins + h2h.arcade.losses + h2h.arcade.ties : 0;
+  const fmtDate = iso => { const d = new Date(iso); return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${d.getDate()}`; };
+  const sgn = v => (v > 0 ? `+${v}` : String(v));
 
   return (
     <SafeAreaView style={s.container}>
@@ -121,8 +123,8 @@ export default function RivalryScreen({ navigation, route }) {
           <View style={s.vsSide}>
             <InitialsAvatar name={me.full_name} size={56} avatarUrl={me.avatar_url} username={me.username} />
             <Text style={s.vsName} numberOfLines={1}>YOU</Text>
-            <Text style={[s.vsScore, { color: myTier.color }]}>{myRating?.clockedScore ?? '—'}</Text>
-            <Text style={[s.vsTier, { color: myTier.color }]}>{myTier.name}</Text>
+            <Text style={[s.vsScore, { color: myTier.color }]}>{myScore ?? '\u2014'}</Text>
+            <Text style={[s.vsTier, { color: myTier.color }]}>{myScore == null ? 'NO ROUNDS' : myTier.name}</Text>
           </View>
           <View style={s.vsCenter}>
             <Text style={s.vsLabel}>VS</Text>
@@ -135,31 +137,64 @@ export default function RivalryScreen({ navigation, route }) {
           <View style={s.vsSide}>
             <InitialsAvatar name={rival.full_name} size={56} avatarUrl={rival.avatar_url} username={rival.username} />
             <Text style={s.vsName} numberOfLines={1}>{(rivalUsername ?? rival.username ?? 'RIVAL').toUpperCase()}</Text>
-            <Text style={[s.vsScore, { color: rivalTier.color }]}>{rivalRating?.clockedScore ?? '—'}</Text>
-            <Text style={[s.vsTier, { color: rivalTier.color }]}>{rivalTier.name}</Text>
+            <Text style={[s.vsScore, { color: rivalTier.color }]}>{rivalScore ?? '\u2014'}</Text>
+            <Text style={[s.vsTier, { color: rivalTier.color }]}>{rivalScore == null ? 'NO ROUNDS' : rivalTier.name}</Text>
           </View>
         </View>
 
-        {/* ── Challenge record ── */}
-        <View style={s.sectionLabelRow}><Text style={s.sectionLabel}>CHALLENGE RECORD</Text></View>
+        {/* ── Record ── */}
+        <View style={s.sectionLabelRow}><Text style={s.sectionLabel}>RECORD</Text></View>
         <View style={s.recordRow}>
           <View style={s.recordItem}>
-            <Text style={[s.recordNum, { color: GREEN }]}>{challengeRecord.wins}</Text>
-            <Text style={s.recordLabel}>WINS</Text>
+            <Text style={[s.recordNum, { color: together ? (h2h.wins > h2h.losses ? GREEN : h2h.losses > h2h.wins ? RED_WARN : CREAM) : DIM }]}>
+              {together ? `${h2h.wins}\u2013${h2h.losses}${h2h.ties ? `\u2013${h2h.ties}` : ''}` : '\u2014'}
+            </Text>
+            <Text style={s.recordLabel}>ROUNDS TOGETHER</Text>
           </View>
           <View style={s.recordItem}>
-            <Text style={[s.recordNum, { color: RED_WARN }]}>{challengeRecord.losses}</Text>
-            <Text style={s.recordLabel}>LOSSES</Text>
+            <Text style={[s.recordNum, { color: challengeRecord.wins + challengeRecord.losses ? (challengeRecord.wins >= challengeRecord.losses ? GREEN : RED_WARN) : DIM }]}>
+              {challengeRecord.wins + challengeRecord.losses ? `${challengeRecord.wins}\u2013${challengeRecord.losses}` : '\u2014'}
+            </Text>
+            <Text style={s.recordLabel}>CHALLENGES{challengeRecord.pending ? ` \u00B7 ${challengeRecord.pending} OPEN` : ''}</Text>
           </View>
           <View style={s.recordItem}>
-            <Text style={[s.recordNum, { color: DIM }]}>{challengeRecord.pending}</Text>
-            <Text style={s.recordLabel}>PENDING</Text>
+            <Text style={[s.recordNum, { color: arcadeTotal ? (h2h.arcade.wins >= h2h.arcade.losses ? GREEN : RED_WARN) : DIM }]}>
+              {arcadeTotal ? `${h2h.arcade.wins}\u2013${h2h.arcade.losses}${h2h.arcade.ties ? `\u2013${h2h.arcade.ties}` : ''}` : '\u2014'}
+            </Text>
+            <Text style={s.recordLabel}>ARCADE{h2h?.arcade.open ? ` \u00B7 ${h2h.arcade.open} OPEN` : ''}</Text>
           </View>
         </View>
+
+        {/* ── Rounds together ── */}
+        <View style={s.sectionLabelRow}>
+          <Text style={s.sectionLabel}>ROUNDS TOGETHER</Text>
+          {!!h2h?.pendingConfirm && <Text style={s.sectionSub}>{h2h.pendingConfirm} awaiting confirmation</Text>}
+        </View>
+        {!h2h?.matchups?.length ? (
+          <View style={s.emptyCard}>
+            <Text style={s.emptyText}>No rounds on the same card yet.</Text>
+            <Text style={s.emptySub}>Add {rivalUsername ? '@' + rivalUsername : 'them'} as a player when you set up a Clocked round.</Text>
+          </View>
+        ) : (
+          h2h.matchups.map(m => {
+            const iWon = m.myPts > m.theirPts, tied = m.myPts === m.theirPts;
+            return (
+              <View key={m.roundId} style={s.courseRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.courseName} numberOfLines={1}>{m.course || 'Quick Play'}</Text>
+                  <Text style={s.courseMeta}>{fmtDate(m.date)}{m.holes ? ` \u00B7 ${m.holes} holes` : ''}{m.confirmed ? '' : ' \u00B7 unconfirmed'}</Text>
+                </View>
+                <Text style={[s.coursePts, { color: tied ? MUTED : iWon ? GREEN : RED_WARN }]}>{sgn(m.myPts)}</Text>
+                <Text style={s.courseDash}>vs</Text>
+                <Text style={[s.coursePts, { color: tied ? MUTED : iWon ? RED_WARN : GREEN }]}>{sgn(m.theirPts)}</Text>
+              </View>
+            );
+          })
+        )}
 
         {/* ── Head-to-head courses ── */}
         <View style={s.sectionLabelRow}>
-          <Text style={s.sectionLabel}>SHARED COURSES</Text>
+          <Text style={s.sectionLabel}>BEST AT SHARED COURSES</Text>
           {headToHead.length > 0 && (
             <Text style={s.sectionSub}>{coursesWon}-{coursesLost}{coursesTied ? `-${coursesTied}` : ''}</Text>
           )}
@@ -234,6 +269,7 @@ const s = StyleSheet.create({
 
   courseRow:   { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER, gap: 8 },
   courseName:  { fontSize: 12, color: CREAM, fontWeight: '600' },
+  courseMeta:  { fontSize: 10, color: DIM, marginTop: 1 },
   coursePts:   { fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'], minWidth: 32, textAlign: 'center' },
   courseDash:  { fontSize: 11, color: DIM },
 
