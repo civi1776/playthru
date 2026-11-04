@@ -92,81 +92,6 @@ const DELAY_DOT = {
 // The real, currently-rendered hero/stats live further down this component,
 // driven by `clockedRating` (the real 0–100 Clocked Score).
 
-// ─── Profile Activity Tab ─────────────────────────────────────────────────────
-
-function ActivityRow({ item }) {
-  const typeMap = {
-    round_logged:       { icon: 'golf',        color: COLOR.green, label: c => `Logged a round at ${c?.course_name ?? '—'}` },
-    live_round_started: { icon: 'golf',        color: COLOR.green, label: c => `Playing live at ${c?.course_name ?? 'a course'} right now` },
-    milestone:          { icon: 'trophy',      color: COLOR.gold, label: c => c?.title ?? 'Reached a milestone' },
-    leaderboard:        { icon: 'trending-up', color: COLOR.gold, label: c => c?.description ?? 'Moved on the leaderboard' },
-    course_review:      { icon: 'location',    color: COLOR.green, label: c => `Reviewed ${c?.course_name ?? 'a course'}` },
-    user_post:          { icon: 'chatbubble',  color: COLOR.muted, label: c => c?.text?.slice(0, 80) ?? 'Shared an update' },
-    course_leader:      { icon: 'trophy',      color: COLOR.gold, label: c => c?.description ?? 'Set a course record' },
-  };
-  const info    = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: COLOR.dim, label: () => 'Activity' };
-  const content = item.content ?? {};
-  const pts     = content.team_score;
-  return (
-    <View style={s.activityRow}>
-      <View style={[s.activityIconWrap, { backgroundColor: info.color + '22' }]}>
-        <Ionicons name={info.icon} size={16} color={info.color} />
-      </View>
-      <View style={s.activityContent}>
-        <Text style={s.activityLabel}>{info.label(content)}</Text>
-        {item.type === 'round_logged' && pts != null && (
-          <Text style={[s.activityPop, { color: ptsColor(pts) }]}>{pts > 0 ? `+${pts}` : pts} PTS</Text>
-        )}
-        <Text style={s.activityTime}>{timeAgo(item.created_at)}</Text>
-      </View>
-    </View>
-  );
-}
-
-function ActivityTab({ userId }) {
-  const [items, setItems]           = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    if (!userId) return;
-    const { data } = await supabase
-      .from('activity_feed')
-      .select('id, type, content, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(30);
-    setItems(data ?? []);
-  }, [userId]);
-
-  useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await load();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  if (loading) return <ActivityIndicator color={COLOR.gold} style={{ marginTop: 40 }} />;
-  if (!items.length) return (
-    <View style={s.activityEmpty}>
-      <Ionicons name="time-outline" size={36} color="rgba(201,168,76,0.2)" style={{ marginBottom: 10 }} />
-      <Text style={s.activityEmptyText}>No activity yet.</Text>
-    </View>
-  );
-  return (
-    <FlatList
-      data={items}
-      keyExtractor={i => i.id}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLOR.gold} />}
-      renderItem={({ item }) => <ActivityRow item={item} />}
-      contentContainerStyle={{ paddingBottom: 40 }}
-    />
-  );
-}
-
 // ─── Score Trend Chart ────────────────────────────────────────────────────────
 
 // Plots average points-per-hole for each of the last 20 clocked rounds —
@@ -558,7 +483,6 @@ function FriendsTab({ navigation }) {
 export default function ProfileScreen({ navigation }) {
   const { profile, user, refreshProfile } = useAuth();
 
-  const [tab, setTab]           = useState('stats');
 
   // On focus: pull fresh profile from DB
   useFocusEffect(useCallback(() => {
@@ -637,8 +561,6 @@ export default function ProfileScreen({ navigation }) {
   const last5Clocked = rounds.filter(r => r.round_format === 'clocked' && r.hole_scores?.length).slice(0, 5);
   const isCertified = PRO_ENABLED && last5Clocked.length === 5
     && last5Clocked.every(r => (totalPointsFromHoleScores(r.hole_scores) ?? -Infinity) >= 8);
-  const tabs     = ['stats', 'rounds', 'friends', 'activity'];
-  const tabLabel = (t) => t.toUpperCase();
 
   const handleSettings = () => navigation.navigate('Settings');
 
@@ -958,14 +880,6 @@ const s = StyleSheet.create({
   tabBtnActive:     { borderColor: COLOR.gold, backgroundColor: '#C9A84C22' },
   tabBtnText:       { fontSize: 9, fontWeight: '700', color: COLOR.muted, letterSpacing: 2 },
   tabBtnTextActive: { color: COLOR.gold },
-  activityRow:       { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#7DC87A11', gap: 12 },
-  activityIconWrap:  { width: 32, height: 32, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
-  activityContent:   { flex: 1 },
-  activityLabel:     { fontSize: 13, color: COLOR.cream, fontWeight: '500', lineHeight: 18 },
-  activityPop:       { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
-  activityTime:      { fontSize: 10, color: 'rgba(184,168,130,0.5)', marginTop: 3 },
-  activityEmpty:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  activityEmptyText: { fontSize: 14, color: COLOR.dim },
   challengeRow:       { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(125,200,122,0.07)', gap: 8 },
   challengeOpponent:  { fontSize: 13, fontWeight: '700', color: COLOR.cream },
   challengeBadge:     { borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1 },

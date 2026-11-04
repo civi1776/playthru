@@ -17,7 +17,7 @@ import { CLOCKED_ROUND_STATE_KEY } from './lib/clockedRoundConstants';
 import { ActiveRoundContext, ACTIVE_ROUND_MAX_AGE_MS } from './lib/activeRound';
 import { COLOR } from './lib/theme';
 
-import FeedScreen             from './screens/FeedScreen';
+import TodayScreen            from './screens/TodayScreen';
 import RulesScreen            from './screens/RulesScreen';
 import ProfileScreen      from './screens/ProfileScreen';
 import LeaderboardScreen  from './screens/LeaderboardScreen';
@@ -106,7 +106,7 @@ const RootStack = createNativeStackNavigator();
 // Five slots: PLAY in the middle, two tabs either side. Rules lives in the
 // feed header (book icon) and in the round/setup screens.
 const PLAYER_TABS = [
-  { name: 'Feed',   icon: 'flash-outline',           iconActive: 'flash',           label: 'FEED' },
+  { name: 'Today',  icon: 'home-outline',            iconActive: 'home',            label: 'TODAY' },
   { name: 'Arcade', icon: 'game-controller-outline', iconActive: 'game-controller', label: 'ARCADE' },
   { name: 'Play',   icon: 'timer-outline',           label: 'PLAY', isPlay: true },
   { name: 'Ranks',  icon: 'trophy-outline',          iconActive: 'trophy',          label: 'RANKS' },
@@ -344,9 +344,9 @@ function MainApp({ navigation }) {
         )}
         screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
       >
-        <Tab.Screen name="Feed"  component={FeedScreen} />
+        <Tab.Screen name="Today"  component={TodayScreen} />
         <Tab.Screen name="Arcade" component={ArcadeHomeScreen} />
-        <Tab.Screen name="Play"  component={FeedScreen} />
+        <Tab.Screen name="Play"   component={TodayScreen} />
         <Tab.Screen name="Ranks" component={LeaderboardScreen} />
         <Tab.Screen name="You"   component={ProfileScreen} />
       </Tab.Navigator>
@@ -485,14 +485,14 @@ function AppNavigator() {
       case 'round_confirm':
         navRef.current.navigate('ConfirmRound', { roundId: data.round_id, playerKey: data.player_key });
         break;
-      case 'comment':
-      case 'like':
-        // Route to Feed (activity_id is in data for future scroll-to support)
-        navRef.current.navigate('Feed');
+      case 'course_record':
+      case 'record_lost':
+        if (data.course_name) navRef.current.navigate('CourseProfile', { course: { name: data.course_name } });
+        else navRef.current.navigate('Today');
         break;
       case 'new_follower':
         if (data.follower_id) navRef.current.navigate('PublicProfile', { userId: data.follower_id });
-        else navRef.current.navigate('Feed');
+        else navRef.current.navigate('Today');
         break;
       case 'challenge_received':
       case 'challenge_accepted':
@@ -514,7 +514,7 @@ function AppNavigator() {
         break;
       case 'still_playing':
       case 'interaction_ladder':
-        navRef.current.navigate('Feed');
+        navRef.current.navigate('Today');
         break;
       case 'inactivity':
       case 'weekly_digest':
@@ -522,7 +522,7 @@ function AppNavigator() {
       case 'friend_round':
       case 'course_update':
       default:
-        navRef.current.navigate('Feed');
+        navRef.current.navigate('Today');
         break;
     }
   }, []);

@@ -20,6 +20,7 @@ import {
 } from '../lib/clockedSport';
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
 import { fetchClockedRatingForUser } from '../lib/clockedRating';
+import { claimCourseRecord } from '../lib/courseRecords';
 import { sendPushToUser, sendLocalNotification, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
 import * as Notifications from 'expo-notifications';
 import {
@@ -724,25 +725,28 @@ export default function ClockedRoundScreen({ navigation, route }) {
         }
       }
 
-      // Post to activity feed — fire and forget, never block round save
-      if (savedRoundId) {
-        (async () => { try { await supabase.from('activity_feed').insert({
-          user_id:  uid,
-          type:     'round_logged',
-          round_id: savedRoundId,
-          content: {
-            course_name:      course?.name ?? null,
-            holes:            String(holeCount),
-            transport,
-            players:          String(playerCount),
-            duration_minutes: durationMinutes,
-            round_format:     'clocked',
-            difficulty,
-            team_score:       summary.totalScore,
-            total_elapsed:    summary.totalElapsed,
-            total_time_par:   summary.totalTimePar,
-          },
-        }); } catch {} })();
+      // Course record check — fire and forget, never block round save.
+      // Taking a record is the thing worth telling someone about, and losing
+      // one is the thing that brings them back. This replaces the activity
+      // feed: a notification reaches the person who cares, where a feed card
+      // waited for someone to come looking.
+      if (savedRoundId && course?.name) {
+        (async () => {
+          try {
+            const mine = playerDefs.find(p => p.userId === uid)?.name;
+            const myPoints = mine
+              ? (summary.players?.find(p => p.name === mine)?.totalPoints ?? summary.totalScore)
+              : summary.totalScore;
+            if (myPoints == null) return;
+            await claimCourseRecord({
+              courseName: course.name,
+              userId: uid,
+              roundId: savedRoundId,
+              points: myPoints,
+              displayName: mine ?? 'A player',
+            });
+          } catch { /* records are a bonus layer */ }
+        })();
       }
 
       // Cancel interaction ladder + schedule post-round notifications

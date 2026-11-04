@@ -356,6 +356,7 @@ export default function CourseProfileScreen({ navigation, route }) {
               city={courseData?.city ?? initialCourse.city}
               latitude={courseData?.latitude ?? initialCourse.latitude}
               longitude={courseData?.longitude ?? initialCourse.longitude}
+              aerial
               width={340}
               height={170}
               radius={14}

@@ -11,7 +11,7 @@
 // recent activities), chess.com (head-to-head record on every rival).
 
 import { useState, useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
@@ -104,33 +104,6 @@ function FormBars({ points }) {
   );
 }
 
-function ActRow({ item }) {
-  const typeMap = {
-    round_logged:       { icon: 'golf',        color: COLOR.green, label: c => `Logged a round at ${c?.course_name ?? '—'}` },
-    live_round_started: { icon: 'golf',        color: COLOR.green, label: c => `Playing live at ${c?.course_name ?? 'a course'} right now` },
-    milestone:          { icon: 'trophy',      color: COLOR.gold,  label: c => c?.title ?? 'Reached a milestone' },
-    leaderboard:        { icon: 'trending-up', color: COLOR.gold,  label: c => c?.description ?? 'Moved on the leaderboard' },
-    course_review:      { icon: 'location',    color: COLOR.green, label: c => `Reviewed ${c?.course_name ?? 'a course'}` },
-    user_post:          { icon: 'chatbubble',  color: COLOR.muted, label: c => c?.text?.slice(0, 80) ?? 'Shared an update' },
-    course_leader:      { icon: 'trophy',      color: COLOR.gold,  label: c => c?.description ?? 'Set a course record' },
-  };
-  const info = typeMap[item.type] ?? { icon: 'ellipsis-horizontal', color: COLOR.dim, label: () => 'Activity' };
-  const content = item.content ?? {};
-  const pts = content.team_score;
-  return (
-    <View style={s.actRow}>
-      <View style={[s.actIconWrap, { backgroundColor: info.color + '22' }]}>
-        <Ionicons name={info.icon} size={16} color={info.color} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={s.actLabel}>{info.label(content)}</Text>
-        {item.type === 'round_logged' && pts != null && <Text style={[s.actPts, { color: ptsColor(pts) }]}>{signed(pts)} PTS</Text>}
-        <Text style={s.actTime}>{timeAgo(item.created_at)}</Text>
-      </View>
-    </View>
-  );
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PublicProfileScreen({ navigation, route }) {
@@ -146,8 +119,6 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [loadError, setLoadError] = useState(false);
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [tab, setTab] = useState('profile');
-  const [activity, setActivity] = useState(null);
   const [rating, setRating] = useState({ clockedScore: null, scoring: null, clock: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
   const [rank, setRank] = useState(null);
   const [h2h, setH2h] = useState(null);
@@ -182,8 +153,6 @@ export default function PublicProfileScreen({ navigation, route }) {
         if (myUid && !isOwnProfile) {
           fetchHeadToHead(myUid, userId, myProfile?.full_name || myProfile?.username, name).then(v => { if (!cancelled) setH2h(v); });
         }
-        supabase.from('activity_feed').select('id, type, content, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(30)
-          .then(({ data }) => { if (!cancelled) setActivity(data ?? []); });
       } catch {
         if (!cancelled) { setLoadError(true); setLoading(false); }
       }
@@ -311,16 +280,7 @@ export default function PublicProfileScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* Segments */}
-      <View style={s.segRow}>
-        {['profile', 'activity'].map(t => (
-          <TouchableOpacity key={t} style={[s.seg, tab === t && s.segOn]} onPress={() => setTab(t)} activeOpacity={0.8} accessibilityRole="tab" accessibilityState={{ selected: tab === t }}>
-            <Text style={[s.segTxt, tab === t && s.segTxtOn]}>{t.toUpperCase()}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {tab === 'profile' ? (
+      {(
         <ScrollView contentContainerStyle={{ paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
           <ClockedScoreCard {...rating} />
 
@@ -438,12 +398,6 @@ export default function PublicProfileScreen({ navigation, route }) {
             </View>
           )}
         </ScrollView>
-      ) : (
-        activity == null
-          ? <ActivityIndicator color={COLOR.gold} style={{ marginTop: 60 }} />
-          : activity.length === 0
-            ? <View style={s.empty}><Ionicons name="time-outline" size={36} color="rgba(201,168,76,0.2)" /><Text style={s.emptyText}>No activity yet.</Text></View>
-            : <FlatList data={activity} keyExtractor={i => i.id} renderItem={({ item }) => <ActRow item={item} />} contentContainerStyle={{ paddingBottom: 40 }} />
       )}
     </SafeAreaView>
   );
@@ -473,12 +427,6 @@ const s = StyleSheet.create({
   actionRow:   { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginTop: 14 },
   actionBtn:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: COLOR.borderGold, borderRadius: RADIUS.sm, paddingVertical: 10, paddingHorizontal: 8 },
   actionTxt:   { fontSize: 10, fontWeight: '800', color: COLOR.gold, letterSpacing: 1.5 },
-
-  segRow:      { flexDirection: 'row', gap: 8, paddingHorizontal: 20, marginTop: 14, marginBottom: 2 },
-  seg:         { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLOR.border },
-  segOn:       { borderColor: COLOR.gold, backgroundColor: '#C9A84C18' },
-  segTxt:      { fontSize: 9, fontWeight: '800', color: COLOR.dim, letterSpacing: 2 },
-  segTxtOn:    { color: COLOR.gold },
 
   credRow:     { flexDirection: 'row', marginHorizontal: 16, marginTop: -2, marginBottom: 6, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, paddingVertical: 12 },
   cred:        { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
@@ -524,10 +472,4 @@ const s = StyleSheet.create({
 
   empty:       { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyText:   { fontSize: 15, color: COLOR.dim },
-
-  actRow:      { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#7DC87A11', gap: 12 },
-  actIconWrap: { width: 32, height: 32, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
-  actLabel:    { fontSize: 13, color: COLOR.cream, fontWeight: '500', lineHeight: 18 },
-  actPts:      { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
-  actTime:     { fontSize: 10, color: 'rgba(184,168,130,0.5)', marginTop: 3 },
 });
