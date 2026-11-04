@@ -42,6 +42,10 @@ marketing plan asks for a feed.
 - [ ] **Analytics** — arcade-to-real-round conversion above all. The marketing plan's own measurement list is currently unmeasurable.
 - [ ] **Arcade section on clocked.golf** — the plan calls the arcade top of funnel; the website does not mention it anywhere.
 
+## STILL OPEN IN THE APP
+
+- [ ] **PreviewModeScreen** still reads `activity_feed` for its logged-out teaser, which is now permanently empty. Swap it for recent clocked rounds before the next build.
+
 ## OPEN RISKS
 
 - **Arcade qualifier spots are cheatable.** The game posts its own score from the client. Before a real purse is attached, either validate runs server-side from an input log or make the reward free entry rather than a guaranteed spot.
@@ -52,6 +56,8 @@ marketing plan asks for a feed.
 
 ## Website changes (clocked.golf)
 
-- [ ] Add an **arcade** section and nav entry — the missing top of funnel.
-- [ ] Update the "in the app now" list — course records, not "follow friends".
-- [ ] Reflect the Today-first app structure in the app screenshots and copy.
+- [x] Add an **arcade** section and nav entry — the missing top of funnel.
+- [x] Update the "in the app now" list — course records, not "follow friends".
+- [x] Reflect the Today-first app structure in the app band copy.
+- [x] Courses page: ask for a block of consecutive tee times, not scattered slots.
+- [ ] Deploy to production (`netlify deploy --no-build --prod`).
