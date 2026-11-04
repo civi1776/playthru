@@ -44,13 +44,13 @@ marketing plan asks for a feed.
 
 ## STILL OPEN IN THE APP
 
-- [ ] **PreviewModeScreen** still reads `activity_feed` for its logged-out teaser, which is now permanently empty. Swap it for recent clocked rounds before the next build.
+- [x] **PreviewModeScreen** now lists recent clocked rounds instead of the retired activity feed.
 
 ## OPEN RISKS
 
 - **Arcade qualifier spots are cheatable.** The game posts its own score from the client. Before a real purse is attached, either validate runs server-side from an input log or make the reward free entry rather than a guaranteed spot.
 - **Entry fees and Apple.** A real-world tournament entry should qualify as a physical-world service and route through Stripe, but this is where review gets strict. Settle it early.
-- **Pending migration.** `supabase/migrations/20261103120000_arcade_seasons_challenges.sql` is written and unapplied, so the arcade qualifying board and friend duels are inert.
+- **Pending migration, now load-bearing.** `supabase/migrations/20261103120000_arcade_seasons_challenges.sql` is written and unapplied. As of v1.7.0 the Today tab, the arcade lobby and the public website all advertise the monthly qualifying board and the top-ten qualifier spot. Until the migration runs, `arcade_season_board` does not exist, every one of those surfaces shows an empty board, and the promise on clocked.golf cannot be kept. Apply it before the website goes to production.
 
 ---
 
@@ -60,4 +60,4 @@ marketing plan asks for a feed.
 - [x] Update the "in the app now" list — course records, not "follow friends".
 - [x] Reflect the Today-first app structure in the app band copy.
 - [x] Courses page: ask for a block of consecutive tee times, not scattered slots.
-- [ ] Deploy to production (`netlify deploy --no-build --prod`).
+- [ ] Deploy to production (`netlify deploy --no-build --prod`) — blocked by the permission classifier, needs to be run by hand.
