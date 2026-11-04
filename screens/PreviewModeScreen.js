@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import InitialsAvatar from '../components/InitialsAvatar';
 import CourseAvatar from '../components/CourseAvatar';
 import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import { totalPointsFromHoleScores } from '../lib/clockedSport';
 import { COLOR, RADIUS } from '../lib/theme';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -371,26 +372,44 @@ function ActivityTab({ showGate }) {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Recent clocked rounds, not the retired activity feed. A prospective
+  // player needs to see the format being used; an empty feed sells nothing.
   const load = useCallback(async () => {
     try {
       const { data: rows } = await supabase
-        .from('activity_feed')
-        .select('id, user_id, type, content, likes, created_at')
+        .from('rounds')
+        .select('id, user_id, course_name, holes, players, duration_minutes, hole_scores, created_at')
+        .eq('round_format', 'clocked')
+        .not('hole_scores', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(20);
 
-      if (rows && rows.length > 0) {
-        const uids = [...new Set(rows.map(r => r.user_id))];
+      const list = (rows ?? []).map(r => ({
+        id: r.id,
+        user_id: r.user_id,
+        type: 'round_logged',
+        created_at: r.created_at,
+        content: {
+          course_name:      r.course_name ?? 'Quick Play',
+          holes:            r.holes,
+          players:          r.players,
+          duration_minutes: r.duration_minutes,
+          team_score:       totalPointsFromHoleScores(r.hole_scores),
+        },
+      }));
+
+      if (list.length > 0) {
+        const uids = [...new Set(list.map(r => r.user_id))];
         const { data: profs } = await supabase
           .from('profiles').select('id, username, full_name').in('id', uids);
         const pm = {};
         (profs ?? []).forEach(pr => { pm[pr.id] = pr; });
-        rows.forEach(r => {
+        list.forEach(r => {
           r.username  = pm[r.user_id]?.username  ?? null;
           r.full_name = pm[r.user_id]?.full_name ?? null;
         });
       }
-      setItems(rows ?? []);
+      setItems(list);
     } catch (e) {
       // silent fail
     } finally {
@@ -410,7 +429,7 @@ function ActivityTab({ showGate }) {
   if (items.length === 0) {
     return (
       <View style={p.centered}>
-        <Text style={p.emptyText}>No activity yet.{'\n'}Be the first to log a round!</Text>
+        <Text style={p.emptyText}>No rounds on the clock yet.{'\n'}Be the first.</Text>
       </View>
     );
   }
