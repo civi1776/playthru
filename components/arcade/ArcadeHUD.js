@@ -14,7 +14,7 @@ import { formatSeconds } from '../../lib/clockedSport';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const RING = 64;
 
-export default function ArcadeHUD({ holeNumber, par, strokes, points, timePar, elapsed, clockLive, lie, club }) {
+export default function ArcadeHUD({ holeNumber, par, strokes, points, timePar, elapsed, clockLive, lie, club, streak = 0 }) {
   const remaining = Math.ceil(timePar - elapsed);
   const over = remaining < 0;
   const zone = clockLive ? ringZone(remaining, timePar) : 'green';
@@ -47,6 +47,7 @@ export default function ArcadeHUD({ holeNumber, par, strokes, points, timePar, e
           </CountdownRing>
         </Animated.View>
         <Text style={st.clockLabel}>{clockLive ? (over ? 'OVER' : `PAR ${formatSeconds(timePar)}`) : 'CLOCK ARMED'}</Text>
+        {streak > 0 && <Text style={st.heat}>{'\u{1F525}'} {streak} IN A ROW</Text>}
       </View>
     </View>
   );
@@ -96,17 +97,25 @@ export function VerdictOverlay({ verdict }) {
         </Svg>
         <Animated.View style={[st.verdictCenter, { opacity, transform: [{ scale }] }]} accessibilityLiveRegion="polite">
           <Text style={[st.verdictHeadline, { color: verdict.color }]}>
-            {verdict.beat ? 'BEAT THE CLOCK' : 'OVER THE CLOCK'}
+            {verdict.timedOut ? 'OUT OF TIME' : verdict.beat ? 'BEAT THE CLOCK' : 'OVER THE CLOCK'}
           </Text>
-          <View style={st.verdictDeltaRow}>
-            <Text style={[st.verdictBy, { color: verdict.color }]}>by</Text>
-            <Text style={[st.verdictDelta, { color: verdict.color }]}>{formatSeconds(verdict.delta)}</Text>
-          </View>
+          {!verdict.timedOut && (
+            <View style={st.verdictDeltaRow}>
+              <Text style={[st.verdictBy, { color: verdict.color }]}>by</Text>
+              <Text style={[st.verdictDelta, { color: verdict.color }]}>{formatSeconds(verdict.delta)}</Text>
+            </View>
+          )}
           <Text style={st.verdictResult}>
             {verdict.pickedUp ? 'PICKED UP · ' : ''}{(verdict.label ?? '').toUpperCase()}  {verdict.points > 0 ? `+${verdict.points}` : verdict.points} PTS
           </Text>
           {verdict.penalty < 0 && (
-            <Text style={[st.verdictResult, { color: COLOR.red, marginTop: 2 }]}>CLOCK {verdict.penalty}</Text>
+            <Text style={[st.verdictResult, { color: COLOR.red, marginTop: 2 }]}>{verdict.timedOut ? `DOUBLE AND ONE MORE  ${verdict.penalty}` : `CLOCK ${verdict.penalty}`}</Text>
+          )}
+          {verdict.bonus > 0 && (
+            <Text style={[st.verdictResult, { color: COLOR.gold, marginTop: 2 }]}>{'\u{1F525}'} {verdict.streak} IN A ROW  +{verdict.bonus}</Text>
+          )}
+          {verdict.bonus === 0 && verdict.beat && verdict.streak > 0 && verdict.streak % 3 !== 0 && (
+            <Text style={[st.verdictResult, { marginTop: 2 }]}>{verdict.streak} IN A ROW {'\u00B7'} {3 - (verdict.streak % 3)} MORE FOR HEAT</Text>
           )}
         </Animated.View>
       </View>
@@ -126,6 +135,7 @@ const st = StyleSheet.create({
   clockWrap: { alignItems: 'center' },
   clockDigits: { ...TYPE.statNumber, fontSize: 15 },
   clockLabel: { ...TYPE.label, fontSize: 8, marginTop: 2 },
+  heat: { fontSize: 8, fontWeight: '800', color: COLOR.gold, letterSpacing: 1, marginTop: 2 },
 
   verdictWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   verdictCenter: { alignItems: 'center', justifyContent: 'center' },

@@ -82,7 +82,7 @@ function playRound(seed, difficulty, opts = {}) {
       if (['water', 'edge', 'tree', 'flagstick', 'expired', 'turbo'].includes(ev.type)) cur.events[ev.type] = (cur.events[ev.type] ?? 0) + 1;
       if (ev.type === 'verdict') {
         const r = ev.result;
-        holes.push({ hole: r.hole, par: g.hole.par, len: Math.round(g.hole.length), strokes: r.strokes, pts: r.playerResults[0].points, holeScore: r.holeScore, elapsed: r.elapsed, timePar: r.timePar, arcadePar: g.timePar, penalty: r.penalty, beat: ev.beat, pickedUp: ev.pickedUp, ...cur });
+        holes.push({ hole: r.hole, par: g.hole.par, len: Math.round(g.hole.length), strokes: r.strokes, pts: r.playerResults[0].points, holeScore: r.holeScore, elapsed: r.elapsed, timePar: r.timePar, arcadePar: g.timePar, penalty: r.penalty, beat: ev.beat, pickedUp: ev.pickedUp, timedOut: !!ev.timedOut, bonus: ev.bonus ?? 0, ...cur });
         startHole(); stuckGuard = 0; pinned = 0; detourUntil = 0; lockPending = false;
       }
       if (ev.type === 'done') return { summary: g.summary, holes, swings };
@@ -103,7 +103,7 @@ for (const difficulty of ['beginner', 'intermediate', 'pro']) {
   const ended = rounds.filter(r => r.ended); if (ended.length) console.log(`\n[${difficulty}] ${ended.length} rounds did not finish: ` + ended.slice(0,3).map(r => r.ended).join(' | '));
   const H = rounds.flatMap(r => r.holes);
   const S = rounds.flatMap(r => r.swings);
-  const pts = rounds.map(r => r.summary?.totalPlayerPoints ?? 0);
+  const pts = rounds.map(r => r.summary?.totalScore ?? 0);   // board points: scoring + penalties + heat
   const secs = rounds.map(r => r.summary?.totalSeconds ?? 0);
   const phase = {};
   for (const h of H) for (const [k, v] of Object.entries(h.phase)) phase[k] = (phase[k] ?? 0) + v;
@@ -112,8 +112,9 @@ for (const difficulty of ['beginner', 'intermediate', 'pro']) {
   for (const h of H) for (const [k, v] of Object.entries(h.events)) ev[k] = (ev[k] ?? 0) + v;
   const putts = S.filter(x => x.putt), chips = S.filter(x => x.club === 'chip');
   console.log(`\n=== ${difficulty.toUpperCase()}  (${seeds} rounds, hesitation ${hes}s) ===`);
-  console.log(`points/9: mean ${mean(pts).toFixed(1)}  min ${Math.min(...pts)}  max ${Math.max(...pts)}   time/9: ${(mean(secs) / 60).toFixed(1)} min`);
+  console.log(`board points/9: mean ${mean(pts).toFixed(1)}  min ${Math.min(...pts)}  max ${Math.max(...pts)}   time/9: ${(mean(secs) / 60).toFixed(1)} min`);
   console.log(`holes under time par: ${(100 * H.filter(h => h.beat).length / H.length).toFixed(0)}%   picked up (double): ${(100 * H.filter(h => h.pickedUp).length / H.length).toFixed(0)}%   expired: ${ev.expired ?? 0}/${H.length}`);
+  console.log(`timeouts ${H.filter(h => h.timedOut).length}/${H.length}   heat bonus/round ${(H.reduce((a, h) => a + h.bonus, 0) / seeds).toFixed(1)}`);
   console.log(`strokes/hole ${mean(H.map(h => h.strokes)).toFixed(2)}   putts/hole ${mean(H.map(h => h.putts)).toFixed(2)}   3-putt+ holes ${H.filter(h => h.putts >= 3).length}   chips/hole ${mean(H.map(h => h.chips)).toFixed(2)}`);
   console.log(`events/round: water ${(ev.water ?? 0) / seeds}  edge ${(ev.edge ?? 0) / seeds}  tree ${(ev.tree ?? 0) / seeds}  flagstick ${(ev.flagstick ?? 0) / seeds}  turbo ${(ev.turbo ?? 0) / seeds}${ev.stuck ? '  STUCK ' + ev.stuck : ''}`);
   console.log(`time split: ` + Object.entries(phase).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${(100 * v / totalPhase).toFixed(0)}%`).join('  '));

@@ -229,6 +229,7 @@ function Game({ seed, difficulty, avatar, onDone, onQuit, challengeId = null }) 
   const verdictTimer = useRef(null);
   const showVerdict = useCallback((ev) => {
     const color = ev.beat ? COLOR.green : COLOR.red;
+    if (ev.bonus > 0) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     if (ev.beat) {
       playChime();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -240,6 +241,7 @@ function Game({ seed, difficulty, avatar, onDone, onQuit, challengeId = null }) 
     setVerdict({
       beat: ev.beat, delta: ev.delta, color, key: Date.now(),
       label: pr?.label, points: ev.result?.holeScore ?? 0, pickedUp: ev.pickedUp, penalty: ev.result?.penalty ?? 0,
+      timedOut: !!ev.timedOut, streak: ev.streak ?? 0, bonus: ev.bonus ?? 0,
     });
     verdictTimer.current = setTimeout(() => setVerdict(null), VERDICT_HOLD_MS - 150);
   }, [playChime]);
@@ -390,6 +392,7 @@ function Game({ seed, difficulty, avatar, onDone, onQuit, challengeId = null }) 
         par={g.hole.par}
         strokes={g.strokes}
         points={runningPoints(g)}
+        streak={g.clockStreak}
         timePar={g.timePar}
         elapsed={elapsed}
         clockLive={clockLive}
@@ -546,7 +549,7 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
           <BigStat label="POINTS" value={summary.totalScore > 0 ? `+${summary.totalScore}` : String(summary.totalScore)} color={summary.totalScore > 0 ? COLOR.green : summary.totalScore < 0 ? COLOR.red : COLOR.cream} />
           <BigStat label="TOTAL TIME" value={formatSecondsLong(summary.totalSeconds)} />
           <BigStat label="UNDER CLOCK" value={`${summary.holesUnderClock}/${summary.holesPlayed}`} color={summary.holesUnderClock >= 6 ? COLOR.green : summary.holesUnderClock >= 3 ? COLOR.amber : COLOR.red} />
-          <BigStat label="STROKES" value={String(summary.totalStrokes)} />
+          <BigStat label="HEAT" value={summary.bonusPoints ? `+${summary.bonusPoints}` : '0'} color={summary.bonusPoints ? COLOR.gold : COLOR.cream} />
         </View>
 
         <View style={st.holesCard}>
@@ -565,8 +568,9 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
                 <Text style={[st.holeCell, st.holeNum]}>{h.hole}</Text>
                 <Text style={[st.holeCell, st.holeTxt]}>{h.par}</Text>
                 <Text style={[st.holeCell, st.holeTxt]}>{h.strokes}{h.pickedUp ? '*' : ''}</Text>
-                <Text style={[st.holeCell, st.holeTxt, { flex: 1.6, color: beat ? COLOR.green : COLOR.red }]}>
-                  {beat ? '−' : '+'}{formatSeconds(d)}{h.penalty ? `  (${h.penalty})` : ''}
+                <Text style={[st.holeCell, st.holeTxt, { flex: 1.6, color: h.timedOut ? COLOR.red : beat ? COLOR.green : COLOR.red }]}>
+                  {h.timedOut ? 'OUT OF TIME' : `${beat ? '−' : '+'}${formatSeconds(d)}`}
+                  {h.bonus ? <Text style={{ color: COLOR.gold }}>{`  HEAT +${h.bonus}`}</Text> : null}
                 </Text>
                 <Text style={[st.holeCell, st.holeTxt, { textAlign: 'right', color: h.holeScore > 0 ? COLOR.green : h.holeScore < 0 ? COLOR.red : COLOR.muted }]}>
                   {h.holeScore > 0 ? `+${h.holeScore}` : h.holeScore}
@@ -574,7 +578,7 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
               </View>
             );
           })}
-          <Text style={[st.footnote, { textAlign: 'left', marginTop: 8 }]}>* picked up at double bogey, the real Clocked cap.</Text>
+          <Text style={[st.footnote, { textAlign: 'left', marginTop: 8 }]}>* picked up at double bogey. Out of time is double bogey and one more. HEAT pays every third hole in a row under the clock.</Text>
         </View>
 
         {challenge && (

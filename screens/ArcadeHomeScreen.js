@@ -225,7 +225,9 @@ export default function ArcadeHomeScreen({ navigation }) {
           <HowRow icon="timer-outline"  text="Stand over the ball too long and the shot cone widens. Hesitation costs accuracy and clock." />
           <HowRow icon="car-sport-outline" text="Drive to your ball. The cart has real momentum: it drifts wide at speed and slides in sand. Turbo with the button, or drop a second finger while you steer. Hole out and you're already on the next tee." />
           <HowRow icon="flag-outline" text="The flagstick is real. Hit it hard and the ball bounces off; catch it right and it drops in." />
-          <HowRow icon="trophy-outline" text="Real Clocked scoring: par 1, birdie 3, eagle 6. Over time par costs half a point per 30s. Pick up at double." />
+          <HowRow icon="trophy-outline" text="Real Clocked scoring: par 1, birdie 3, eagle 6. Pick up at double." />
+          <HowRow icon="alarm-outline" text="The clock is a buzzer. Hit zero and the hole is over: double bogey and one more, −3. A ball already in the air gets to land." />
+          <HowRow icon="flame-outline" text="HEAT. Beat the clock three holes in a row for +1, six for +2, all nine for +3. One slow hole and the streak is gone." />
         </View>
 
         {/* Qualifier banner */}
