@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import { computeFullRating, extractPlayerRoundStats, DEFAULT_PROVISIONAL_ROUNDS } from '../lib/clockedRating';
 import { COLOR, SPACING, RADIUS } from '../lib/theme';
 import ScreenHeader from '../components/ScreenHeader';
+import ArcadeBoardRow from '../components/arcade/ArcadeBoardRow';
+import { fetchArcadeBoard, seasonLabel, currentSeason, daysLeftInSeason, QUALIFY_TOP } from '../lib/arcade/season';
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 function LeaderboardSkeleton() {
@@ -134,45 +136,6 @@ function ClockedRow({ entry, navigation }) {
   );
 }
 
-// ─── Tournament Standings Row ────────────────────────────────────────────────
-function TournamentRow({ entry }) {
-  return (
-    <View style={s.courseRow}>
-      <View style={s.rowAvatar}>
-        <InitialsAvatar name={entry.name} size={34} avatarUrl={entry.avatarUrl} />
-      </View>
-      <View style={s.courseInfo}>
-        <Text style={s.courseName} numberOfLines={1}>{entry.name}</Text>
-        <Text style={s.courseMeta} numberOfLines={1}>
-          {entry.division ? entry.division.toUpperCase() : ''}
-          {entry.placement != null ? ` · #${entry.placement} PLACE` : ''}
-        </Text>
-      </View>
-      <View style={s.courseRight}>
-        <Text style={s.courseTime}>{entry.points ?? '—'}</Text>
-        <Text style={s.courseRounds}>PTS</Text>
-      </View>
-    </View>
-  );
-}
-
-// ─── Tournament Standings Empty State ────────────────────────────────────────
-function TournamentEmptyState({ navigation }) {
-  return (
-    <View style={s.emptyState}>
-      <Ionicons name="ribbon-outline" size={56} color="rgba(201,168,76,0.2)" style={{ marginBottom: 18 }} />
-      <Text style={s.emptyTitle}>No tournaments completed yet.</Text>
-      <Text style={s.emptyText}>
-        This is where tournament results will live once the first Clocked event is played. It's coming to South Florida. Request an invitation and be among the first on the board.
-      </Text>
-      <TouchableOpacity style={s.ctaBtn} onPress={() => navigation.navigate('Tournament')} activeOpacity={0.85}>
-        <Ionicons name="trophy-outline" size={16} color={COLOR.bg} style={{ marginRight: 6 }} />
-        <Text style={s.ctaBtnText}>ABOUT THE FIRST EVENT</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
 // ─── Course Row ──────────────────────────────────────────────────────────────
 function CourseRow({ course, navigation }) {
   return (
@@ -197,20 +160,21 @@ function CourseRow({ course, navigation }) {
 }
 
 // ─── Filters ─────────────────────────────────────────────────────────────────
+// Three boards, nothing nested under the first one. CLOCKED is the real
+// thing: one score, one ranking. ARCADE is the game, with the level on every
+// row. COURSES ranks where people play fastest.
 const FILTERS = [
-  { key: 'OVERALL',    label: 'OVERALL' },
-  { key: 'COURSE',     label: 'COURSE' },
-  { key: 'TOURNAMENT', label: 'STANDINGS' },
+  { key: 'CLOCKED', label: 'CLOCKED' },
+  { key: 'ARCADE',  label: 'ARCADE' },
+  { key: 'COURSE',  label: 'COURSES' },
 ];
-
-// Format/difficulty segments for the OVERALL board — "how well they play
-// THIS format," not a re-sort of the same global list. Rounds carry a real
-// `difficulty` column on the rounds table (default 'intermediate'), so this
-// is computable today with zero new data collection.
-const DIFFICULTIES = ['ALL', 'BEGINNER', 'INTERMEDIATE', 'PRO'];
-
-// Division segments for Tournament Standings — mirrors tournament_results.division.
-const DIVISIONS = ['ALL', 'BEGINNER', 'INTERMEDIATE', 'PRO', 'OPEN'];
+const ARCADE_PERIODS = [['month', 'THIS MONTH'], ['all', 'ALL TIME']];
+// The month board defaults to the qualifying slice (intermediate + pro),
+// because that is the one that leads to the event; all-time defaults to all.
+const ARCADE_DIFFS = {
+  month: [['qualifying', 'QUALIFYING'], ['beginner', 'BEGINNER'], ['intermediate', 'INTER'], ['pro', 'PRO']],
+  all:   [['all', 'ALL'], ['beginner', 'BEGINNER'], ['intermediate', 'INTER'], ['pro', 'PRO']],
+};
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function LeaderboardScreen({ navigation }) {
@@ -221,7 +185,7 @@ export default function LeaderboardScreen({ navigation }) {
   const { session, profile } = useAuth();
   const uid = session?.user?.id ?? null;
 
-  const [filter, setFilter]     = useState('OVERALL');
+  const [filter, setFilter]     = useState('CLOCKED');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(false);
   const [data, setData]         = useState([]);
@@ -231,11 +195,14 @@ export default function LeaderboardScreen({ navigation }) {
   // Course filter search (client-side)
   const [courseQuery, setCourseQuery] = useState('');
 
-  // Format/difficulty segment for OVERALL ('ALL' = today's behavior).
-  const [difficulty, setDifficulty] = useState('ALL');
+  // The Clocked board is one board. Rounds at every difficulty feed one
+  // score, so there is nothing to slice; the constant keeps the legacy-round
+  // merge below on its ALL path.
+  const difficulty = 'ALL';
 
-  // Division filter for TOURNAMENT standings (client-side).
-  const [tournamentDivision, setTournamentDivision] = useState('ALL');
+  // Arcade board slices.
+  const [arcadePeriod, setArcadePeriod] = useState('month');
+  const [arcadeDiff, setArcadeDiff] = useState('qualifying');
 
   const filterRef = useRef(filter);
   filterRef.current = filter;
@@ -446,63 +413,36 @@ export default function LeaderboardScreen({ navigation }) {
     }
   }, []);
 
-  // ── Fetch tournament standings board ──
-  // tournament_results is currently empty (no tournaments have completed
-  // yet) — that's expected, the empty state below handles it. Query shape
-  // matches the table exactly: id, tournament_id, user_id, team_name,
-  // division, placement, points, created_at.
-  const fetchTournamentBoard = useCallback(async () => {
+  // ── Fetch arcade board ──
+  const fetchArcadeBoardData = useCallback(async () => {
     setLoading(dataRef.current.length === 0);
     setError(false);
-    setMyRank(null);
     setMyProjected(null);
     try {
-      const { data: results, error: err } = await supabase
-        .from('tournament_results')
-        .select('id, tournament_id, user_id, team_name, division, placement, points, created_at')
-        .order('points', { ascending: false })
-        .order('placement', { ascending: true });
-      if (err) throw err;
-
-      const userIds = [...new Set((results ?? []).map(r => r.user_id).filter(Boolean))];
-      let profileMap = {};
-      if (userIds.length) {
-        const { data: profiles } = await supabase
-          .from('profiles').select('id, full_name, username, avatar_url').in('id', userIds);
-        (profiles ?? []).forEach(p => { profileMap[p.id] = p; });
-      }
-
-      const rows = (results ?? []).map((r, i) => {
-        const prof = profileMap[r.user_id];
-        const name = r.team_name || prof?.full_name || prof?.username || 'Player';
-        return {
-          id: r.id, rank: i + 1, name, division: r.division,
-          placement: r.placement, points: r.points,
-          avatarUrl: prof?.avatar_url, isYou: r.user_id === uid,
-        };
-      });
-      setData(rows);
+      const rows = await fetchArcadeBoard({ period: arcadePeriod, difficulty: arcadeDiff, limit: 50 });
+      setData(rows.map(r => ({ ...r, isYou: r.user_id === uid })));
+      setMyRank(rows.find(r => r.user_id === uid)?.rank ?? null);
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [uid]);
+  }, [uid, arcadePeriod, arcadeDiff]);
 
   // ── Fetch dispatch ──
   const fetchCurrent = useCallback(() => {
     if (filter === 'COURSE') fetchCourseBoard();
-    else if (filter === 'TOURNAMENT') fetchTournamentBoard();
+    else if (filter === 'ARCADE') fetchArcadeBoardData();
     else fetchPlayerBoard();
-  }, [filter, fetchPlayerBoard, fetchCourseBoard, fetchTournamentBoard]);
+  }, [filter, fetchPlayerBoard, fetchCourseBoard, fetchArcadeBoardData]);
 
-  useEffect(() => { fetchCurrent(); }, [filter, difficulty]);
+  useEffect(() => { fetchCurrent(); }, [filter, arcadePeriod, arcadeDiff]);
   useFocusEffect(useCallback(() => { fetchCurrent(); }, []));
 
   useEffect(() => { if (!session) navigation.replace('Welcome'); }, [session]);
 
   const isCourse = filter === 'COURSE';
-  const isTournament = filter === 'TOURNAMENT';
+  const isArcade = filter === 'ARCADE';
   const isEmpty = !loading && !error && data.length === 0;
 
   // Client-side course filtering
@@ -511,11 +451,6 @@ export default function LeaderboardScreen({ navigation }) {
         c.name?.toLowerCase().includes(courseQuery.toLowerCase()) ||
         (c.city && c.city.toLowerCase().includes(courseQuery.toLowerCase()))
       )
-    : data;
-
-  // Client-side division filtering for tournament standings
-  const filteredTournament = isTournament && tournamentDivision !== 'ALL'
-    ? data.filter(r => (r.division || '').toUpperCase() === tournamentDivision)
     : data;
 
   return (
@@ -531,23 +466,32 @@ export default function LeaderboardScreen({ navigation }) {
       <View style={s.filterRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f.key} style={[s.filterBtn, filter === f.key && s.filterBtnActive]}
-            onPress={() => { setFilter(f.key); setCourseQuery(''); setDifficulty('ALL'); setTournamentDivision('ALL'); }}>
+            onPress={() => { setFilter(f.key); setCourseQuery(''); }} accessibilityRole="tab" accessibilityState={{ selected: filter === f.key }}>
             <Text style={[s.filterText, filter === f.key && s.filterTextActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Format/difficulty segment — personalized rankings by how well a
-          player performs a given format, not just their raw overall score */}
-      {filter === 'OVERALL' && (
-        <View style={s.diffRow}>
-          {DIFFICULTIES.map(d => (
-            <TouchableOpacity key={d} style={[s.diffPill, difficulty === d && s.diffPillActive]}
-              onPress={() => setDifficulty(d)} activeOpacity={0.8}>
-              <Text style={[s.diffPillText, difficulty === d && s.diffPillTextActive]}>{d}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {/* Arcade slices: period, then level. The level is never implicit. */}
+      {isArcade && (
+        <>
+          <View style={s.diffRow}>
+            {ARCADE_PERIODS.map(([k, l]) => (
+              <TouchableOpacity key={k} style={[s.diffPill, arcadePeriod === k && s.diffPillActive]}
+                onPress={() => { setArcadePeriod(k); setArcadeDiff(k === 'month' ? 'qualifying' : 'all'); }} activeOpacity={0.8}>
+                <Text style={[s.diffPillText, arcadePeriod === k && s.diffPillTextActive]}>{l}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={s.diffRow}>
+            {ARCADE_DIFFS[arcadePeriod].map(([k, l]) => (
+              <TouchableOpacity key={k} style={[s.diffPill, arcadeDiff === k && s.diffPillActive]}
+                onPress={() => setArcadeDiff(k)} activeOpacity={0.8}>
+                <Text style={[s.diffPillText, arcadeDiff === k && s.diffPillTextActive]}>{l}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
       )}
 
       {/* Course search bar */}
@@ -565,18 +509,6 @@ export default function LeaderboardScreen({ navigation }) {
         </View>
       )}
 
-      {/* Division filter — only shown once there's tournament data to slice */}
-      {isTournament && !loading && data.length > 0 && (
-        <View style={s.diffRow}>
-          {DIVISIONS.map(d => (
-            <TouchableOpacity key={d} style={[s.diffPill, tournamentDivision === d && s.diffPillActive]}
-              onPress={() => setTournamentDivision(d)} activeOpacity={0.8}>
-              <Text style={[s.diffPillText, tournamentDivision === d && s.diffPillTextActive]}>{d}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
       {/* Content */}
       {loading ? (
         <LeaderboardSkeleton />
@@ -588,8 +520,20 @@ export default function LeaderboardScreen({ navigation }) {
             <Text style={s.ctaBtnText}>RETRY</Text>
           </TouchableOpacity>
         </View>
-      ) : isEmpty && isTournament ? (
-        <TournamentEmptyState navigation={navigation} />
+      ) : isEmpty && isArcade ? (
+        <View style={s.emptyState}>
+          <Ionicons name="game-controller-outline" size={56} color="rgba(201,168,76,0.2)" style={{ marginBottom: 18 }} />
+          <Text style={s.emptyTitle}>Nothing on this board yet.</Text>
+          <Text style={s.emptyText}>
+            {arcadeDiff === 'qualifying'
+              ? 'Play nine on intermediate or pro and you are first on the qualifying board.'
+              : 'Play nine at this level and you are first.'}
+          </Text>
+          <TouchableOpacity style={s.ctaBtn} onPress={() => navigation.navigate('Arcade')} activeOpacity={0.85}>
+            <Ionicons name="game-controller-outline" size={16} color={COLOR.bg} style={{ marginRight: 6 }} />
+            <Text style={s.ctaBtnText}>PLAY NINE</Text>
+          </TouchableOpacity>
+        </View>
       ) : isEmpty ? (
         <View style={s.emptyState}>
           <Ionicons name="trophy-outline" size={56} color="rgba(201,168,76,0.2)" style={{ marginBottom: 18 }} />
@@ -616,16 +560,34 @@ export default function LeaderboardScreen({ navigation }) {
             )}
           </View>
         </ScrollView>
-      ) : isTournament ? (
+      ) : isArcade ? (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <Text style={s.courseListHeader}>Ranked by tournament points</Text>
+          <Text style={s.courseListHeader}>
+            {arcadePeriod === 'month' ? `${seasonLabel(currentSeason())} \u00B7 best nine per player` : 'All time \u00B7 best nine per player'}
+            {arcadeDiff === 'qualifying' ? ` \u00B7 intermediate and pro \u00B7 ${daysLeftInSeason()} days left` : ''}
+          </Text>
+          {arcadePeriod === 'month' && arcadeDiff === 'qualifying' && (
+            <Text style={s.glossaryWide}>Top {QUALIFY_TOP} at month end earn a spot in the first Clocked event's qualifier.</Text>
+          )}
+          {myRank != null && (
+            <View style={s.yourRankCard}>
+              <Text style={s.yourRankLabel}>{arcadeDiff === 'qualifying' ? 'YOUR QUALIFYING RANK' : 'YOUR RANK ON THIS BOARD'}</Text>
+              <Text style={s.yourRankValue}>#{myRank}</Text>
+            </View>
+          )}
           <View style={s.listSection}>
-            {filteredTournament.map((entry, i) => (
-              <TournamentRow key={entry.id ?? i} entry={entry} />
-            ))}
-            {filteredTournament.length === 0 && (
-              <Text style={s.noResults}>No results in this division yet.</Text>
-            )}
+            <View style={s.boardCard}>
+              {data.map((row, i) => {
+                const cut = arcadePeriod === 'month' && arcadeDiff === 'qualifying' && row.rank === QUALIFY_TOP && data.length > QUALIFY_TOP;
+                return (
+                  <View key={row.id ?? i}>
+                    <ArcadeBoardRow row={row} isYou={row.isYou} last={i === data.length - 1 || cut}
+                      onPress={row.isYou ? undefined : () => navigation.navigate('PublicProfile', { userId: row.user_id })} />
+                    {cut && <View style={s.cutLine}><Text style={s.cutText}>QUALIFYING LINE</Text></View>}
+                  </View>
+                );
+              })}
+            </View>
           </View>
         </ScrollView>
       ) : (
@@ -634,7 +596,7 @@ export default function LeaderboardScreen({ navigation }) {
 
           {myRank != null && (
             <View style={s.yourRankCard}>
-              <Text style={s.yourRankLabel}>{difficulty === 'ALL' ? 'YOUR GLOBAL RANK' : `YOUR ${difficulty} RANK`}</Text>
+              <Text style={s.yourRankLabel}>YOUR CLOCKED RANK</Text>
               <Text style={s.yourRankValue}>#{myRank}</Text>
             </View>
           )}
@@ -651,8 +613,8 @@ export default function LeaderboardScreen({ navigation }) {
           )}
 
           <View style={s.listSection}>
-            <Text style={s.sectionLabel}>RANKINGS</Text>
-            <Text style={s.glossary}>CLK is the Clocked Score, 0 to 100. Legacy rows are pre-clock rounds.</Text>
+            <Text style={s.sectionLabel}>CLOCKED SCORE RANKINGS</Text>
+            <Text style={s.glossary}>Real rounds on the clock. CLK is the Clocked Score, 0 to 100. Legacy rows are pre-clock rounds.</Text>
             {data.map((entry, i) => (
               <ClockedRow key={entry.userId ?? i} entry={entry} navigation={navigation} />
             ))}
@@ -669,6 +631,10 @@ const s = StyleSheet.create({
   // Same treatment as the Feed / Profile tab wordmarks — gold, tracked,
   // sans — so the tabs read as one app instead of one serif outlier.
   glossary:      { fontSize: 11, color: COLOR.dim, marginTop: -4, marginBottom: 10, lineHeight: 15 },
+  glossaryWide:  { fontSize: 11, color: COLOR.dim, paddingHorizontal: SPACING.xl, marginTop: -6, marginBottom: 8, lineHeight: 15 },
+  boardCard:     { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, overflow: 'hidden' },
+  cutLine:       { alignItems: 'center', paddingVertical: 6, backgroundColor: '#C9A84C12', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#C9A84C55' },
+  cutText:       { fontSize: 8, fontWeight: '800', color: COLOR.gold, letterSpacing: 2 },
 
   // Filters
   filterRow:       { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: 6, marginBottom: SPACING.sm },

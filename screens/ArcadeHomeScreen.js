@@ -23,6 +23,7 @@ import { SwingStage } from '../components/arcade/Golfer';
 import { QUALIFY_TOP, currentSeason, seasonLabel, daysLeftInSeason, fetchSeasonBoard, fetchAllTimeBoard, fetchMyQualifiers } from '../lib/arcade/season';
 import { createArcadeChallenge, fetchMyArcadeChallenges, respondToArcadeChallenge } from '../lib/arcade/challenges';
 import InitialsAvatar from '../components/InitialsAvatar';
+import ArcadeBoardRow from '../components/arcade/ArcadeBoardRow';
 import ScreenHeader from '../components/ScreenHeader';
 import Button from '../components/Button';
 
@@ -312,21 +313,12 @@ export default function ArcadeHomeScreen({ navigation }) {
           {board == null && <ActivityIndicator color={COLOR.gold} style={{ padding: 16 }} />}
           {board?.length === 0 && <Text style={st.emptyText}>{boardMode === 'season' ? 'No qualifying runs yet this month. Play intermediate or pro and be first.' : 'No arcade rounds posted yet. Be first.'}</Text>}
           {board?.map((r, i) => {
-            const name = nameOf(r.profile);
-            const isYou = r.user_id === user?.id;
             const rank = r.rank ?? i + 1;
             const cut = boardMode === 'season' && rank === QUALIFY_TOP && board.length > QUALIFY_TOP;
             return (
               <View key={r.score_id ?? r.id ?? i}>
-                <View style={[st.boardRow, i < board.length - 1 && !cut && st.boardRowBorder]}>
-                  <Text style={[st.rank, rank <= 3 && { color: COLOR.gold }]}>{rank}</Text>
-                  <InitialsAvatar name={r.profile?.full_name} username={r.profile?.username} avatarUrl={r.profile?.avatar_url} size={32} />
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={[st.boardName, isYou && { color: COLOR.gold }]} numberOfLines={1}>{name}{isYou ? '  (you)' : ''}</Text>
-                    <Text style={st.boardMeta}>{formatSeconds(r.total_seconds)} · {String(r.difficulty ?? '').toUpperCase()}{r.holes_under_clock != null ? ` · ${r.holes_under_clock}/9 under` : ''}</Text>
-                  </View>
-                  <Text style={st.boardPts}>{r.points > 0 ? `+${r.points}` : r.points}</Text>
-                </View>
+                <ArcadeBoardRow row={r} rank={rank} isYou={r.user_id === user?.id} last={i === board.length - 1 || cut}
+                  onPress={r.user_id === user?.id ? undefined : () => navigation.navigate('PublicProfile', { userId: r.user_id })} />
                 {cut && (
                   <View style={st.cutLine}><Text style={st.cutText}>QUALIFYING LINE</Text></View>
                 )}

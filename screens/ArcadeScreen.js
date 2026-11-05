@@ -230,7 +230,7 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
     const pr = ev.result?.playerResults?.[0];
     setVerdict({
       beat: ev.beat, delta: ev.delta, color, key: Date.now(),
-      label: pr?.label, points: ev.result?.holeScore ?? 0, pickedUp: ev.pickedUp,
+      label: pr?.label, points: ev.result?.holeScore ?? 0, pickedUp: ev.pickedUp, penalty: ev.result?.penalty ?? 0,
     });
     verdictTimer.current = setTimeout(() => setVerdict(null), VERDICT_HOLD_MS - 150);
   }, [playChime]);

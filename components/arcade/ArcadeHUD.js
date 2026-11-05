@@ -105,6 +105,9 @@ export function VerdictOverlay({ verdict }) {
           <Text style={st.verdictResult}>
             {verdict.pickedUp ? 'PICKED UP · ' : ''}{(verdict.label ?? '').toUpperCase()}  {verdict.points > 0 ? `+${verdict.points}` : verdict.points} PTS
           </Text>
+          {verdict.penalty < 0 && (
+            <Text style={[st.verdictResult, { color: COLOR.red, marginTop: 2 }]}>CLOCK {verdict.penalty}</Text>
+          )}
         </Animated.View>
       </View>
     </View>

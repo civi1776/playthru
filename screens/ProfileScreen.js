@@ -20,6 +20,8 @@ import { totalPointsFromHoleScores } from '../lib/clockedSport';
 import { scoreTier, COLOR, SCORE_TIERS, RADIUS } from '../lib/theme';
 import ScreenHeader from '../components/ScreenHeader';
 import Button from '../components/Button';
+import ArcadeRecordCard from '../components/arcade/ArcadeRecordCard';
+import { fetchArcadeProfile } from '../lib/arcade/season';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -495,6 +497,7 @@ export default function ProfileScreen({ navigation }) {
   const [clockedRating, setClockedRating] = useState({ clockedScore: null, scoring: null, clock: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
   const [followingCount, setFollowingCount] = useState(0);
   const [nationalRank, setNationalRank] = useState(null);
+  const [arcadeRec, setArcadeRec] = useState(null);
 
   useEffect(() => {
     if (!user) navigation.replace('Welcome');
@@ -551,6 +554,7 @@ export default function ProfileScreen({ navigation }) {
       // National rank — profiles.national_rank is a retired column (only
       // ever written by the orphaned LiveRoundScreen), so compute it fresh.
       computeNationalRank(supabase, profile.id).then(setNationalRank).catch(() => {});
+      fetchArcadeProfile(profile.id).then(setArcadeRec).catch(() => {});
 
       setLoading(false);
     };
@@ -783,7 +787,7 @@ export default function ProfileScreen({ navigation }) {
         {!loading && bestRound && (
           <View style={s.bestRound}>
             <View>
-              <Text style={s.bestRoundLabel}>BEST ROUND</Text>
+              <Text style={s.bestRoundLabel}>BEST ROUND \u00B7 ON THE COURSE</Text>
               <Text style={s.bestRoundCourse}>
                 {bestRound.course_name ?? 'Quick Play'}
                 <Text style={s.bestRoundMeta}>{' \u00B7 '}{bestRound.holes}h</Text>
@@ -798,6 +802,9 @@ export default function ProfileScreen({ navigation }) {
           </View>
         )}
 
+
+        {/* The arcade half of the profile, kept apart from the course half */}
+        {!loading && <ArcadeRecordCard rec={arcadeRec} isOwn onPress={() => navigation.navigate('Arcade')} />}
 
         {/* Recent clocked rounds */}
         {!loading && (() => {

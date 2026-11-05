@@ -27,6 +27,8 @@ import RecentRoundsList from '../components/RecentRoundsList';
 import ScreenHeader from '../components/ScreenHeader';
 import { fetchClockedRatingForUser, computeNationalRank } from '../lib/clockedRating';
 import { fetchPlayerRounds, fetchHeadToHead, recordFromRounds } from '../lib/headToHead';
+import { fetchArcadeProfile } from '../lib/arcade/season';
+import ArcadeRecordCard from '../components/arcade/ArcadeRecordCard';
 import { COLOR, RADIUS, scoreTier } from '../lib/theme';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -122,6 +124,7 @@ export default function PublicProfileScreen({ navigation, route }) {
   const [rating, setRating] = useState({ clockedScore: null, scoring: null, clock: null, isProvisional: true, roundsUsed: 0, roundsNeeded: 5 });
   const [rank, setRank] = useState(null);
   const [h2h, setH2h] = useState(null);
+  const [arcadeRec, setArcadeRec] = useState(null);
   const [duelSending, setDuelSending] = useState(false);
 
   useEffect(() => {
@@ -150,6 +153,7 @@ export default function PublicProfileScreen({ navigation, route }) {
 
         // Slower extras, off the critical path.
         computeNationalRank(supabase, userId).then(v => { if (!cancelled) setRank(v); }).catch(() => {});
+        fetchArcadeProfile(userId).then(v => { if (!cancelled) setArcadeRec(v); }).catch(() => {});
         if (myUid && !isOwnProfile) {
           fetchHeadToHead(myUid, userId, myProfile?.full_name || myProfile?.username, name).then(v => { if (!cancelled) setH2h(v); });
         }
@@ -362,7 +366,7 @@ export default function PublicProfileScreen({ navigation, route }) {
           )}
 
           {/* By the numbers */}
-          <Text style={[s.sectionLabel, s.sectionPad]}>BY THE NUMBERS</Text>
+          <Text style={[s.sectionLabel, s.sectionPad]}>ON THE COURSE</Text>
           <View style={s.tiles}>
             <Tile label="ROUNDS" value={String(rounds.length)} sub={stats.legacy ? `${stats.legacy} legacy` : null} />
             <Tile label="AVG PTS / ROUND" value={stats.avgPts != null ? signed(Math.round(stats.avgPts * 10) / 10) : '—'} color={stats.avgPts != null ? ptsColor(stats.avgPts) : null} />
@@ -371,6 +375,8 @@ export default function PublicProfileScreen({ navigation, route }) {
             <Tile label="UNDER THE CLOCK" value={hasScore && rating.clock != null ? `${Math.round(rating.clock)}%` : '—'} color={hasScore && rating.clock != null ? (rating.clock >= 70 ? COLOR.green : COLOR.gold) : null} sub="holes under time par" />
             <Tile label="AVG TIME" value={formatDuration(stats.avgTime)} sub="per round" />
           </View>
+
+          <ArcadeRecordCard rec={arcadeRec} />
 
           {/* Form */}
           {stats.last10.length >= 2 && (

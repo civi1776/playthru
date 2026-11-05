@@ -49,14 +49,31 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
     onChangeRef.current?.({ dx: x / RANGE, dy: -y / RANGE });
   };
 
-  // Classify every touch we have not seen yet: stick or turbo.
+  // Classify every touch we have not seen yet: stick or turbo. Touch ids that
+  // have lifted are forgotten, because iOS reuses identifiers: without this a
+  // second turbo tap in the same drive could arrive with the first tap's id
+  // and be ignored.
   const classify = (touches) => {
+    const live = new Set(touches.map(t => t.identifier));
+    for (const id of [...seenIds.current]) if (!live.has(id)) seenIds.current.delete(id);
     for (const t of touches) {
       if (seenIds.current.has(t.identifier)) continue;
       seenIds.current.add(t.identifier);
       if (steerId.current == null && onStick(t)) steerId.current = t.identifier;
       else { setPressed(true); onTurboRef.current?.(); }
     }
+  };
+
+  // Keep steering and the pressed state honest against the fingers that are
+  // actually down. Runs on every start, move and end, because a finger that
+  // lands while the steering finger is held still produces no move event.
+  const sync = (touches) => {
+    classify(touches);
+    if (steerId.current != null && !touches.some(t => t.identifier === steerId.current)) {
+      steerId.current = null; knob.setValue({ x: 0, y: 0 }); onChangeRef.current?.({ dx: 0, dy: 0 });
+    }
+    if (!touches.some(t => t.identifier !== steerId.current)) setPressed(false);
+    steer(touches);
   };
 
   const endAll = (spring) => {
@@ -69,17 +86,11 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
   const pan = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => !disabled,
     onMoveShouldSetPanResponder: () => !disabled,
-    onPanResponderGrant: (e) => { measure(); classify(e.nativeEvent.touches); steer(e.nativeEvent.touches); },
-    onPanResponderMove: (e) => {
-      const touches = e.nativeEvent.touches;
-      classify(touches);
-      // Steering finger lifted while another stays down: stop the cart.
-      if (steerId.current != null && !touches.some(t => t.identifier === steerId.current)) {
-        steerId.current = null; knob.setValue({ x: 0, y: 0 }); onChangeRef.current?.({ dx: 0, dy: 0 });
-      }
-      if (!touches.some(t => !t.identifier || t.identifier !== steerId.current)) setPressed(false);
-      steer(touches);
-    },
+    onPanResponderGrant: (e) => { measure(); sync(e.nativeEvent.touches); },
+    // A second finger landing or lifting fires start/end, not move.
+    onPanResponderStart: (e) => sync(e.nativeEvent.touches),
+    onPanResponderEnd:   (e) => sync(e.nativeEvent.touches),
+    onPanResponderMove:  (e) => sync(e.nativeEvent.touches),
     onPanResponderRelease: () => endAll(true),
     onPanResponderTerminate: () => endAll(false),
     onPanResponderTerminationRequest: () => false,
