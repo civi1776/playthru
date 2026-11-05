@@ -37,6 +37,10 @@ marketing plan asks for a feed.
 - [x] **Rounds started, per player.** `play_sessions` records every arcade run and every Clocked round the moment it begins, and closes it on completion or abandonment (including the stale-round cleanup). Admin → PLAY DATA shows started / completed / finish rate / players for each kind, all time, 30 days and 7 days, a per-player table, and a CSV export for sponsors.
 - [x] **Course ranking removed from Ranks.** Courses either run Clocked tee times or they don't; they are not ranked against each other. Per-course player boards and course records stay.
 
+- [x] **The clock is a buzzer.** Hit zero and the hole is over: double bogey and one more (−3). A ball already in the air gets to land. Verified on device.
+- [x] **HEAT.** Beat the clock 3 holes in a row for +1, 6 for +2, 9 for +3; a slow hole resets it. Shown on the HUD, the verdict card, the hole table and the summary. `STREAK_BONUS` and `CLOCK_BONUS_PER_HOLE` in `lib/arcade/engine.js` switch schemes in one line.
+- [x] **Pro timeScale 0.25 → 0.30.** With a hard buzzer a careful player timed out on a quarter of pro holes; now 4%.
+
 ## ADD — next (not in this pass)
 
 - [ ] **Course pace report, GM-facing export** — minutes saved converted to tee times and dollars at their rate, as a one-page leave-behind. Turns "we won't promise you numbers" into "here are yours." Blocks every course conversation in the next 90 days.
