@@ -65,7 +65,7 @@ function TopThree({ entries, navigation }) {
         <View style={[s.podiumAvatar, { borderColor: color, width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
           <InitialsAvatar name={entry.name} size={avatarSize - 2} avatarUrl={entry.avatarUrl} />
         </View>
-        <Text style={s.podiumName} numberOfLines={1}>{entry.name.split(' ')[0]}</Text>
+        <Text style={s.podiumName} numberOfLines={1}>{(entry.name ?? '').split(' ')[0]}</Text>
         <Text style={[s.podiumScore, { color: clockedColor(entry.sortVal) }]}>
           {entry.sortVal != null ? Math.round(entry.sortVal) : '\u2014'}
         </Text>
@@ -358,7 +358,7 @@ export default function LeaderboardScreen({ navigation }) {
       <View style={s.filterRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f.key} style={[s.filterBtn, filter === f.key && s.filterBtnActive]}
-            onPress={() => setFilter(f.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === f.key }}>
+            onPress={() => { if (filter !== f.key) { setData([]); setMyRank(null); setMyProjected(null); } setFilter(f.key); }} accessibilityRole="tab" accessibilityState={{ selected: filter === f.key }}>
             <Text style={[s.filterText, filter === f.key && s.filterTextActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
@@ -370,7 +370,7 @@ export default function LeaderboardScreen({ navigation }) {
           <View style={s.diffRow}>
             {ARCADE_PERIODS.map(([k, l]) => (
               <TouchableOpacity key={k} style={[s.diffPill, arcadePeriod === k && s.diffPillActive]}
-                onPress={() => { setArcadePeriod(k); setArcadeDiff(k === 'month' ? 'qualifying' : 'all'); }} activeOpacity={0.8}>
+                onPress={() => { setData([]); setArcadePeriod(k); setArcadeDiff(k === 'month' ? 'qualifying' : 'all'); }} activeOpacity={0.8}>
                 <Text style={[s.diffPillText, arcadePeriod === k && s.diffPillTextActive]}>{l}</Text>
               </TouchableOpacity>
             ))}
@@ -378,7 +378,7 @@ export default function LeaderboardScreen({ navigation }) {
           <View style={s.diffRow}>
             {ARCADE_DIFFS[arcadePeriod].map(([k, l]) => (
               <TouchableOpacity key={k} style={[s.diffPill, arcadeDiff === k && s.diffPillActive]}
-                onPress={() => setArcadeDiff(k)} activeOpacity={0.8}>
+                onPress={() => { setData([]); setArcadeDiff(k); }} activeOpacity={0.8}>
                 <Text style={[s.diffPillText, arcadeDiff === k && s.diffPillTextActive]}>{l}</Text>
               </TouchableOpacity>
             ))}
