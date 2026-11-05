@@ -49,8 +49,8 @@ marketing plan asks for a feed.
 - [ ] **Verified round receipt** — "I played 18 in 2 hours" only travels if it survives disbelief. `rounds.verification_level` already exists.
 - [ ] **Events** — event object, Stripe entry, field list, realtime leaderboard, sponsor slot. Gates all of Phase 2. Settle the Apple fee question before the purse math goes in a deck.
 - [ ] **Founding player invites** — capped code and a badge for the first 100–200 athletes. The tournament interest list already supplies the names.
-- [ ] **Analytics** — arcade-to-real-round conversion above all. The marketing plan's own measurement list is currently unmeasurable.
-- [ ] **Arcade section on clocked.golf** — the plan calls the arcade top of funnel; the website does not mention it anywhere.
+- [x] **Analytics, first cut** — `play_sessions` records every start; Admin → PLAY DATA. Still missing: arcade-to-real conversion as a single number (players whose first session was arcade and who later started a Clocked round), content-to-download.
+- [x] **Arcade section on clocked.golf** — live 4 Nov.
 
 ## STILL OPEN IN THE APP
 
@@ -79,7 +79,7 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 ## RELEASES
 
 - **1.7.0 (build 54)** approved and live on the App Store, 4 Nov: Today tab, course records, head-to-head profiles, course crests, arcade qualifying board.
-- **1.8.0 (build 58)** uploading 4 Nov: buzzer + HEAT, auto-posting arcade runs, champagne gold, white splash, short-game cones, turbo while steering, Ranks as two boards, profile course/arcade split, course ranking removed, play sessions. Builds 55–57 never reached review (55 and 56 cancelled pre-upload, 57 rejected because the 1.7.0 train had closed).
+- **1.8.0 (build 59)** submitted for review 4 Nov: buzzer + HEAT, auto-posting arcade runs, champagne gold, white splash, short-game cones, turbo while steering, Ranks as two boards, profile course/arcade split, course ranking removed, play sessions. Builds 55–58 never reached review (55 and 56 cancelled pre-upload, 57 rejected because the 1.7.0 train had closed, 58 skipped for a Ranks crash found while taking screenshots). Screenshots in `~/Desktop/clocked golf screenshot 2.0`.
 
 ## OPEN RISKS
 
