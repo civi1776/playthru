@@ -82,6 +82,7 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 - [x] **UNDER CLOCK counted a timed-out hole** (8/9 with two timeouts). Holes carry the verdict flag now.
 - [x] **Cart drove itself after a shot** when a thumb was still on the stick at arrival. Stick ref zeroed outside the drive phase; responder kept alive across phases.
 - [x] **Turbo** also fires from the button's own touch start, so it works whatever owns the gesture. Needs a device retest on the next build: stick held first, boost pressed second.
+- [x] **Arcade summary buttons do something.** SEE LEADERBOARD opens the Ranks tab on the Arcade board (with your rank on the button once posted); SHARE sends the run through the share sheet.
 - [ ] **Build 60** carries all of the above. 59 is in review without them; cancel 59's review and submit 60, or let 59 ship and follow with 60.
 
 ## RELEASES

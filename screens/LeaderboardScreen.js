@@ -145,7 +145,7 @@ const ARCADE_DIFFS = {
 };
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
-export default function LeaderboardScreen({ navigation }) {
+export default function LeaderboardScreen({ navigation, route }) {
   // Rendered inside the tab navigator (as "Ranks") or pushed on the root
   // stack (as "Leaderboard"). The tab instance's immediate navigator is the
   // tab navigator; the pushed instance's is the stack.
@@ -153,7 +153,12 @@ export default function LeaderboardScreen({ navigation }) {
   const { session, profile } = useAuth();
   const uid = session?.user?.id ?? null;
 
-  const [filter, setFilter]     = useState('CLOCKED');
+  const requested = route?.params?.board === 'ARCADE' ? 'ARCADE' : null;
+  const [filter, setFilter]     = useState(requested ?? 'CLOCKED');
+  // The tab stays mounted, so a later navigate with params must switch it too.
+  useEffect(() => {
+    if (requested && requested !== filter) { setData([]); setMyRank(null); setMyProjected(null); setFilter(requested); }
+  }, [route?.params?.board, route?.params?.ts]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(false);
   const [data, setData]         = useState([]);

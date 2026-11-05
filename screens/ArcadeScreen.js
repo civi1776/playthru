@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet, PanResponder,
   AppState, Alert, ActivityIndicator,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,7 +74,12 @@ export default function ArcadeScreen({ navigation, route }) {
     );
   }
   if (mode === 'summary' && summary) {
-    return <Summary summary={summary} challenge={challenge} onPlayAgain={startGame} onBack={leave} />;
+    return (
+      <Summary
+        summary={summary} challenge={challenge} onPlayAgain={startGame} onBack={leave}
+        onSeeBoard={() => navigation.navigate('Main', { screen: 'Ranks', params: { board: 'ARCADE', ts: Date.now() } })}
+      />
+    );
   }
   return (
     <Start
@@ -487,7 +493,7 @@ function Readout({ label, value, unit, color = COLOR.cream }) {
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
-function Summary({ summary, challenge, onPlayAgain, onBack }) {
+function Summary({ summary, challenge, onPlayAgain, onBack, onSeeBoard }) {
   const { user, profile } = useAuth();
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(false);
@@ -618,7 +624,12 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
         {posting ? (
           <View style={[st.secondaryBtn, { opacity: 0.7 }]}><ActivityIndicator color={COLOR.gold} /></View>
         ) : posted ? (
-          <View style={st.secondaryBtn}><Text style={st.secondaryBtnText}>ON THE ARCADE BOARD</Text></View>
+          <TouchableOpacity style={st.secondaryBtn} onPress={onSeeBoard} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="See the arcade leaderboard">
+            <View style={st.btnRow}>
+              <Ionicons name="trophy-outline" size={15} color={COLOR.gold} />
+              <Text style={st.secondaryBtnText}>SEE LEADERBOARD{seasonRank != null ? `  \u00B7  #${seasonRank}` : ''}</Text>
+            </View>
+          </TouchableOpacity>
         ) : !user?.id ? (
           <View style={st.secondaryBtn}><Text style={st.secondaryBtnText}>SIGN IN TO POST RUNS</Text></View>
         ) : (
@@ -626,6 +637,20 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
             <Text style={st.secondaryBtnText}>RETRY POSTING</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          style={st.secondaryBtn}
+          onPress={() => {
+            const pts = summary.totalScore > 0 ? `+${summary.totalScore}` : String(summary.totalScore);
+            const line = `${pts} on Clocked Arcade \u00B7 ${formatSecondsLong(summary.totalSeconds)} \u00B7 ${summary.holesUnderClock}/${summary.holesPlayed} under the clock \u00B7 ${String(summary.difficulty).toUpperCase()}`;
+            Share.share({ message: `${line}\n\nNine holes, a shot clock on every one. clocked.golf` }).catch(() => {});
+          }}
+          activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Share this run"
+        >
+          <View style={st.btnRow}>
+            <Ionicons name="share-outline" size={15} color={COLOR.gold} />
+            <Text style={st.secondaryBtnText}>SHARE</Text>
+          </View>
+        </TouchableOpacity>
         <Text style={st.footnote}>Every run posts to the arcade board. Arcade runs never touch your Clocked Score.</Text>
       </ScrollView>
     </SafeAreaView>
@@ -664,6 +689,7 @@ const st = StyleSheet.create({
   primaryBtn: { backgroundColor: COLOR.gold, borderRadius: RADIUS.lg, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
   primaryBtnText: { color: COLOR.bg, fontSize: 14, fontWeight: '800', letterSpacing: 3 },
   secondaryBtn: { borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: COLOR.gold },
+  btnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   secondaryBtnText: { color: COLOR.gold, fontSize: 13, fontWeight: '800', letterSpacing: 3 },
 
   howCard: { ...CARD, marginTop: 20, paddingTop: 0 },
