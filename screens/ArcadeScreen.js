@@ -299,6 +299,10 @@ function Game({ seed, difficulty, avatar, onDone, onQuit, challengeId = null }) 
       const { width, height } = mapSizeRef.current;
       if (!pausedRef.current && width > 0) {
         const dt = lastTsRef.current == null ? 0 : Math.min(0.05, (now - lastTsRef.current) / 1000);
+        // Outside the drive phase the stick is dead, whatever the row last
+        // reported. A thumb still on the stick when the cart arrived used to
+        // leave a stale push that drove the cart on its own after the shot.
+        if (g.phase !== 'drive') joyRef.current = { dx: 0, dy: 0 };
         tick(g, dt, now, joyRef.current);
         const aspect = width / height;
         const target = cameraTargetFor(g, aspect, cameraRef.current);
@@ -561,7 +565,7 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
             <Text style={[st.holeCell, st.statLabel, { textAlign: 'right' }]}>PTS</Text>
           </View>
           {summary.holes.map(h => {
-            const beat = h.elapsed <= h.timePar;
+            const beat = h.beat ?? (!h.timedOut && h.elapsed <= h.timePar);
             const d = Math.abs(h.timePar - h.elapsed);
             return (
               <View key={h.hole} style={st.holeRow}>

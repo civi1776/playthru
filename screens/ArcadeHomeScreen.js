@@ -228,6 +228,7 @@ export default function ArcadeHomeScreen({ navigation }) {
           <HowRow icon="trophy-outline" text="Real Clocked scoring: par 1, birdie 3, eagle 6. Pick up at double." />
           <HowRow icon="alarm-outline" text="The clock is a buzzer. Hit zero and the hole is over: double bogey and one more, −3. A ball already in the air gets to land." />
           <HowRow icon="flame-outline" text="HEAT. Beat the clock three holes in a row for +1, six for +2, all nine for +3. One slow hole and the streak is gone." />
+          <HowRow icon="analytics-outline" text="Greens break on intermediate and pro. The contour lines run across the slope and the chevron points downhill; the putt hint tells you which way it breaks." />
         </View>
 
         {/* Qualifier banner */}

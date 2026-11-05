@@ -9,7 +9,7 @@
 //     steering finger or later.
 // Children render in the middle (hint text + readouts).
 
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import { View, Text, Animated, PanResponder, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -83,9 +83,12 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
     onChangeRef.current?.({ dx: 0, dy: 0 });
   };
 
+  // The row always owns its touches, even while disabled: a gesture that
+  // began during a drive must still end cleanly (and zero the stick) if the
+  // phase flips under it. The screen ignores the stick outside the drive.
   const pan = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => !disabled,
-    onMoveShouldSetPanResponder: () => !disabled,
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => { measure(); sync(e.nativeEvent.touches); },
     // A second finger landing or lifting fires start/end, not move.
     onPanResponderStart: (e) => sync(e.nativeEvent.touches),
@@ -94,7 +97,10 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
     onPanResponderRelease: () => endAll(true),
     onPanResponderTerminate: () => endAll(false),
     onPanResponderTerminationRequest: () => false,
-  }), [disabled]);
+  }), []);
+
+  // Zero the stick if the row ever unmounts mid-gesture.
+  useEffect(() => () => { onChangeRef.current?.({ dx: 0, dy: 0 }); }, []);
 
   const tColor = turbo.active ? COLOR.goldBright : turbo.ready ? COLOR.gold : COLOR.dim;
 
@@ -110,7 +116,8 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
       <View style={st.middle} pointerEvents="none">{children}</View>
 
       {/* Turbo (visual only; the row's responder handles the touch) */}
-      <View style={[st.turbo, pressed && turbo.ready && st.turboPressed]} accessibilityRole="button" accessibilityLabel="Turbo boost">
+      <View style={[st.turbo, pressed && turbo.ready && st.turboPressed]} accessibilityRole="button" accessibilityLabel="Turbo boost"
+        onTouchStart={() => { if (!disabled) { setPressed(true); onTurboRef.current?.(); } }} onTouchEnd={() => setPressed(false)}>
         <Svg width={TSIZE} height={TSIZE} style={StyleSheet.absoluteFill}>
           <Circle cx={TSIZE / 2} cy={TSIZE / 2} r={TR} stroke={COLOR.border} strokeWidth={TSTROKE} fill={turbo.active ? '#E8CC6E22' : COLOR.surface} />
           <Circle cx={TSIZE / 2} cy={TSIZE / 2} r={TR} stroke={tColor} strokeWidth={TSTROKE} fill="none"

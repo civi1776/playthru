@@ -18,3 +18,13 @@ Args: rounds per difficulty, hesitation seconds. `SIGMA` is the meter
 timing error (0.05 careful, 0.12 sloppy). The cart controller is naive
 and steers into water about 2% of rounds; a human steers around, so
 ignore "did not finish" lines unless the count jumps.
+
+## Putt break
+
+Fires straight putts at the pin across a tilted green and reports which drop
+and how far the misses break, per level, per tilt, per distance. Use it when
+touching `greenSlopeBase`, the `slope` multipliers or `cupMult`.
+
+```bash
+node --import ./scripts/arcade-sim/register-hooks.mjs scripts/arcade-sim/putt-break.mjs
+```

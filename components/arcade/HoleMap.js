@@ -155,6 +155,7 @@ const CourseLayer = memo(function CourseLayer({ hole }) {
       {/* Green + fringe */}
       <Circle cx={hole.green.x} cy={ry(hole.green.y)} r={hole.greenRadius + 1.6} fill={MAP.fringe} />
       <Circle cx={hole.green.x} cy={ry(hole.green.y)} r={hole.greenRadius} fill={MAP.green} />
+      <GreenContour hole={hole} ry={ry} />
       {/* Trees */}
       {hole.trees.map((t, i) => (
         <G key={`t${i}`}>
@@ -248,6 +249,38 @@ function AimGuide({ ball, angle, lengthYd, dispersionDeg, ry }) {
       <Line x1={ball.x} y1={ry(ball.y)} x2={r.x} y2={r.y} stroke={MAP.cone} strokeWidth={0.3} opacity={0.5} />
       <Line x1={ball.x} y1={ry(ball.y)} x2={end.x} y2={end.y} stroke={MAP.aim} strokeWidth={0.5} strokeDasharray="2 1.6" opacity={0.9} />
       <Circle cx={end.x} cy={end.y} r={1.1} fill="none" stroke={MAP.aim} strokeWidth={0.4} />
+    </G>
+  );
+}
+
+// Contour lines across the fall line, like a topo map, and a chevron at the
+// low edge. Line weight follows the tilt so a pro green reads as steeper.
+function GreenContour({ hole, ry }) {
+  const sl = hole.slope;
+  if (!sl || sl.mag < 0.2) return null;
+  const { x: cx, y: cy } = hole.green;
+  const r = hole.greenRadius;
+  const ux = Math.cos(sl.dir), uy = Math.sin(sl.dir);   // downhill, world
+  const px = -uy, py = ux;                                // across the slope
+  const strength = Math.min(1, sl.mag / 3);
+  const lines = [-0.62, -0.21, 0.21, 0.62].map((f, i) => {
+    const d = f * r;
+    const L = Math.sqrt(Math.max(0, r * r - d * d)) * 0.92;
+    const mx = cx + ux * d, my = cy + uy * d;
+    // Bow each line slightly toward the low side so the set reads as a bowl.
+    const bow = (0.9 - Math.abs(f)) * r * 0.22;
+    const ax = mx - px * L, ay = my - py * L, bx = mx + px * L, by = my + py * L;
+    const qx = mx + ux * bow, qy = my + uy * bow;
+    return <Path key={i} d={`M ${ax} ${ry(ay)} Q ${qx} ${ry(qy)} ${bx} ${ry(by)}`} stroke="#1E4A27" strokeWidth={0.28 + 0.22 * strength} fill="none" opacity={0.45 + 0.4 * strength} strokeLinecap="round" />;
+  });
+  // Chevron at the low edge, pointing downhill.
+  const tx = cx + ux * r * 0.78, ty = cy + uy * r * 0.78;
+  const s1 = 1.6, s2 = 1.1;
+  const chev = `M ${tx - ux * s1 - px * s2} ${ry(ty - uy * s1 - py * s2)} L ${tx} ${ry(ty)} L ${tx - ux * s1 + px * s2} ${ry(ty - uy * s1 + py * s2)}`;
+  return (
+    <G>
+      {lines}
+      <Path d={chev} stroke="#F5EDD8" strokeWidth={0.35} fill="none" opacity={0.75} strokeLinecap="round" strokeLinejoin="round" />
     </G>
   );
 }
