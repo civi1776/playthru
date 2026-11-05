@@ -391,7 +391,7 @@ export default function LeaderboardScreen({ navigation }) {
         <LeaderboardSkeleton />
       ) : error ? (
         <View style={s.emptyState}>
-          <Ionicons name="cloud-offline-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+          <Ionicons name="cloud-offline-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 14 }} />
           <Text style={s.emptyText}>Could not load rankings.</Text>
           <TouchableOpacity style={s.ctaBtn} onPress={fetchCurrent} activeOpacity={0.8}>
             <Text style={s.ctaBtnText}>RETRY</Text>
@@ -399,7 +399,7 @@ export default function LeaderboardScreen({ navigation }) {
         </View>
       ) : isEmpty && isArcade ? (
         <View style={s.emptyState}>
-          <Ionicons name="game-controller-outline" size={56} color="rgba(201,168,76,0.2)" style={{ marginBottom: 18 }} />
+          <Ionicons name="game-controller-outline" size={56} color="rgba(232,204,110,0.2)" style={{ marginBottom: 18 }} />
           <Text style={s.emptyTitle}>Nothing on this board yet.</Text>
           <Text style={s.emptyText}>
             {arcadeDiff === 'qualifying'
@@ -413,7 +413,7 @@ export default function LeaderboardScreen({ navigation }) {
         </View>
       ) : isEmpty ? (
         <View style={s.emptyState}>
-          <Ionicons name="trophy-outline" size={56} color="rgba(201,168,76,0.2)" style={{ marginBottom: 18 }} />
+          <Ionicons name="trophy-outline" size={56} color="rgba(232,204,110,0.2)" style={{ marginBottom: 18 }} />
           <Text style={s.emptyTitle}>Be the first.</Text>
           <Text style={s.emptyText}>No one's ranked here yet. Play a round and claim the top spot.</Text>
           <TouchableOpacity style={s.ctaBtn} onPress={() => {
@@ -498,20 +498,20 @@ const s = StyleSheet.create({
   glossary:      { fontSize: 11, color: COLOR.dim, marginTop: -4, marginBottom: 10, lineHeight: 15 },
   glossaryWide:  { fontSize: 11, color: COLOR.dim, paddingHorizontal: SPACING.xl, marginTop: -6, marginBottom: 8, lineHeight: 15 },
   boardCard:     { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, overflow: 'hidden' },
-  cutLine:       { alignItems: 'center', paddingVertical: 6, backgroundColor: '#C9A84C12', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#C9A84C55' },
+  cutLine:       { alignItems: 'center', paddingVertical: 6, backgroundColor: '#E8CC6E12', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#E8CC6E55' },
   cutText:       { fontSize: 8, fontWeight: '800', color: COLOR.gold, letterSpacing: 2 },
 
   // Filters
   filterRow:       { flexDirection: 'row', paddingHorizontal: SPACING.lg, gap: 6, marginBottom: SPACING.sm },
   filterBtn:       { flex: 1, paddingVertical: SPACING.sm, alignItems: 'center', borderRadius: RADIUS.sm, backgroundColor: COLOR.surface, borderWidth: 1, borderColor: COLOR.border },
-  filterBtnActive: { borderColor: COLOR.gold, backgroundColor: '#C9A84C22' },
+  filterBtnActive: { borderColor: COLOR.gold, backgroundColor: '#E8CC6E22' },
   filterText:      { fontSize: 8, fontWeight: '700', color: COLOR.muted, letterSpacing: 1 },
   filterTextActive:{ color: COLOR.gold },
 
   // Format/division segment pills
   diffRow:          { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SPACING.lg, gap: 6, marginBottom: SPACING.sm },
   diffPill:         { paddingVertical: 6, paddingHorizontal: SPACING.md, borderRadius: RADIUS.sm, backgroundColor: COLOR.surface, borderWidth: 1, borderColor: COLOR.border },
-  diffPillActive:   { borderColor: COLOR.gold, backgroundColor: '#C9A84C22' },
+  diffPillActive:   { borderColor: COLOR.gold, backgroundColor: '#E8CC6E22' },
   diffPillText:     { fontSize: 8, fontWeight: '700', color: COLOR.muted, letterSpacing: 1 },
   diffPillTextActive: { color: COLOR.gold },
 
@@ -527,7 +527,7 @@ const s = StyleSheet.create({
 
   // Player rows
   row:          { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, padding: SPACING.md, marginBottom: SPACING.sm, gap: 10 },
-  rowYou:       { borderColor: '#C9A84C44', backgroundColor: '#C9A84C0A' },
+  rowYou:       { borderColor: '#E8CC6E44', backgroundColor: '#E8CC6E0A' },
   rowRank:      { fontSize: 12, fontWeight: '700', color: COLOR.muted, width: 28 },
   rowAvatar:    { width: 36, height: 36, borderRadius: RADIUS.lg, backgroundColor: '#7DC87A11', borderWidth: 1, borderColor: '#7DC87A33', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   rowInfo:      { flex: 1 },
@@ -539,7 +539,7 @@ const s = StyleSheet.create({
   rowSubStat:   { fontSize: 10, fontWeight: '600', color: COLOR.dim },
   rowSubDot:    { fontSize: 10, color: COLOR.dim },
   rowRoundsLabel:{ fontSize: 9, color: '#7A6E5866' },
-  rowProvBadge: { fontSize: 9, fontWeight: '700', color: '#C9A84C88' },
+  rowProvBadge: { fontSize: 9, fontWeight: '700', color: '#E8CC6E88' },
 
   // Course + tournament rows
   courseRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, padding: SPACING.md, marginBottom: SPACING.sm },
@@ -553,12 +553,12 @@ const s = StyleSheet.create({
   noResults:    { fontSize: 13, color: COLOR.dim, textAlign: 'center', paddingVertical: 20 },
 
   // Your rank
-  yourRankCard:  { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: '#C9A84C44', paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, alignItems: 'center' },
+  yourRankCard:  { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: '#E8CC6E44', paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, alignItems: 'center' },
   yourRankLabel: { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 3, marginBottom: 4 },
   yourRankValue: { fontSize: 36, fontWeight: '300', color: COLOR.cream, fontVariant: ['tabular-nums'] },
 
   // Provisional projection
-  provCard:      { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, backgroundColor: '#C9A84C0A', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLOR.borderGold, paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, alignItems: 'center' },
+  provCard:      { marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, backgroundColor: '#E8CC6E0A', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLOR.borderGold, paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, alignItems: 'center' },
   provCardLabel: { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 3, marginBottom: 4 },
   provCardValue: { fontSize: 28, fontWeight: '300', color: COLOR.gold, fontVariant: ['tabular-nums'], marginBottom: 4 },
   provCardHint:  { fontSize: 11, color: COLOR.muted, textAlign: 'center', lineHeight: 16 },

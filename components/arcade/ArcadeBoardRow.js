@@ -50,7 +50,7 @@ export default function ArcadeBoardRow({ row, rank, isYou, last, onPress }) {
 const s = StyleSheet.create({
   row:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: COLOR.border },
-  rowYou:    { backgroundColor: '#C9A84C0A' },
+  rowYou:    { backgroundColor: '#E8CC6E0A' },
   rank:      { width: 24, fontSize: 13, fontWeight: '700', color: COLOR.muted, fontVariant: ['tabular-nums'] },
   name:      { fontSize: 14, fontWeight: '600', color: COLOR.cream },
   metaRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },

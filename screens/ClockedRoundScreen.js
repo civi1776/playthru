@@ -1549,7 +1549,7 @@ const st = StyleSheet.create({
   scValText:        { color: CREAM },
   scTotalText:      { fontSize: 12, fontWeight: '700' },
   scDimText:        { color: DIM },
-  scRowCurrent:     { backgroundColor: '#C9A84C0F' },
+  scRowCurrent:     { backgroundColor: '#E8CC6E0F' },
   abandonBtn:       { marginTop: 24, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E85D4A44', borderRadius: RADIUS.md },
   abandonBtnText:   { color: RED_WARN, fontSize: 13, fontWeight: '600', letterSpacing: 1 },
 });

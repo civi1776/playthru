@@ -326,7 +326,7 @@ export default function ClockedSetupScreen({ navigation }) {
               onPress={() => { setCourse(null); setPhase(PHASE.MODE); }}
               activeOpacity={0.7}
             >
-              <Ionicons name="flash-outline" size={14} color="#C9A84C88" />
+              <Ionicons name="flash-outline" size={14} color="#E8CC6E88" />
               <Text style={s.skipCourseText}>Skip. I'll set par manually</Text>
             </TouchableOpacity>
             {/* Not at a course — play the arcade on the same rules */}
@@ -650,8 +650,8 @@ const s = StyleSheet.create({
 
   searchInput: { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.md, padding: 14, color: COLOR.cream, fontSize: 15, marginBottom: 12 },
   skipCourseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: 12 },
-  skipCourseText:{ fontSize: 12, color: '#C9A84C88', fontWeight: '500' },
-  arcadeCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C9A84C33', paddingVertical: 12, paddingHorizontal: 14, marginBottom: 14 },
+  skipCourseText:{ fontSize: 12, color: '#E8CC6E88', fontWeight: '500' },
+  arcadeCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#E8CC6E33', paddingVertical: 12, paddingHorizontal: 14, marginBottom: 14 },
   arcadeTitle:   { fontSize: 13, color: COLOR.cream, fontWeight: '600' },
   arcadeSub:     { fontSize: 11, color: COLOR.dim, marginTop: 2 },
   courseRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 12, marginBottom: 8, gap: 12 },
@@ -666,7 +666,7 @@ const s = StyleSheet.create({
   groupBtnTxtOn: { color: COLOR.gold, fontWeight: '700' },
 
   primaryBtn:     { backgroundColor: COLOR.gold, borderRadius: RADIUS.md, paddingVertical: 16, alignItems: 'center' },
-  primaryBtnDisabled: { backgroundColor: '#C9A84C44' },
+  primaryBtnDisabled: { backgroundColor: '#E8CC6E44' },
   primaryBtnText: { fontSize: 12, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
 
   backLink:    { fontSize: 13, color: COLOR.gold, textAlign: 'center' },
@@ -689,13 +689,13 @@ const s = StyleSheet.create({
   playerRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   playerNum:   { width: 30, height: 30, borderRadius: 15, backgroundColor: COLOR.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   playerNumTxt:{ fontSize: 13, fontWeight: '700', color: COLOR.gold },
-  playerInput: { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#C9A84C22', borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, color: COLOR.cream, fontSize: 14 },
+  playerInput: { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#E8CC6E22', borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 10, color: COLOR.cream, fontSize: 14 },
   hcpInput:    { width: 64, textAlign: 'center' },
   linkedPlayer:{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#7DC87A44', paddingHorizontal: 10, paddingVertical: 8 },
   linkedName:  { fontSize: 14, fontWeight: '500', color: COLOR.cream },
   linkedHandle:{ fontSize: 10, color: COLOR.muted },
-  linkBtn:     { width: 36, height: 36, borderRadius: RADIUS.lg, backgroundColor: COLOR.surfaceAlt, borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
-  searchDropdown:     { backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#C9A84C33', marginBottom: 8, marginLeft: 38, overflow: 'hidden' },
+  linkBtn:     { width: 36, height: 36, borderRadius: RADIUS.lg, backgroundColor: COLOR.surfaceAlt, borderWidth: 1, borderColor: '#E8CC6E44', alignItems: 'center', justifyContent: 'center' },
+  searchDropdown:     { backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#E8CC6E33', marginBottom: 8, marginLeft: 38, overflow: 'hidden' },
   searchDropdownInput:{ padding: 10, color: COLOR.cream, fontSize: 13, borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
   searchResultRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderBottomWidth: 1, borderBottomColor: '#7DC87A11' },
   searchResultName:   { fontSize: 13, fontWeight: '500', color: COLOR.cream },
@@ -705,7 +705,7 @@ const s = StyleSheet.create({
   // Difficulty picker
   difficultyRow:  { flexDirection: 'row', gap: 10 },
   diffBtn:        { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, alignItems: 'center', gap: 4 },
-  diffBtnActive:  { borderColor: COLOR.gold, backgroundColor: '#C9A84C0F' },
+  diffBtnActive:  { borderColor: COLOR.gold, backgroundColor: '#E8CC6E0F' },
   diffDot:        { width: 10, height: 10, borderRadius: RADIUS.xs },
   diffLabel:      { fontSize: 11, fontWeight: '700', color: COLOR.dim, letterSpacing: 1 },
   diffLabelActive:{ color: COLOR.cream },

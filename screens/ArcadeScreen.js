@@ -651,7 +651,7 @@ const st = StyleSheet.create({
   sectionQ: { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 8, marginTop: 20 },
   difficultyRow: { flexDirection: 'row', gap: 10 },
   diffBtn: { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, paddingVertical: 14, alignItems: 'center', gap: 4 },
-  diffBtnActive: { borderColor: COLOR.gold, backgroundColor: '#C9A84C0F' },
+  diffBtnActive: { borderColor: COLOR.gold, backgroundColor: '#E8CC6E0F' },
   diffDot: { width: 8, height: 8, borderRadius: RADIUS.xs, marginBottom: 2 },
   diffLabel: { fontSize: 11, fontWeight: '700', color: COLOR.dim, letterSpacing: 1 },
   diffLabelActive: { color: COLOR.cream },

@@ -204,15 +204,15 @@ export default function SignUpScreen({ navigation }) {
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
             <TouchableOpacity style={[s.selectorBtn, { flex: 2 }]} onPress={() => setActiveDropdown(activeDropdown === 'month' ? null : 'month')} activeOpacity={0.8}>
               <Text style={[s.selectorText, !dobMonth && s.selectorPlaceholder]}>{dobMonth || 'Month'}</Text>
-              <Ionicons name="chevron-down" size={13} color="#C9A84C66" />
+              <Ionicons name="chevron-down" size={13} color="#E8CC6E66" />
             </TouchableOpacity>
             <TouchableOpacity style={[s.selectorBtn, { flex: 1 }]} onPress={() => setActiveDropdown(activeDropdown === 'day' ? null : 'day')} activeOpacity={0.8}>
               <Text style={[s.selectorText, !dobDay && s.selectorPlaceholder]}>{dobDay || 'Day'}</Text>
-              <Ionicons name="chevron-down" size={13} color="#C9A84C66" />
+              <Ionicons name="chevron-down" size={13} color="#E8CC6E66" />
             </TouchableOpacity>
             <TouchableOpacity style={[s.selectorBtn, { flex: 2 }]} onPress={() => setActiveDropdown(activeDropdown === 'year' ? null : 'year')} activeOpacity={0.8}>
               <Text style={[s.selectorText, !dobYear && s.selectorPlaceholder]}>{dobYear || 'Year'}</Text>
-              <Ionicons name="chevron-down" size={13} color="#C9A84C66" />
+              <Ionicons name="chevron-down" size={13} color="#E8CC6E66" />
             </TouchableOpacity>
           </View>
           {activeDropdown && (
@@ -421,7 +421,7 @@ const s = StyleSheet.create({
   input:        { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, color: COLOR.cream, fontSize: 15 },
   fieldError:   { fontSize: 11, color: COLOR.red, marginTop: 4 },
   fieldOk:      { fontSize: 11, color: COLOR.green, marginTop: 4 },
-  fieldHint:    { fontSize: 11, color: '#C9A84C88', marginTop: 4 },
+  fieldHint:    { fontSize: 11, color: '#E8CC6E88', marginTop: 4 },
 
   // Error
   error:        { color: COLOR.red, fontSize: 13, marginBottom: 16 },
@@ -452,9 +452,9 @@ const s = StyleSheet.create({
   selectorBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#7DC87A22', paddingHorizontal: 14, paddingVertical: 12 },
   selectorText:      { fontSize: 15, color: COLOR.cream },
   selectorPlaceholder:{ color: COLOR.dim },
-  dropdownList:      { backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#C9A84C33', marginTop: 8, overflow: 'hidden' },
+  dropdownList:      { backgroundColor: COLOR.surface, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#E8CC6E33', marginTop: 8, overflow: 'hidden' },
   dropdownItem:      { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#7DC87A11' },
-  dropdownItemActive:{ backgroundColor: '#C9A84C22' },
+  dropdownItemActive:{ backgroundColor: '#E8CC6E22' },
   dropdownItemText:  { fontSize: 14, color: COLOR.cream },
   dropdownItemTextActive: { color: COLOR.gold, fontWeight: '600' },
 });

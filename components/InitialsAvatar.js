@@ -34,7 +34,7 @@ function InitialsAvatar({ name, size = 40, avatarUrl, username }) {
         width: size, height: size, borderRadius: size / 2,
         backgroundColor: avatarBg(name || username),
         alignItems: 'center', justifyContent: 'center',
-        borderWidth: 1.5, borderColor: '#C9A84C44',
+        borderWidth: 1.5, borderColor: '#E8CC6E44',
         overflow: 'hidden',
       }}
       accessibilityRole="image"
@@ -49,8 +49,8 @@ function InitialsAvatar({ name, size = 40, avatarUrl, username }) {
       ) : initials ? (
         <Text style={{ color: COLOR.cream, fontSize: Math.round(size * 0.35), fontWeight: '600' }}>{initials}</Text>
       ) : (
-        <View style={{ width: size * 0.5, height: size * 0.5, borderRadius: size * 0.25, backgroundColor: '#C9A84C33', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#C9A84C88', fontSize: Math.round(size * 0.28) }}>{'\u{1F464}'}</Text>
+        <View style={{ width: size * 0.5, height: size * 0.5, borderRadius: size * 0.25, backgroundColor: '#E8CC6E33', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: '#E8CC6E88', fontSize: Math.round(size * 0.28) }}>{'\u{1F464}'}</Text>
         </View>
       )}
     </View>

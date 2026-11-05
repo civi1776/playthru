@@ -194,7 +194,7 @@ const s = StyleSheet.create({
   prefLabel:    { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 10 },
   segRow:       { flexDirection: 'row', gap: 8 },
   seg:          { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLOR.border },
-  segOn:        { borderColor: COLOR.gold, backgroundColor: '#C9A84C14' },
+  segOn:        { borderColor: COLOR.gold, backgroundColor: '#E8CC6E14' },
   segDot:       { width: 7, height: 7, borderRadius: RADIUS.xs },
   segText:      { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 1 },
   segTextOn:    { color: COLOR.cream },

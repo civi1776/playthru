@@ -187,7 +187,7 @@ export default function SearchUsersScreen({ navigation }) {
         {/* Pre-search empty state */}
         {query.length === 0 && (
           <View style={s.emptyState}>
-            <Ionicons name="people-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+            <Ionicons name="people-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 14 }} />
             <Text style={s.emptyText}>Search for players by name or username</Text>
           </View>
         )}
@@ -198,7 +198,7 @@ export default function SearchUsersScreen({ navigation }) {
         {/* Error state */}
         {!searching && searchError && (
           <View style={s.emptyState}>
-            <Ionicons name="cloud-offline-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+            <Ionicons name="cloud-offline-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 14 }} />
             <Text style={s.emptyText}>Search failed. Please try again.</Text>
           </View>
         )}
@@ -206,7 +206,7 @@ export default function SearchUsersScreen({ navigation }) {
         {/* No results */}
         {!searching && !searchError && query.length > 0 && results.length === 0 && (
           <View style={s.emptyState}>
-            <Ionicons name="search-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+            <Ionicons name="search-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 14 }} />
             <Text style={s.emptyText}>No players found. Try a different name.</Text>
           </View>
         )}
@@ -256,7 +256,7 @@ const s = StyleSheet.create({
   searchWrap:      { paddingHorizontal: 16, paddingBottom: 12 },
   searchInput:     { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.md, padding: 14, color: COLOR.cream, fontSize: 15 },
   row:             { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10, gap: 12 },
-  avatar:          { width: 42, height: 42, borderRadius: 21, backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', alignItems: 'center', justifyContent: 'center' },
+  avatar:          { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8CC6E22', borderWidth: 1, borderColor: '#E8CC6E44', alignItems: 'center', justifyContent: 'center' },
   avatarText:      { fontSize: 17, fontWeight: '600', color: COLOR.gold },
   info:            { flex: 1 },
   name:            { fontSize: 15, fontWeight: '500', color: COLOR.cream },
@@ -264,7 +264,7 @@ const s = StyleSheet.create({
   right:           { alignItems: 'flex-end', gap: 6 },
   pop:             { fontSize: 22, fontWeight: '300' },
   followBtn:       { backgroundColor: COLOR.gold, borderRadius: RADIUS.sm, paddingVertical: 6, paddingHorizontal: 12 },
-  followingBtn:    { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#C9A84C44' },
+  followingBtn:    { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#E8CC6E44' },
   followBtnText:   { fontSize: 9, fontWeight: '700', color: COLOR.bg, letterSpacing: 1.5 },
   followingBtnText:{ color: COLOR.gold },
   emptyState:      { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },

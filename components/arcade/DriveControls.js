@@ -112,7 +112,7 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
       {/* Turbo (visual only; the row's responder handles the touch) */}
       <View style={[st.turbo, pressed && turbo.ready && st.turboPressed]} accessibilityRole="button" accessibilityLabel="Turbo boost">
         <Svg width={TSIZE} height={TSIZE} style={StyleSheet.absoluteFill}>
-          <Circle cx={TSIZE / 2} cy={TSIZE / 2} r={TR} stroke={COLOR.border} strokeWidth={TSTROKE} fill={turbo.active ? '#C9A84C22' : COLOR.surface} />
+          <Circle cx={TSIZE / 2} cy={TSIZE / 2} r={TR} stroke={COLOR.border} strokeWidth={TSTROKE} fill={turbo.active ? '#E8CC6E22' : COLOR.surface} />
           <Circle cx={TSIZE / 2} cy={TSIZE / 2} r={TR} stroke={tColor} strokeWidth={TSTROKE} fill="none"
             strokeDasharray={`${TCIRC}`} strokeDashoffset={TCIRC * (1 - turbo.charge)} strokeLinecap="round"
             transform={`rotate(-90 ${TSIZE / 2} ${TSIZE / 2})`} />

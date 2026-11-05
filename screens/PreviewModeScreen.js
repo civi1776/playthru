@@ -642,7 +642,7 @@ const p = StyleSheet.create({
   container:  { flex: 1, backgroundColor: COLOR.bg },
 
   // Banner
-  banner:     { backgroundColor: '#1E3D22', paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: 'rgba(201,168,76,0.3)' },
+  banner:     { backgroundColor: '#1E3D22', paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: 'rgba(232,204,110,0.3)' },
   bannerText: { color: COLOR.cream, fontSize: 12, flex: 1, lineHeight: 16 },
   bannerBtn:  { backgroundColor: COLOR.gold, borderRadius: RADIUS.xs, paddingVertical: 6, paddingHorizontal: 12, marginLeft: 12 },
   bannerBtnText: { color: COLOR.bg, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
@@ -651,7 +651,7 @@ const p = StyleSheet.create({
   headerRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerTitle:   { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 2 },
-  headerTagline: { fontSize: 8, fontWeight: '600', color: '#C9A84C88', letterSpacing: 2, marginTop: 2 },
+  headerTagline: { fontSize: 8, fontWeight: '600', color: '#E8CC6E88', letterSpacing: 2, marginTop: 2 },
 
   // Tab bar
   tabBar:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#7DC87A22' },
@@ -662,7 +662,7 @@ const p = StyleSheet.create({
 
   // Gate modal
   gateOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  gateCard:    { backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, padding: 24, width: '100%', borderWidth: 1, borderColor: 'rgba(201,168,76,0.3)' },
+  gateCard:    { backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, padding: 24, width: '100%', borderWidth: 1, borderColor: 'rgba(232,204,110,0.3)' },
   gateTitle:   { fontSize: 22, fontWeight: '700', color: COLOR.cream, marginBottom: 8, textAlign: 'center' },
   gateSub:     { fontSize: 14, color: COLOR.muted, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
   gateBtn:     { backgroundColor: COLOR.gold, borderRadius: RADIUS.sm, padding: 14, alignItems: 'center', marginBottom: 10 },
@@ -703,10 +703,10 @@ const p = StyleSheet.create({
   popBadge:    { alignItems: 'center', borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 10 },
   popScore:    { fontSize: 20, fontWeight: '300' },
   popLabel:    { fontSize: 8, fontWeight: '700', letterSpacing: 1 },
-  milestoneBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(201,168,76,0.08)', borderRadius: RADIUS.sm, padding: 10, marginVertical: 6 },
+  milestoneBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(232,204,110,0.08)', borderRadius: RADIUS.sm, padding: 10, marginVertical: 6 },
   milestoneEmoji:  { fontSize: 20 },
   milestoneText:   { fontSize: 13, color: '#D4B86A', flex: 1, lineHeight: 18 },
-  leaderBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(201,168,76,0.06)', borderRadius: RADIUS.sm, padding: 10, marginVertical: 6 },
+  leaderBanner:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(232,204,110,0.06)', borderRadius: RADIUS.sm, padding: 10, marginVertical: 6 },
   leaderBannerText: { fontSize: 13, color: COLOR.gold, flex: 1 },
   lockedBar:   { flexDirection: 'row', gap: 16, marginTop: 10 },
   lockedBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.6 },
@@ -718,7 +718,7 @@ const p = StyleSheet.create({
   courseCard:  { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10 },
   courseName:  { fontSize: 15, fontWeight: '600', color: COLOR.cream },
   courseLocation: { fontSize: 11, color: COLOR.muted, marginTop: 2 },
-  coursePopBadge: { alignItems: 'center', borderWidth: 1, borderColor: '#C9A84C44', borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 6 },
+  coursePopBadge: { alignItems: 'center', borderWidth: 1, borderColor: '#E8CC6E44', borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 6 },
   coursePopText:  { fontSize: 14, fontWeight: '500', color: COLOR.cream },
   coursePopLabel: { fontSize: 7, fontWeight: '700', letterSpacing: 1, color: COLOR.gold, marginTop: 2 },
   courseRounds:   { fontSize: 10, color: COLOR.dim, marginTop: 8, fontWeight: '500' },

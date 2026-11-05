@@ -114,10 +114,10 @@ const PLAYER_TABS = [
   { name: 'You',    icon: 'person-outline',          iconActive: 'person',          label: 'YOU' },
 ];
 // ─── Play button glow colors ─────────────────────────────────────────────────
-const PLAY_GOLD       = '#F0CB5B'; // brighter, more saturated than #C9A84C
-const PLAY_GOLD_TOP   = '#F7DC82'; // lighter highlight for gradient top
-const PLAY_GOLD_BOT   = '#D4A832'; // richer shadow for gradient bottom
-const TAB_ACTIVE      = '#E2C66E'; // active tabs: gold, a notch below the Play button
+const PLAY_GOLD       = '#F6E3A0'; // a touch brighter than the champagne gold
+const PLAY_GOLD_TOP   = '#FBEFC2'; // lighter highlight for gradient top
+const PLAY_GOLD_BOT   = '#D9B957'; // richer shadow for gradient bottom
+const TAB_ACTIVE      = '#EFD88A'; // active tabs: gold, a notch below the Play button
 const TAB_INACTIVE    = 'rgba(184,168,130,0.42)';
 
 function PlayButton({ onPress }) {
@@ -237,7 +237,7 @@ function BottomNav({ state, navigation, activeRound, onResume, onAbandon }) {
 const nav = StyleSheet.create({
   container: {
     width: '100%', backgroundColor: '#090D0A', paddingTop: 8,
-    borderTopWidth: 1, borderTopColor: '#C9A84C2E',
+    borderTopWidth: 1, borderTopColor: '#E8CC6E2E',
     flexDirection: 'row', alignItems: 'flex-end',
   },
   item:  { alignItems: 'center', justifyContent: 'flex-end', flex: 1, paddingBottom: 2 },
@@ -403,11 +403,11 @@ function UpdateGateScreen() {
 
 const ug = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#090F0A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  wordmark:  { fontSize: 22, fontWeight: '700', color: '#C9A84C', letterSpacing: 6, marginBottom: 40 },
-  badge:     { backgroundColor: '#C9A84C22', borderWidth: 1, borderColor: '#C9A84C44', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16, marginBottom: 28 },
-  badgeText: { fontSize: 11, fontWeight: '700', color: '#C9A84C', letterSpacing: 3 },
+  wordmark:  { fontSize: 22, fontWeight: '700', color: '#E8CC6E', letterSpacing: 6, marginBottom: 40 },
+  badge:     { backgroundColor: '#E8CC6E22', borderWidth: 1, borderColor: '#E8CC6E44', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16, marginBottom: 28 },
+  badgeText: { fontSize: 11, fontWeight: '700', color: '#E8CC6E', letterSpacing: 3 },
   message:   { fontSize: 15, color: '#B8A882', textAlign: 'center', lineHeight: 24, marginBottom: 40 },
-  btn:       { backgroundColor: '#C9A84C', borderRadius: 14, paddingVertical: 18, paddingHorizontal: 52 },
+  btn:       { backgroundColor: '#E8CC6E', borderRadius: 14, paddingVertical: 18, paddingHorizontal: 52 },
   btnText:   { fontSize: 13, fontWeight: '700', color: '#090F0A', letterSpacing: 2 },
 });
 
@@ -598,7 +598,7 @@ function AppNavigator() {
   if (initializing) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#C9A84C" />
+        <ActivityIndicator size="large" color="#E8CC6E" />
       </View>
     );
   }

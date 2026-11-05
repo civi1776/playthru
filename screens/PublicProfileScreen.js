@@ -399,7 +399,7 @@ export default function PublicProfileScreen({ navigation, route }) {
           <RecentRoundsList rounds={rounds} navigation={navigation} limit={10} />
           {rounds.length === 0 && (
             <View style={s.empty}>
-              <Ionicons name="golf-outline" size={36} color="rgba(201,168,76,0.25)" />
+              <Ionicons name="golf-outline" size={36} color="rgba(232,204,110,0.25)" />
               <Text style={s.emptyText}>No rounds logged yet.</Text>
             </View>
           )}

@@ -58,7 +58,7 @@ export default function ChallengeButton({ targetUserId, targetUsername, courseNa
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7} disabled={sending} style={sending ? { opacity: 0.4 } : null} accessibilityLabel={`Challenge ${targetUsername ?? 'this player'}`} accessibilityRole="button">
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-          <Ionicons name="flash" size={11} color="#C9A84C" />
+          <Ionicons name="flash" size={11} color="#E8CC6E" />
           <Text style={c.inlineTxt}>Challenge</Text>
         </View>
       </TouchableOpacity>
@@ -77,7 +77,7 @@ export default function ChallengeButton({ targetUserId, targetUsername, courseNa
   return (
     <TouchableOpacity style={[c.btn, sending && c.disabled]} onPress={onPress} activeOpacity={0.8} disabled={sending} accessibilityLabel={`Challenge ${targetUsername ?? 'this player'}`} accessibilityRole="button">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <Ionicons name="flash" size={11} color="#C9A84C" />
+        <Ionicons name="flash" size={11} color="#E8CC6E" />
         <Text style={c.txt}>CHALLENGE</Text>
       </View>
     </TouchableOpacity>

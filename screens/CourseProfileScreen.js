@@ -340,7 +340,7 @@ export default function CourseProfileScreen({ navigation, route }) {
         <CourseProfileSkeleton />
       ) : error ? (
         <View style={s.errorState}>
-          <Ionicons name="cloud-offline-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 14 }} />
+          <Ionicons name="cloud-offline-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 14 }} />
           <Text style={s.errorText}>Could not load course data.</Text>
           <TouchableOpacity style={s.retryBtn} onPress={fetchAll} activeOpacity={0.8}>
             <Text style={s.retryText}>RETRY</Text>
@@ -510,7 +510,7 @@ export default function CourseProfileScreen({ navigation, route }) {
               })
             ) : (
               <View style={s.emptyCard}>
-                <Ionicons name="trophy-outline" size={48} color="rgba(201,168,76,0.3)" style={{ marginBottom: 12 }} />
+                <Ionicons name="trophy-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 12 }} />
                 <Text style={s.emptyText}>No rounds logged here yet. Be the first.</Text>
               </View>
             )}
@@ -598,7 +598,7 @@ export default function CourseProfileScreen({ navigation, route }) {
                         <Ionicons
                           name={i <= paceRating ? 'flag' : 'flag-outline'}
                           size={26}
-                          color={i <= paceRating ? COLOR.gold : 'rgba(201,168,76,0.25)'}
+                          color={i <= paceRating ? COLOR.gold : 'rgba(232,204,110,0.25)'}
                         />
                       </TouchableOpacity>
                     ))}
@@ -628,7 +628,7 @@ export default function CourseProfileScreen({ navigation, route }) {
               {/* Reviews list */}
               {reviews.length === 0 ? (
                 <View style={s.emptyCard}>
-                  <Ionicons name="chatbubble-outline" size={36} color="rgba(201,168,76,0.2)" style={{ marginBottom: 8 }} />
+                  <Ionicons name="chatbubble-outline" size={36} color="rgba(232,204,110,0.2)" style={{ marginBottom: 8 }} />
                   <Text style={s.emptyTextSmall}>No reviews yet. Be the first to review this course.</Text>
                 </View>
               ) : (
@@ -663,7 +663,7 @@ export default function CourseProfileScreen({ navigation, route }) {
                               key={i}
                               name={i <= review.pace_rating ? 'flag' : 'flag-outline'}
                               size={11}
-                              color={i <= review.pace_rating ? COLOR.gold : 'rgba(201,168,76,0.2)'}
+                              color={i <= review.pace_rating ? COLOR.gold : 'rgba(232,204,110,0.2)'}
                             />
                           ))}
                         </View>
@@ -704,12 +704,12 @@ const s = StyleSheet.create({
   // POPScore hero card
   popHeroCard:        { margin: 16, backgroundColor: COLOR.surface, borderRadius: 20, padding: 28, borderWidth: 1, borderColor: '#7DC87A22', alignItems: 'center', gap: 4 },
   popHeroNum:         { fontSize: 80, lineHeight: 88, textAlign: 'center' },
-  popHeroLabel:       { fontSize: 9, fontWeight: '700', color: 'rgba(201,168,76,0.6)', letterSpacing: 4, marginTop: 2, marginBottom: 4 },
+  popHeroLabel:       { fontSize: 9, fontWeight: '700', color: 'rgba(232,204,110,0.6)', letterSpacing: 4, marginTop: 2, marginBottom: 4 },
   popHeroRounds:      { fontSize: 12, color: COLOR.muted, marginBottom: 4 },
   popHeroTimeRow:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 12 },
   popHeroTime:        { fontSize: 12, color: COLOR.muted, fontFamily: 'monospace' },
   followBtn:          { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.gold, borderRadius: RADIUS.md, paddingVertical: 14, paddingHorizontal: 28, marginTop: 4 },
-  followingBtn:       { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#C9A84C44' },
+  followingBtn:       { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#E8CC6E44' },
   followBtnText:      { fontSize: 11, fontWeight: '700', color: COLOR.bg, letterSpacing: 2 },
   followingBtnText:   { color: COLOR.gold },
 
@@ -721,7 +721,7 @@ const s = StyleSheet.create({
   statDivider:        { width: 1, backgroundColor: '#7DC87A22', marginVertical: 4 },
 
   // Average Round Time
-  avgTimeCard:        { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C9A84C22', padding: 16, marginHorizontal: 16, marginBottom: 12 },
+  avgTimeCard:        { backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#E8CC6E22', padding: 16, marginHorizontal: 16, marginBottom: 12 },
   avgTimeLabel:       { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 6 },
   avgTimeValue:       { fontSize: 28, fontWeight: '300', color: COLOR.cream, fontVariant: ['tabular-nums'] },
   avgTimeSub:         { fontSize: 11, color: COLOR.dim, marginTop: 2 },
@@ -730,7 +730,7 @@ const s = StyleSheet.create({
   certifiedBadge:     { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.gold, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 5, marginTop: 10, alignSelf: 'flex-start' },
   certifiedBadgeText: { fontSize: 9, fontWeight: '700', color: COLOR.bg, letterSpacing: 1.5 },
   timeParBlock:       { gap: 8 },
-  timeParBlockDivider:{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#C9A84C22' },
+  timeParBlockDivider:{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E8CC6E22' },
   timeParHeader:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
   timeParLabel:       { fontSize: 10, fontWeight: '700', color: COLOR.gold, letterSpacing: 1.5 },
   timeParBody:        { fontSize: 12, color: COLOR.muted, lineHeight: 18 },
@@ -748,7 +748,7 @@ const s = StyleSheet.create({
 
   // Leaderboard
   leaderRow:          { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 8, gap: 6 },
-  leaderRowGold:      { borderColor: '#C9A84C44', backgroundColor: '#C9A84C0A' },
+  leaderRowGold:      { borderColor: '#E8CC6E44', backgroundColor: '#E8CC6E0A' },
   leaderRank:         { fontSize: 12, fontWeight: '700', color: COLOR.muted, width: 28 },
   leaderInfo:         { flex: 1 },
   leaderName:         { fontSize: 15, fontWeight: '500', color: COLOR.cream },
@@ -766,7 +766,7 @@ const s = StyleSheet.create({
   activityPop:        { fontSize: 26, fontWeight: '300' },
 
   // Reviews
-  reviewPrompt:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C9A84C33', padding: 14, marginBottom: 10 },
+  reviewPrompt:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#E8CC6E33', padding: 14, marginBottom: 10 },
   reviewPromptText:   { flex: 1, fontSize: 13, color: COLOR.gold, fontWeight: '500' },
   playedBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#7DC87A22', borderRadius: RADIUS.sm, paddingHorizontal: 7, paddingVertical: 3 },
   playedBadgeText:    { fontSize: 9, fontWeight: '700', color: COLOR.green },

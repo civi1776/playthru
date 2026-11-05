@@ -99,7 +99,7 @@ const s = StyleSheet.create({
   },
   btnSecondary: {
     borderRadius: RADIUS.md, paddingVertical: 17, alignItems: 'center',
-    width: '100%', borderWidth: 1, borderColor: '#C9A84C55',
+    width: '100%', borderWidth: 1, borderColor: '#E8CC6E55',
     marginTop: 12,
   },
   btnSecondaryText: {
