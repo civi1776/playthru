@@ -13,6 +13,7 @@ import { supabase } from './lib/supabase';
 import { setupNotifications, refreshPushToken } from './lib/notifications';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { endPlaySession } from './lib/playSessions';
 import { CLOCKED_ROUND_STATE_KEY } from './lib/clockedRoundConstants';
 import { ActiveRoundContext, ACTIVE_ROUND_MAX_AGE_MS } from './lib/activeRound';
 import { COLOR } from './lib/theme';
@@ -301,6 +302,7 @@ function MainApp({ navigation }) {
       const state = JSON.parse(saved);
       const age = Date.now() - (state?.savedAt ?? 0);
       if (!state || age > ACTIVE_ROUND_MAX_AGE_MS) {
+        if (state?.playSessionId) endPlaySession(state.playSessionId, { outcome: 'abandoned', holesCompleted: state.holeResults?.length ?? 0 });
         await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
         setActiveRound(null);
         return;
@@ -324,6 +326,7 @@ function MainApp({ navigation }) {
   };
 
   const abandonActiveRound = async () => {
+    if (activeRound?.playSessionId) endPlaySession(activeRound.playSessionId, { outcome: 'abandoned', holesCompleted: activeRound.holeResults?.length ?? 0 });
     await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY).catch(() => {});
     setActiveRound(null);
   };

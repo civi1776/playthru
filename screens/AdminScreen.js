@@ -5,7 +5,7 @@
 // themselves — this screen is a convenience, not the security boundary).
 
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
@@ -23,7 +23,61 @@ const TABS = [
   { key: 'sponsors',     label: 'SPONSORS',     table: 'sponsor_inquiries' },
   { key: 'inbox',        label: 'INBOX',        table: 'website_inquiries', kind: 'contact' },
   { key: 'qualifiers',   label: 'QUALIFIERS',   table: 'arcade_qualifiers' },
+  { key: 'play',         label: 'PLAY DATA',    rpc: 'admin_play_stats' },
 ];
+
+// ─── Play data — the numbers a sponsor asks for ─────────────────────────────
+function fmtDate(iso) { if (!iso) return '\u2014'; const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`; }
+function pct(a, b) { return b ? `${Math.round(100 * a / b)}%` : '\u2014'; }
+
+function KindCard({ title, t }) {
+  if (!t) return null;
+  return (
+    <View style={s.card}>
+      <Text style={s.cardTitle}>{title}</Text>
+      <View style={s.statRow}>
+        {[['STARTED', t.starts], ['COMPLETED', t.completed], ['FINISH RATE', pct(t.completed, t.starts)], ['PLAYERS', t.players]].map(([l, v]) => (
+          <View key={l} style={s.stat}><Text style={s.statVal}>{v ?? 0}</Text><Text style={s.statLbl}>{l}</Text></View>
+        ))}
+      </View>
+      <View style={[s.statRow, { marginTop: 8 }]}>
+        {[['30 DAYS', `${t.starts_30d ?? 0} / ${t.completed_30d ?? 0}`], ['7 DAYS', `${t.starts_7d ?? 0} / ${t.completed_7d ?? 0}`], ['PLAYERS 30D', t.players_30d], ['AVG HOLES', t.avg_holes]].map(([l, v]) => (
+          <View key={l} style={s.stat}><Text style={[s.statVal, { fontSize: 15 }]}>{v ?? 0}</Text><Text style={s.statLbl}>{l}</Text></View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function PlayStats({ stats }) {
+  if (!stats) return <ActivityIndicator color={GOLD} style={{ marginTop: 20 }} />;
+  if (stats.error) return <Text style={s.emptyText}>{stats.error.includes('admin_play_stats') ? 'Run the play_sessions migration to turn this on.' : stats.error}</Text>;
+  const users = stats.users ?? [];
+  const exportCsv = () => {
+    const head = 'name,username,joined,arcade_starts,arcade_completed,clocked_starts,clocked_completed,last_active';
+    const rows = users.map(u => [u.full_name ?? '', u.username ?? '', fmtDate(u.joined), u.arcade_starts, u.arcade_completed, u.clocked_starts, u.clocked_completed, fmtDate(u.last_active)].map(x => `"${String(x ?? '').replace(/"/g, '""')}"`).join(','));
+    Share.share({ message: [head, ...rows].join('\n'), title: 'Clocked play data' }).catch(() => {});
+  };
+  return (
+    <View>
+      <Text style={s.sectionNote}>{stats.profiles} profiles {'\u00B7'} started / completed counts, all time unless marked. Generated {fmtDate(stats.generated_at)}.</Text>
+      <KindCard title="ARCADE" t={stats.totals?.arcade} />
+      <KindCard title="CLOCKED ROUNDS" t={stats.totals?.clocked} />
+      <ActionBtn label="EXPORT PLAYER TABLE (CSV)" color={GOLD} onPress={exportCsv} />
+      <Text style={s.sectionLabel}>BY PLAYER {'\u00B7'} ARCADE {'\u00B7'} CLOCKED</Text>
+      {users.map(u => (
+        <View key={u.user_id} style={s.userRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.cardTitle} numberOfLines={1}>{u.full_name || (u.username ? '@' + u.username : u.user_id.slice(0, 8))}</Text>
+            <Text style={s.cardLine}>joined {fmtDate(u.joined)} {'\u00B7'} last {fmtDate(u.last_active)}</Text>
+          </View>
+          <Text style={s.userNum}>{u.arcade_completed}/{u.arcade_starts}</Text>
+          <Text style={s.userNum}>{u.clocked_completed}/{u.clocked_starts}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 function statusColor(status) {
   if (['accepted', 'certified', 'contacted', 'invited', 'claimed'].includes(status)) return GREEN;
@@ -41,8 +95,17 @@ export default function AdminScreen({ navigation }) {
   const [busyId, setBusyId] = useState(null);
 
   const activeTab = TABS.find(t => t.key === tab);
+  const [stats, setStats] = useState(null);
 
   const load = useCallback(async () => {
+    if (activeTab.rpc) {
+      const { data, error } = await supabase.rpc(activeTab.rpc);
+      setStats(error ? { error: error.message } : data);
+      setItems([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     let q = supabase
       .from(activeTab.table)
       .select('*')
@@ -60,7 +123,7 @@ export default function AdminScreen({ navigation }) {
     if (!error) setItems(rows);
     setLoading(false);
     setRefreshing(false);
-  }, [activeTab.table, activeTab.kind, activeTab.key]);
+  }, [activeTab.table, activeTab.kind, activeTab.key, activeTab.rpc]);
 
   const [closing, setClosing] = useState(false);
   const closeLastSeason = () => {
@@ -147,7 +210,8 @@ export default function AdminScreen({ navigation }) {
           {tab === 'qualifiers' && (
             <ActionBtn label={closing ? 'CLOSING…' : `CLOSE ${seasonLabel(previousSeason()).toUpperCase()}`} color={GOLD} busy={closing} onPress={closeLastSeason} />
           )}
-          {items.length === 0 && (
+          {tab === 'play' && <PlayStats stats={stats} />}
+          {items.length === 0 && !activeTab.rpc && (
             <Text style={s.emptyText}>Nothing here yet.</Text>
           )}
           {items.map((item) => (
@@ -307,4 +371,12 @@ const s = StyleSheet.create({
   actionsRow:  { flexDirection: 'row', gap: 8, marginTop: 12 },
   actionBtn:   { flex: 1, borderWidth: 1, borderRadius: RADIUS.sm, paddingVertical: 9, alignItems: 'center', justifyContent: 'center', minHeight: 32 },
   actionBtnText: { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
+  statRow:     { flexDirection: 'row', gap: 6 },
+  stat:        { flex: 1, alignItems: 'center', paddingVertical: 6, backgroundColor: BG, borderRadius: RADIUS.sm },
+  statVal:     { fontSize: 20, fontWeight: '300', color: CREAM, fontVariant: ['tabular-nums'] },
+  statLbl:     { fontSize: 7, fontWeight: '700', color: DIM, letterSpacing: 1, marginTop: 2 },
+  sectionNote: { fontSize: 11, color: DIM, marginBottom: 10, lineHeight: 16 },
+  sectionLabel:{ fontSize: 9, fontWeight: '700', color: GOLD, letterSpacing: 2, marginTop: 14, marginBottom: 8 },
+  userRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: BORDER },
+  userNum:     { minWidth: 44, textAlign: 'right', fontSize: 13, fontWeight: '700', color: CREAM, fontVariant: ['tabular-nums'] },
 });

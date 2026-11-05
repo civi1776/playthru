@@ -22,6 +22,7 @@ import {
   holeElapsed, roundElapsed, runningPoints, currentDispersion, hintFor, VERDICT_HOLD_MS,
 } from '../lib/arcade/engine';
 import { turboState, cartMph } from '../lib/arcade/physics';
+import { startPlaySession, endPlaySession } from '../lib/playSessions';
 import { randomSeed, dist } from '../lib/arcade/course';
 import { DEFAULT_AVATAR, loadAvatar } from '../lib/arcade/avatar';
 import { submitArcadeChallengeScore } from '../lib/arcade/challenges';
@@ -66,6 +67,7 @@ export default function ArcadeScreen({ navigation, route }) {
         difficulty={difficulty}
         avatar={avatar}
         onQuit={leave}
+        challengeId={challenge?.id ?? null}
         onDone={(s) => { setSummary(s); setMode('summary'); }}
       />
     );
@@ -195,10 +197,17 @@ function HowRow({ icon, text }) {
 }
 
 // ─── Game ────────────────────────────────────────────────────────────────────
-function Game({ seed, difficulty, avatar, onDone, onQuit }) {
+function Game({ seed, difficulty, avatar, onDone, onQuit, challengeId = null }) {
   const gameRef = useRef(null);
   if (!gameRef.current) gameRef.current = createGame({ seed, difficulty });
   const g = gameRef.current;
+
+  // A started round is a fact worth recording whether or not it finishes.
+  const sessionRef = useRef(null);
+  useEffect(() => {
+    startPlaySession({ kind: 'arcade', difficulty, holesPlanned: 9, seed: String(seed), challengeId })
+      .then(id => { sessionRef.current = id; });
+  }, []);
 
   const [, setFrame] = useState(0);
   const [mapSize, setMapSize] = useState({ width: 0, height: 0 });
@@ -269,7 +278,11 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
           showVerdict(ev);
           break;
         case 'done':
-          if (!doneRef.current) { doneRef.current = true; setTimeout(() => onDone(ev.summary), 0); }
+          if (!doneRef.current) {
+            doneRef.current = true;
+            endPlaySession(sessionRef.current, { outcome: 'completed', holesCompleted: 9 });
+            setTimeout(() => onDone({ ...ev.summary, playSessionId: sessionRef.current }), 0);
+          }
           break;
         default: break;
       }
@@ -346,7 +359,7 @@ function Game({ seed, difficulty, avatar, onDone, onQuit }) {
   const confirmQuit = () => {
     Alert.alert('Leave the arcade?', 'This round will not be saved.', [
       { text: 'Keep playing', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: onQuit },
+      { text: 'Leave', style: 'destructive', onPress: () => { endPlaySession(sessionRef.current, { outcome: 'abandoned', holesCompleted: gameRef.current?.holeIdx ?? 0 }); onQuit(); } },
     ]);
   };
 
@@ -494,6 +507,7 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
       }).select('id').single();
       if (error) throw error;
       setPosted(true);
+      endPlaySession(summary.playSessionId, { scoreId: row.id });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (challenge) {
         try { setDuel(await submitArcadeChallengeScore(challenge, user.id, profile?.username, row.id)); }
@@ -507,8 +521,9 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
     } finally { setPosting(false); }
   };
 
-  // Challenge runs post themselves: the run is the answer to the duel.
-  useEffect(() => { if (challenge && !posted && !posting) post(); }, []);
+  // Every run posts itself. A completed nine belongs on the board; the only
+  // choice a player makes is which level to play.
+  useEffect(() => { if (user?.id && !posted && !posting) post(); }, []);
 
   return (
     <SafeAreaView style={st.screen}>
@@ -592,19 +607,18 @@ function Summary({ summary, challenge, onPlayAgain, onBack }) {
         <TouchableOpacity style={st.primaryBtn} onPress={onPlayAgain} activeOpacity={0.85}>
           <Text style={st.primaryBtnText}>PLAY AGAIN</Text>
         </TouchableOpacity>
-        {!challenge && (
-          <TouchableOpacity
-            style={[st.secondaryBtn, (posted || posting) && { opacity: 0.6 }]}
-            onPress={post}
-            disabled={posted || posting}
-            activeOpacity={0.85}
-          >
-            {posting ? <ActivityIndicator color={COLOR.gold} /> : (
-              <Text style={st.secondaryBtnText}>{posted ? 'POSTED TO ARCADE BOARD' : 'POST TO ARCADE BOARD'}</Text>
-            )}
+        {posting ? (
+          <View style={[st.secondaryBtn, { opacity: 0.7 }]}><ActivityIndicator color={COLOR.gold} /></View>
+        ) : posted ? (
+          <View style={st.secondaryBtn}><Text style={st.secondaryBtnText}>ON THE ARCADE BOARD</Text></View>
+        ) : !user?.id ? (
+          <View style={st.secondaryBtn}><Text style={st.secondaryBtnText}>SIGN IN TO POST RUNS</Text></View>
+        ) : (
+          <TouchableOpacity style={st.secondaryBtn} onPress={post} activeOpacity={0.85}>
+            <Text style={st.secondaryBtnText}>RETRY POSTING</Text>
           </TouchableOpacity>
         )}
-        <Text style={st.footnote}>Posting adds this run to the Arcade boards only.</Text>
+        <Text style={st.footnote}>Every run posts to the arcade board. Arcade runs never touch your Clocked Score.</Text>
       </ScrollView>
     </SafeAreaView>
   );

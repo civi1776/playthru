@@ -31,6 +31,12 @@ marketing plan asks for a feed.
 - [x] **Pace vs baseline on the course page** — minutes saved against the course's own average. The raw material for the course pitch.
 - [x] **Rules copy aligned to the website** — ready golf, roll it in the fairway, beat time par, pick up at double, own your score, keep moving.
 
+## ADDED 4 Nov
+
+- [x] **Every arcade run posts itself.** No post button; a completed nine goes on the board. Signed-out runs show a sign-in note.
+- [x] **Rounds started, per player.** `play_sessions` records every arcade run and every Clocked round the moment it begins, and closes it on completion or abandonment (including the stale-round cleanup). Admin → PLAY DATA shows started / completed / finish rate / players for each kind, all time, 30 days and 7 days, a per-player table, and a CSV export for sponsors.
+- [x] **Course ranking removed from Ranks.** Courses either run Clocked tee times or they don't; they are not ranked against each other. Per-course player boards and course records stay.
+
 ## ADD — next (not in this pass)
 
 - [ ] **Course pace report, GM-facing export** — minutes saved converted to tee times and dollars at their rate, as a one-page leave-behind. Turns "we won't promise you numbers" into "here are yours." Blocks every course conversation in the next 90 days.
@@ -62,7 +68,7 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 | Intermediate | 43–56s | 105s | 0% / 1% |
 | Pro | 47–63s | 53s | 20% / 71% |
 
-- [ ] **Intermediate's clock never bites.** Even a sloppy player is under par on 99% of holes. The shot clock is the brand and it is cosmetic on the standard level. Suggest `timeScale` 0.35 → 0.24 (par 4 from 105s to about 72s): a careful player stays comfortably under, a sloppy one feels it on par 5s and after a mistake. Beginner can stay roomy. Pro is well tuned as is.
+- [x] **Intermediate's clock never bit.** `timeScale` 0.35 → 0.24 (par 4 from 105s to 72s). Re-simulated: careful player 1% of holes over, sloppy player 7%, 11 of 137 holes expire. Beginner stays roomy. Pro unchanged.
 - [ ] **Half of every round is driving** (48–53%), walking another 11–17%. Fine while the cart is the fun part, but worth watching as holes get longer.
 - [ ] **Beginner is a birdie festival** for an accurate player (birdie or better on 93% of holes, +31 per nine). Acceptable for an on-ramp; revisit if beginner scores ever count for anything.
 

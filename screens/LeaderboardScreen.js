@@ -1,11 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import SkeletonLoader from '../components/SkeletonLoader';
 import InitialsAvatar from '../components/InitialsAvatar';
-import CourseAvatar from '../components/CourseAvatar';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { computeFullRating, extractPlayerRoundStats, DEFAULT_PROVISIONAL_ROUNDS } from '../lib/clockedRating';
@@ -41,13 +40,6 @@ function clockedColor(v) {
   if (v >= 70) return COLOR.green;
   if (v >= 40) return COLOR.gold;
   return COLOR.muted;
-}
-
-function formatAvgTime(minutes) {
-  if (!minutes) return '\u2014';
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 // ─── Podium (Top 3) ─────────────────────────────────────────────────────────
@@ -136,37 +128,13 @@ function ClockedRow({ entry, navigation }) {
   );
 }
 
-// ─── Course Row ──────────────────────────────────────────────────────────────
-function CourseRow({ course, navigation }) {
-  return (
-    <TouchableOpacity
-      style={s.courseRow}
-      onPress={() => navigation?.navigate('CourseProfile', { course: { id: course.id, name: course.name } })}
-      activeOpacity={0.8}
-    >
-      <CourseAvatar courseName={course.name} city={course.city} size={44} />
-      <View style={s.courseInfo}>
-        <Text style={s.courseName} numberOfLines={1}>{course.name}</Text>
-        <Text style={s.courseMeta}>{[course.city, course.state].filter(Boolean).join(', ')}</Text>
-      </View>
-      <View style={s.courseRight}>
-        <Text style={s.courseTime}>{formatAvgTime(course.avg_time)}</Text>
-        <Text style={s.courseRounds}>
-          {course.total_rounds} {course.total_rounds === 1 ? 'round' : 'rounds'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 // ─── Filters ─────────────────────────────────────────────────────────────────
-// Three boards, nothing nested under the first one. CLOCKED is the real
-// thing: one score, one ranking. ARCADE is the game, with the level on every
-// row. COURSES ranks where people play fastest.
+// Two boards. CLOCKED is the real thing: one score, one ranking. ARCADE is
+// the game, with the level on every row. Courses are not ranked against each
+// other: a course either runs Clocked tee times or it does not.
 const FILTERS = [
   { key: 'CLOCKED', label: 'CLOCKED' },
   { key: 'ARCADE',  label: 'ARCADE' },
-  { key: 'COURSE',  label: 'COURSES' },
 ];
 const ARCADE_PERIODS = [['month', 'THIS MONTH'], ['all', 'ALL TIME']];
 // The month board defaults to the qualifying slice (intermediate + pro),
@@ -192,8 +160,6 @@ export default function LeaderboardScreen({ navigation }) {
   const [myProjected, setMyProjected] = useState(null);
   const [myRank, setMyRank]     = useState(null);
 
-  // Course filter search (client-side)
-  const [courseQuery, setCourseQuery] = useState('');
 
   // The Clocked board is one board. Rounds at every difficulty feed one
   // score, so there is nothing to slice; the constant keeps the legacy-round
@@ -349,70 +315,6 @@ export default function LeaderboardScreen({ navigation }) {
     }
   }, [uid, difficulty]);
 
-  // ── Fetch course board ──
-  // Computed LIVE from the `rounds` table (mirrors CourseProfileScreen's
-  // per-course leaderboard) instead of the cached `courses.total_rounds` /
-  // `avg_time` columns — those columns are only ever written by the
-  // retired LiveRoundScreen flow, so a course only ever played through the
-  // current ClockedRoundScreen flow would otherwise never appear here no
-  // matter how many rounds get logged.
-  const fetchCourseBoard = useCallback(async () => {
-    setLoading(dataRef.current.length === 0);
-    setError(false);
-    setMyRank(null);
-    setMyProjected(null);
-    try {
-      const { data: rounds, error: err } = await supabase
-        .from('rounds')
-        .select('course_name, duration_minutes')
-        .eq('flagged', false)
-        .not('course_name', 'is', null)
-        .not('duration_minutes', 'is', null);
-      if (err) throw err;
-
-      // Group by course_name and average the real per-round duration —
-      // the "pace" metric — instead of trusting a stale cached column.
-      const byCourse = {};
-      (rounds ?? []).forEach(r => {
-        const key = r.course_name;
-        if (!byCourse[key]) byCourse[key] = { total: 0, count: 0 };
-        byCourse[key].total += Number(r.duration_minutes) || 0;
-        byCourse[key].count += 1;
-      });
-
-      let courseBoard = Object.entries(byCourse)
-        .map(([name, { total, count }]) => ({
-          id: null, name, city: null, state: null,
-          avg_time: total / count, total_rounds: count,
-        }))
-        .sort((a, b) => a.avg_time - b.avg_time)
-        .slice(0, 50);
-
-      // Enrich with courses table metadata (id/city/state) for display and
-      // navigation — best-effort, matched by name; missing rows just fall
-      // back to name-only (CourseProfileScreen already handles id == null).
-      const names = courseBoard.map(c => c.name);
-      if (names.length) {
-        const { data: courseRows } = await supabase
-          .from('courses')
-          .select('id, name, city, state')
-          .in('name', names);
-        const meta = {};
-        (courseRows ?? []).forEach(c => { meta[c.name] = c; });
-        courseBoard = courseBoard.map(c => {
-          const m = meta[c.name];
-          return m ? { ...c, id: m.id, city: m.city, state: m.state } : c;
-        });
-      }
-
-      setData(courseBoard);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   // ── Fetch arcade board ──
   const fetchArcadeBoardData = useCallback(async () => {
     setLoading(dataRef.current.length === 0);
@@ -431,27 +333,17 @@ export default function LeaderboardScreen({ navigation }) {
 
   // ── Fetch dispatch ──
   const fetchCurrent = useCallback(() => {
-    if (filter === 'COURSE') fetchCourseBoard();
-    else if (filter === 'ARCADE') fetchArcadeBoardData();
+    if (filter === 'ARCADE') fetchArcadeBoardData();
     else fetchPlayerBoard();
-  }, [filter, fetchPlayerBoard, fetchCourseBoard, fetchArcadeBoardData]);
+  }, [filter, fetchPlayerBoard, fetchArcadeBoardData]);
 
   useEffect(() => { fetchCurrent(); }, [filter, arcadePeriod, arcadeDiff]);
   useFocusEffect(useCallback(() => { fetchCurrent(); }, []));
 
   useEffect(() => { if (!session) navigation.replace('Welcome'); }, [session]);
 
-  const isCourse = filter === 'COURSE';
   const isArcade = filter === 'ARCADE';
   const isEmpty = !loading && !error && data.length === 0;
-
-  // Client-side course filtering
-  const filteredCourses = isCourse && courseQuery.length > 1
-    ? data.filter(c =>
-        c.name?.toLowerCase().includes(courseQuery.toLowerCase()) ||
-        (c.city && c.city.toLowerCase().includes(courseQuery.toLowerCase()))
-      )
-    : data;
 
   return (
     <SafeAreaView style={s.container}>
@@ -466,7 +358,7 @@ export default function LeaderboardScreen({ navigation }) {
       <View style={s.filterRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f.key} style={[s.filterBtn, filter === f.key && s.filterBtnActive]}
-            onPress={() => { setFilter(f.key); setCourseQuery(''); }} accessibilityRole="tab" accessibilityState={{ selected: filter === f.key }}>
+            onPress={() => setFilter(f.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === f.key }}>
             <Text style={[s.filterText, filter === f.key && s.filterTextActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
@@ -492,21 +384,6 @@ export default function LeaderboardScreen({ navigation }) {
             ))}
           </View>
         </>
-      )}
-
-      {/* Course search bar */}
-      {isCourse && !loading && data.length > 0 && (
-        <View style={s.courseSearchWrap}>
-          <TextInput
-            style={s.courseSearchInput}
-            placeholder="Search courses..."
-            placeholderTextColor={COLOR.dim}
-            value={courseQuery}
-            onChangeText={setCourseQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
       )}
 
       {/* Content */}
@@ -548,18 +425,6 @@ export default function LeaderboardScreen({ navigation }) {
             <Text style={s.ctaBtnText}>PLAY</Text>
           </TouchableOpacity>
         </View>
-      ) : isCourse ? (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <Text style={s.courseListHeader}>Courses ranked by fastest average round</Text>
-          <View style={s.listSection}>
-            {filteredCourses.map((course, i) => (
-              <CourseRow key={course.id ?? i} course={course} navigation={navigation} />
-            ))}
-            {filteredCourses.length === 0 && courseQuery.length > 1 && (
-              <Text style={s.noResults}>No courses match "{courseQuery}"</Text>
-            )}
-          </View>
-        </ScrollView>
       ) : isArcade ? (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
           <Text style={s.courseListHeader}>
@@ -650,9 +515,6 @@ const s = StyleSheet.create({
   diffPillText:     { fontSize: 8, fontWeight: '700', color: COLOR.muted, letterSpacing: 1 },
   diffPillTextActive: { color: COLOR.gold },
 
-  // Course search
-  courseSearchWrap:  { paddingHorizontal: SPACING.lg, marginBottom: SPACING.sm },
-  courseSearchInput: { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.sm, padding: SPACING.sm, color: COLOR.cream, fontSize: 13 },
 
   // Podium
   podium:        { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 10 },

@@ -19,6 +19,7 @@ import {
   DEFAULT_SCORING_SCALE, DEFAULT_CLOCK_COEFFICIENTS, DEFAULT_PENALTY_PARAMS,
 } from '../lib/clockedSport';
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
+import { startPlaySession, endPlaySession } from '../lib/playSessions';
 import { fetchClockedRatingForUser } from '../lib/clockedRating';
 import { claimCourseRecord } from '../lib/courseRecords';
 import { sendPushToUser, sendLocalNotification, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
@@ -230,6 +231,14 @@ export default function ClockedRoundScreen({ navigation, route }) {
   );
   const [showHolePicker, setShowHolePicker] = useState(false);
   const [isFinishing, setIsFinishing]       = useState(false); // guards against a double-tap double-inserting the round
+  // Started-round record, kept in the saved state so a resumed round closes
+  // the same session it opened.
+  const [playSessionId, setPlaySessionId]   = useState(resumeState?.playSessionId ?? null);
+  useEffect(() => {
+    if (resumeState || playSessionId) return;
+    startPlaySession({ kind: 'clocked', difficulty, holesPlanned: holeCount, courseName: course?.name ?? null, players: playerDefs?.length ?? 1 })
+      .then(id => { if (id) setPlaySessionId(id); });
+  }, []);
 
   // Clock
   const [clockRunning, setClockRunning]     = useState(false);
@@ -370,7 +379,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     roundStartTs, course, holeCount, transport, difficulty, mode,
     holeDataState, playerDefs, configSnap, currentHole, holeResults,
     playerStrokes, clockRunning, clockStartedAt, holeFrozenTime, officialTimePars,
-    defaultPar, savedAt: Date.now(), ...overrides,
+    defaultPar, playSessionId, savedAt: Date.now(), ...overrides,
   });
   const persistRound = (overrides) =>
     AsyncStorage.setItem(CLOCKED_ROUND_STATE_KEY, JSON.stringify(buildRoundState(overrides))).catch(() => {});
@@ -382,7 +391,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     const roundHasBegun = holeResults.length > 0 || clockRunning || holeFrozenTime != null;
     if (!roundHasBegun) return;
     persistRound();
-  }, [currentHole, holeResults, playerStrokes, clockRunning, holeFrozenTime, holeDataState]);
+  }, [currentHole, holeResults, playerStrokes, clockRunning, holeFrozenTime, holeDataState, playSessionId]);
 
   // ── Resume from saved state ──
   useEffect(() => {
@@ -681,6 +690,11 @@ export default function ClockedRoundScreen({ navigation, route }) {
       }
 
       // Create round_participants for linked players (with per-player hole_scores)
+      endPlaySession(playSessionId, {
+        outcome: 'completed',
+        holesCompleted: Array.isArray(holeScoresJson) ? holeScoresJson.length : holeResults.length,
+        roundId: savedRoundId,
+      });
       if (savedRoundId) {
         const participantRows = playerDefs
           .map((p, i) => {
