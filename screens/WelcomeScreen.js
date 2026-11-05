@@ -65,22 +65,22 @@ const s = StyleSheet.create({
     paddingTop: 60,
   },
   wordmark: {
-    fontSize: 13, fontWeight: '700', color: COLOR.cream,
+    fontSize: 13, fontWeight: '700', color: '#FFFFFF',
     letterSpacing: 6,
   },
   motto: {
-    fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 2,
+    fontSize: 9, fontWeight: '700', color: '#FFFFFF', letterSpacing: 2,
     marginTop: 8,
   },
   center: {
     paddingHorizontal: 28,
   },
   heroLight: {
-    fontSize: 40, fontWeight: '200', color: COLOR.cream,
+    fontSize: 40, fontWeight: '200', color: '#FFFFFF',
     lineHeight: 48,
   },
   heroBold: {
-    fontSize: 40, fontWeight: '700', color: COLOR.goldBright,
+    fontSize: 40, fontWeight: '700', color: '#FFFFFF',
     lineHeight: 48,
   },
   sub: {
