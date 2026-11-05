@@ -76,6 +76,11 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 - [ ] **Half of every round is driving** (48–53%), walking another 11–17%. Fine while the cart is the fun part, but worth watching as holes get longer.
 - [ ] **Beginner is a birdie festival** for an accurate player (birdie or better on 93% of holes, +31 per nine). Acceptable for an on-ramp; revisit if beginner scores ever count for anything.
 
+## RELEASES
+
+- **1.7.0 (build 54)** approved and live on the App Store, 4 Nov: Today tab, course records, head-to-head profiles, course crests, arcade qualifying board.
+- **1.8.0 (build 58)** uploading 4 Nov: buzzer + HEAT, auto-posting arcade runs, champagne gold, white splash, short-game cones, turbo while steering, Ranks as two boards, profile course/arcade split, course ranking removed, play sessions. Builds 55–57 never reached review (55 and 56 cancelled pre-upload, 57 rejected because the 1.7.0 train had closed).
+
 ## OPEN RISKS
 
 - **Arcade qualifier spots are cheatable.** The game posts its own score from the client. Before a real purse is attached, either validate runs server-side from an input log or make the reward free entry rather than a guaranteed spot.
