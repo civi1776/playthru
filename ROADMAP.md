@@ -76,6 +76,14 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 - [ ] **Half of every round is driving** (48–53%), walking another 11–17%. Fine while the cart is the fun part, but worth watching as holes get longer.
 - [ ] **Beginner is a birdie festival** for an accurate player (birdie or better on 93% of holes, +31 per nine). Acceptable for an on-ramp; revisit if beginner scores ever count for anything.
 
+## ARCADE — 5 Nov, from build 59 feedback
+
+- [x] **Greens break on intermediate and pro.** Seeded tilt per green, contour lines + downhill chevron on the map, break read in the putt hint. Cups tightened (inter 0.8, pro 0.6) so a straight 10-yarder misses on intermediate and a 6-yarder misses on pro at mid tilt. `scripts/arcade-sim/putt-break.mjs` measures it.
+- [x] **UNDER CLOCK counted a timed-out hole** (8/9 with two timeouts). Holes carry the verdict flag now.
+- [x] **Cart drove itself after a shot** when a thumb was still on the stick at arrival. Stick ref zeroed outside the drive phase; responder kept alive across phases.
+- [x] **Turbo** also fires from the button's own touch start, so it works whatever owns the gesture. Needs a device retest on the next build: stick held first, boost pressed second.
+- [ ] **Build 60** carries all of the above. 59 is in review without them; cancel 59's review and submit 60, or let 59 ship and follow with 60.
+
 ## RELEASES
 
 - **1.7.0 (build 54)** approved and live on the App Store, 4 Nov: Today tab, course records, head-to-head profiles, course crests, arcade qualifying board.
