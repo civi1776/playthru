@@ -6,6 +6,7 @@
 //   kind = tournament_interest → public.website_inquiries        (admin app: INTEREST tab)
 //   kind = contact             → public.website_inquiries        (admin app: INBOX tab)
 //   kind = course_partnership  → public.course_certification_inquiries (admin app: COURSES tab)
+//   kind = event_application   → public.tournament_applications       (admin app: APPLICATIONS tab)
 //
 // Abuse controls: project-key gate, honeypot field, minimum fill time,
 // length caps, per-IP (hourly) and per-email (daily) limits. Responses never
@@ -30,7 +31,11 @@ const INQUIRY_TYPES = [
   'Sponsorship / Brand Partnership', 'Media / Press', 'Other',
 ];
 
-type Kind = 'tournament_interest' | 'course_partnership' | 'contact';
+type Kind = 'tournament_interest' | 'course_partnership' | 'contact' | 'event_application';
+
+// Events that accept team applications from the website. The app posts the
+// same slug through tournament-apply. Anything else falls back to the first.
+const EVENT_SLUGS = ['par3-2026-11-19'];
 
 function cors(req: Request) {
   const origin = req.headers.get('Origin') ?? '';
@@ -123,7 +128,7 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json(400, { ok: false, error: 'Invalid request.' }); }
 
   const kind = str(body.kind) as Kind;
-  if (!['tournament_interest', 'course_partnership', 'contact'].includes(kind)) {
+  if (!['tournament_interest', 'course_partnership', 'contact', 'event_application'].includes(kind)) {
     return json(400, { ok: false, error: 'Unknown form.' });
   }
 
@@ -142,16 +147,22 @@ Deno.serve(async (req) => {
   const source_page = orNull(str(body.page, 120));
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-  const table = kind === 'course_partnership' ? 'course_certification_inquiries' : 'website_inquiries';
+  const table = kind === 'course_partnership' ? 'course_certification_inquiries'
+    : kind === 'event_application' ? 'tournament_applications'
+    : 'website_inquiries';
+  // tournament_applications is shared with the app and has no ip_hash column;
+  // it is rate-limited by email only.
+  const emailCol = table === 'tournament_applications' ? 'contact_email' : 'email';
+  const hasIpHash = table !== 'tournament_applications';
 
   // ── Rate limits ──
   const hourAgo = new Date(Date.now() - 3600_000).toISOString();
   const dayAgo  = new Date(Date.now() - 86400_000).toISOString();
   const [{ count: byIp }, { count: byEmail }] = await Promise.all([
-    ip_hash
+    ip_hash && hasIpHash
       ? admin.from(table).select('id', { count: 'exact', head: true }).eq('ip_hash', ip_hash).gte('created_at', hourAgo)
       : Promise.resolve({ count: 0 }),
-    admin.from(table).select('id', { count: 'exact', head: true }).ilike('email', email).gte('created_at', dayAgo),
+    admin.from(table).select('id', { count: 'exact', head: true }).ilike(emailCol, email).gte('created_at', dayAgo),
   ]);
   if ((byIp ?? 0) >= PER_IP_PER_HOUR || (byEmail ?? 0) >= PER_EMAIL_PER_DAY) {
     return json(429, { ok: false, error: `We already have a recent submission from you. If you need to add something, email ${NOTIFY_TO}.` });
@@ -177,6 +188,36 @@ Deno.serve(async (req) => {
     html = notifyHtml('New tournament invitation request', [
       ['Name', `${first_name} ${last_name}`], ['Email', email], ['Phone', phone], ['Location', location],
       ['Handicap', handicap], ['Home course', home_course], ['Comments', message], ['Consent', consent ? 'Yes' : 'No'], ['Page', source_page ?? ''],
+    ]);
+  } else if (kind === 'event_application') {
+    const slugIn = str(body.tournament_slug, 60);
+    const tournament_slug = EVENT_SLUGS.includes(slugIn) ? slugIn : EVENT_SLUGS[0];
+    const team_name = str(body.team_name), phone = str(body.phone, 40);
+    const player1_name = str(body.player1_name), player1_handicap = str(body.player1_handicap, 40);
+    const player1_sport = str(body.player1_sport), player1_instagram = str(body.player1_instagram, 80);
+    const player2_name = str(body.player2_name), player2_handicap = str(body.player2_handicap, 40);
+    const player2_sport = str(body.player2_sport), player2_instagram = str(body.player2_instagram, 80);
+    const why_compete = text(body.why_compete, 2000);
+    const consent = truthy(body.consent);
+    if (!team_name)     return json(400, { ok: false, error: 'Please enter a team name.' });
+    if (!phone)         return json(400, { ok: false, error: 'Please enter a phone number.' });
+    if (!player1_name || !player2_name) return json(400, { ok: false, error: 'Please enter both player names.' });
+    if (!player1_sport || !player2_sport) return json(400, { ok: false, error: 'Please tell us the sport each player played.' });
+    if (!why_compete)   return json(400, { ok: false, error: 'Tell us why your team should be in the field.' });
+    if (!consent)       return json(400, { ok: false, error: 'Please confirm the entry fee and selection terms.' });
+    insert = {
+      source: 'website', tournament_slug, status: 'pending',
+      team_name, contact_email: email, contact_phone: orNull(phone),
+      player1_name, player1_handicap: orNull(player1_handicap), player1_sport, player1_instagram: orNull(player1_instagram),
+      player2_name, player2_handicap: orNull(player2_handicap), player2_sport, player2_instagram: orNull(player2_instagram),
+      why_compete,
+    };
+    subject = `Event application — ${team_name} (${player1_name} & ${player2_name})`;
+    html = notifyHtml(`New team application · ${tournament_slug}`, [
+      ['Team', team_name], ['Email', email], ['Phone', phone],
+      ['Player 1', `${player1_name} · hcp ${player1_handicap || '—'} · ${player1_sport} · ${player1_instagram || ''}`],
+      ['Player 2', `${player2_name} · hcp ${player2_handicap || '—'} · ${player2_sport} · ${player2_instagram || ''}`],
+      ['Why', why_compete], ['Entry terms', consent ? 'Acknowledged' : 'No'], ['Page', source_page ?? ''],
     ]);
   } else if (kind === 'course_partnership') {
     const contact_name = str(body.contact_name), facility = str(body.facility), job_title = str(body.job_title);

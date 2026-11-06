@@ -30,6 +30,15 @@ import {
 } from '../modules/clocked-activity/src';
 import { COLOR, TYPE, MOTION, ringZone, ringColorForZone, RADIUS } from '../lib/theme';
 
+// Lock-screen alarms, seconds before time par. Sounds are bundled by the
+// expo-notifications plugin (app.json → sounds); a rename here needs a rebuild.
+const CLOCK_ALARMS = [
+  { at: 60, title: 'One minute',  sound: 'chime.wav',  body: (h) => `Hole ${h}: 60 seconds to time par.` },
+  { at: 30, title: '30 seconds',  sound: 'chime.wav',  body: (h) => `Hole ${h}: 30 seconds left. Pick up the pace.` },
+  { at: 10, title: '10 seconds',  sound: 'chime.wav',  body: (h) => `Hole ${h}: 10 seconds. Hole out.` },
+  { at: 0,  title: 'TIME',        sound: 'buzzer.wav', body: (h) => `Hole ${h}: time par is gone. Every second costs points now.` },
+];
+
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // ─── Colors — Midnight Fairway, from the shared design system ────────────────
@@ -408,6 +417,18 @@ export default function ClockedRoundScreen({ navigation, route }) {
     }
     sendLocalNotification('Round Resumed', `Back on hole ${resumeState.currentHole}.`);
 
+    // A clock that was running when the app died still has alarms pending in
+    // the OS; re-derive the hole's time par and reschedule from the original
+    // start so the remaining thresholds fire at the right moments (and the
+    // stale set is swept first).
+    if (resumeState.clockRunning && resumeState.clockStartedAt) {
+      const h  = resumeState.currentHole ?? 1;
+      const hd = (resumeState.holeDataState ?? [])[h - 1] ?? { par: defaultPar, yardage: null };
+      const offSec = officialTimeParFor((resumeState.officialTimePars ?? officialTimePars)?.[h], transport, playerCount);
+      const tp = computeTimePar(hd.yardage, hd.par, playerCount, transport, difficulty, offSec, clockCoeffs);
+      scheduleClockAlarms(h, tp, resumeState.clockStartedAt);
+    }
+
     // ── Lock-screen "Holed Out" hand-off (cold start) ──
     // If the app was killed (not just backgrounded), the AppState 'active'
     // listener near the clock controls never fires before this screen
@@ -433,6 +454,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
             setHoleFrozenTime(finalElapsed);
             setClockRunning(false);
             endActivity().catch(() => {});
+            cancelClockAlarms();
             showVerdict(finalElapsed, resumedTimePar);
           }
         } catch {}
@@ -445,15 +467,48 @@ export default function ClockedRoundScreen({ navigation, route }) {
     return () => { endActivity().catch(() => {}); };
   }, []);
 
+  // ── Lock-screen clock alarms ──
+  // The OS fires these, so they land with the phone locked or the app in the
+  // background — the one thing the in-app buzzer cannot do. Four per hole:
+  // one minute, thirty seconds, ten seconds, and time. Scheduled on START
+  // HOLE, torn down by anything that stops the clock. Identified by
+  // data.type so a cold start can sweep stale ones before rescheduling.
+  const cancelClockAlarms = useCallback(async () => {
+    try {
+      const all = await Notifications.getAllScheduledNotificationsAsync();
+      await Promise.all(all
+        .filter(n => n?.content?.data?.type === 'clock_alarm')
+        .map(n => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {})));
+    } catch {}
+  }, []);
+  const scheduleClockAlarms = useCallback(async (hole, timeParSec, startedAtMs) => {
+    await cancelClockAlarms();
+    const now = Date.now();
+    for (const a of CLOCK_ALARMS) {
+      const seconds = Math.round((startedAtMs + (timeParSec - a.at) * 1000 - now) / 1000);
+      if (seconds < 1) continue;
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: a.title, body: a.body(hole), sound: a.sound,
+          interruptionLevel: 'timeSensitive',
+          data: { type: 'clock_alarm', hole, at: a.at },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds, repeats: false },
+      }).catch(() => {});
+    }
+  }, [cancelClockAlarms]);
+
   // ── Clock controls ──
   const startClock = () => {
     cancelVerdict();
-    setClockStartedAt(Date.now());
+    const startAt = Date.now();
+    setClockStartedAt(startAt);
     setDisplayElapsed(0);
     setHoleFrozenTime(null);
     setClockRunning(true);
     scheduleInteractionLadder(course?.name ?? 'your course').catch(() => {});
-    startActivity(currentHole, curHoleData.par, Date.now() + curTimePar * 1000).catch(() => {});
+    startActivity(currentHole, curHoleData.par, startAt + curTimePar * 1000).catch(() => {});
+    scheduleClockAlarms(currentHole, curTimePar, startAt);
   };
 
   // atMs lets a lock-screen "Holed Out" tap freeze the clock at the moment
@@ -465,6 +520,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     setHoleFrozenTime(finalElapsed);
     setClockRunning(false);
     endActivity().catch(() => {});
+    cancelClockAlarms();
 
     // The verdict — instant, emotional, shareable. Skipped when the clock is
     // stopped for a non-golf reason (pausing/minimizing the round).
@@ -576,6 +632,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     const doJump = () => {
       cancelVerdict();
       endActivity().catch(() => {});
+      cancelClockAlarms();
       setCurrentHole(n);
       setClockRunning(false);
       setClockStartedAt(null);
@@ -619,6 +676,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
   const finishRound = async (results) => {
     setIsFinishing(true);
     endActivity().catch(() => {});
+    cancelClockAlarms();
     const summary = summarizeRound(results);
     // `results` is indexed by hole number and may have gaps (holes skipped
     // via the hole picker never got scored) — map with the real index for
@@ -838,6 +896,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       { text: 'Abandon', style: 'destructive', onPress: async () => {
         cancelInteractionLadder().catch(() => {});
         endActivity().catch(() => {});
+        cancelClockAlarms();
         await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
         navigation.navigate('Main');
       }},

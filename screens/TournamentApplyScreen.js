@@ -1,6 +1,6 @@
-// ─── Tournament Apply — team invitation request for the first Clocked event ──
-// Two-player team application (the website's /tournaments page collects
-// individual interest via the website-forms function; both land in admin review). Player 1
+// ─── Tournament Apply — team application for Clocked at the Par 3 ───────────
+// Two-player team application (the website's /tournaments page posts the same
+// team form through the website-forms function; both land in admin review). Player 1
 // is always the signed-in user (name/handicap prefilled from their profile,
 // editable) since applying in-app requires an account. Submits to the shared
 // tournament-apply edge function — the same backend the website form posts
@@ -16,6 +16,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { COLOR, SPACING, RADIUS } from '../lib/theme';
 import ScreenHeader from '../components/ScreenHeader';
+import { EVENT, EVENT_ENTRY_NOTE } from '../lib/event';
 
 function Field({ label, children, note }) {
   return (
@@ -42,17 +43,18 @@ export default function TournamentApplyScreen({ navigation }) {
   const [p2Instagram, setP2Instagram] = useState('');
   const [p2Username, setP2Username]   = useState('');
   const [whyCompete, setWhyCompete]   = useState('');
+  const [ackEntry, setAckEntry]       = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted]   = useState(false);
   const [errorMsg, setErrorMsg]     = useState(null);
 
   const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  const canSubmit = teamName.trim() && isEmail(email.trim()) && p1Name.trim() && p1Sport.trim() && p2Name.trim() && p2Sport.trim() && whyCompete.trim() && !submitting;
+  const canSubmit = teamName.trim() && isEmail(email.trim()) && p1Name.trim() && p1Sport.trim() && p2Name.trim() && p2Sport.trim() && whyCompete.trim() && ackEntry && !submitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) {
-      Alert.alert('Missing info', 'Team name, email, both player names, the sport each player played, and why your team should compete are required.');
+      Alert.alert('Missing info', 'Team name, email, both player names, the sport each player played, why your team should compete, and the entry acknowledgement are required.');
       return;
     }
     setSubmitting(true);
@@ -61,7 +63,7 @@ export default function TournamentApplyScreen({ navigation }) {
       const { data, error } = await supabase.functions.invoke('tournament-apply', {
         body: {
           source: 'app',
-          tournament_slug: 'tournament-series',
+          tournament_slug: EVENT.slug,
           team_name: teamName.trim(),
           contact_email: email.trim(),
           player1_name: p1Name.trim(),
@@ -92,9 +94,9 @@ export default function TournamentApplyScreen({ navigation }) {
       <SafeAreaView style={s.container}>
         <View style={s.successWrap}>
           <Ionicons name="checkmark-circle" size={48} color={COLOR.green} style={{ marginBottom: 20 }} />
-          <Text style={s.successTitle}>You're on the list.</Text>
+          <Text style={s.successTitle}>Application in.</Text>
           <Text style={s.successBody}>
-            Your request has been received. We'll share the date, venue, and format for the first Clocked event in South Florida as they're set, and invitations go out from this list first. Requesting an invitation expresses interest and doesn't guarantee a spot.
+            We read every one and hand-pick the field. You'll hear from us either way: a spot with payment details, or a place on the waitlist with your number in line. Nobody pays until they're in.
           </Text>
           <Text style={s.successClosing}>The game is yours. The clock is running.</Text>
           <TouchableOpacity style={s.doneBtn} onPress={() => navigation.navigate('Main')} activeOpacity={0.85}>
@@ -107,14 +109,14 @@ export default function TournamentApplyScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <ScreenHeader title="REQUEST AN INVITATION" onBack={() => navigation.goBack()} borderless />
+      <ScreenHeader title="APPLY TO PLAY" onBack={() => navigation.goBack()} borderless />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          <Text style={s.eyebrow}>REQUEST AN INVITATION</Text>
-          <Text style={s.title}>The first Clocked event.</Text>
-          <Text style={s.subtitle}>South Florida. Date and venue to be announced. Clocked tournaments are for athletes: tell us what you played, tell us about your game, and we'll reach out as details are set.</Text>
+          <Text style={s.eyebrow}>{EVENT.dateLabel.toUpperCase()} {'\u00B7'} {EVENT.venue.toUpperCase()}</Text>
+          <Text style={s.title}>Apply with your partner.</Text>
+          <Text style={s.subtitle}>One application per two-player team. {EVENT.teamCap}, hand-picked, with a waitlist. Tell us who you both are, what you played, and why you want to be in the first field.</Text>
 
           <Field label="TEAM NAME">
             <TextInput style={s.input} value={teamName} onChangeText={setTeamName} placeholder="Your team name" placeholderTextColor="#3A5C3C" />
@@ -167,6 +169,11 @@ export default function TournamentApplyScreen({ navigation }) {
             />
           </Field>
 
+          <TouchableOpacity style={s.ack} onPress={() => setAckEntry(v => !v)} activeOpacity={0.8} accessibilityRole="checkbox" accessibilityState={{ checked: ackEntry }}>
+            <Ionicons name={ackEntry ? 'checkbox' : 'square-outline'} size={22} color={ackEntry ? COLOR.gold : COLOR.dim} />
+            <Text style={s.ackText}>{EVENT_ENTRY_NOTE} Applying does not guarantee a spot.</Text>
+          </TouchableOpacity>
+
           {errorMsg && <Text style={s.errorText}>{errorMsg}</Text>}
 
           <TouchableOpacity
@@ -202,6 +209,9 @@ const s = StyleSheet.create({
   fieldNote:    { fontSize: 11, color: '#5A5344', marginTop: 6 },
   input:        { backgroundColor: '#0F2312', borderWidth: 1, borderColor: '#1E3320', borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, color: '#E8DCC8', fontSize: 15 },
   inputMulti:   { minHeight: 100, textAlignVertical: 'top' },
+
+  ack:          { flexDirection: 'row', gap: 12, alignItems: 'flex-start', marginBottom: 20, paddingVertical: 4 },
+  ackText:      { flex: 1, fontSize: 13, color: COLOR.muted, lineHeight: 19 },
 
   errorText:    { fontSize: 13, color: COLOR.red, marginBottom: 16, lineHeight: 19 },
 

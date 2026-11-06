@@ -31,7 +31,8 @@
       },
       "version": "1.8.0",
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.civiswings.playthru"]
+        "com.apple.security.application-groups": ["group.com.civiswings.playthru"],
+        "com.apple.developer.usernotifications.time-sensitive": true
       }
     },
     "android": {
@@ -65,7 +66,7 @@
         {
           "icon": "./assets/PlayThru_AppIcon.png",
           "color": "#C9A84C",
-          "sounds": []
+          "sounds": ["./assets/sounds/chime.wav", "./assets/sounds/buzzer.wav"]
         }
       ],
       [

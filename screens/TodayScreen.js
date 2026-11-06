@@ -23,6 +23,7 @@ import { fetchPlayerRounds } from '../lib/headToHead';
 import { fetchBoards, hydrateNames, splitForUser } from '../lib/courseRecords';
 import { fetchSeasonBoard, currentSeason, daysLeftInSeason, QUALIFY_TOP } from '../lib/arcade/season';
 import { fetchMyArcadeChallenges } from '../lib/arcade/challenges';
+import { EVENT } from '../lib/event';
 import { COLOR, RADIUS, TYPE, scoreTier } from '../lib/theme';
 
 const signed = v => (v == null ? '—' : v > 0 ? `+${v}` : String(v));
@@ -281,9 +282,9 @@ export default function TodayScreen({ navigation }) {
           {/* ── The event ── */}
           <Section label="THE FIRST CLOCKED EVENT">
             <TouchableOpacity style={s.card} onPress={() => navigation.navigate('Tournament')} activeOpacity={0.85}>
-              <Text style={s.cardTitle}>South Florida. Date and venue to be announced.</Text>
-              <Text style={s.cardSub}>Invitations go out from the interest list first.</Text>
-              <Text style={s.cardLink}>REQUEST AN INVITATION  {'›'}</Text>
+              <Text style={s.cardTitle}>{EVENT.dateLabel} · {EVENT.timeLabel} · {EVENT.venue}</Text>
+              <Text style={s.cardSub}>Two-player teams, {EVENT.entryLabel}, cash prize. {EVENT.teamCap}, hand-picked, with a waitlist.</Text>
+              <Text style={s.cardLink}>APPLY WITH YOUR PARTNER  {'›'}</Text>
             </TouchableOpacity>
           </Section>
 
