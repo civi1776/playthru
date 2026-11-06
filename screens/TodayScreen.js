@@ -283,7 +283,7 @@ export default function TodayScreen({ navigation }) {
           <Section label="THE FIRST CLOCKED EVENT">
             <TouchableOpacity style={s.card} onPress={() => navigation.navigate('Tournament')} activeOpacity={0.85}>
               <Text style={s.cardTitle}>{EVENT.dateLabel} · {EVENT.timeLabel} · {EVENT.venue}</Text>
-              <Text style={s.cardSub}>Two-player teams, {EVENT.entryLabel}, cash prize. {EVENT.teamCap}, hand-picked, with a waitlist.</Text>
+              <Text style={s.cardSub}>Nine holes under the lights. Two-player teams, {EVENT.entryLabel}, cash prize. {EVENT.teamCap}, hand-picked, with a waitlist.</Text>
               <Text style={s.cardLink}>APPLY WITH YOUR PARTNER  {'›'}</Text>
             </TouchableOpacity>
           </Section>

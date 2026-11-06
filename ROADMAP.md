@@ -92,7 +92,7 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 - [x] **Migration `20261105120000_par3_event.sql`** applied 5 Nov.
 - [x] **`website-forms` deployed, site live** 5 Nov; the form validates against the live function.
 - [ ] **Payment tracking** — admin can mark accepted/waitlisted; there is no paid flag yet. Track Zelle/Venmo receipts by hand for this one, add `paid_at` before the next event.
-- [ ] **Open question** — 6:00 PM on 19 Nov is after sunset in Palm Beach (~5:30 PM). Confirm lights or the start time with the course.
+- [x] **Lights confirmed** — the course is lit; 6:00 PM is deliberate. "Under the lights" is in the copy.
 
 ## CLOCK — 5 Nov, lock-screen alarms
 

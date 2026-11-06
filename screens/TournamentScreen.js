@@ -9,7 +9,7 @@ import Button from '../components/Button';
 import { EVENT, EVENT_ENTRY_NOTE, EVENT_TEST_RUN_NOTE } from '../lib/event';
 
 const FACTS = [
-  { label: 'WHEN',  value: `${EVENT.dateLabel} · ${EVENT.timeLabel}` },
+  { label: 'WHEN',  value: `${EVENT.dateLabel} · ${EVENT.timeLabel} · under the lights` },
   { label: 'WHERE', value: `${EVENT.venue} · ${EVENT.city}` },
   { label: 'FIELD', value: `${EVENT.teamCap} of two · hand-picked` },
   { label: 'ENTRY', value: `${EVENT.entryLabel} · ${EVENT.paymentLabel}` },
@@ -26,7 +26,7 @@ const HOW_IT_WORKS = [
   { n: '1', title: 'Apply with your partner', body: 'One application per team. Tell us who you both are and what you played.' },
   { n: '2', title: 'We pick the field',         body: `We read every application and hand-pick ${EVENT.teamCap}. Everyone else goes on the waitlist, in order.` },
   { n: '3', title: 'Pay to lock your spot',     body: EVENT_ENTRY_NOTE },
-  { n: '4', title: 'Play on the clock',         body: `Nine holes at ${EVENT.venue}. The cash prize is set by the size of the field and announced before the first tee.` },
+  { n: '4', title: 'Play on the clock',         body: `Nine holes under the lights at ${EVENT.venue}. The cash prize is set by the size of the field and announced before the first tee.` },
 ];
 
 export default function TournamentScreen({ navigation }) {
@@ -44,7 +44,7 @@ export default function TournamentScreen({ navigation }) {
           <View style={s.heroDivider} />
           <Text style={s.heroStatement}>
             {EVENT.dateLabel}, {EVENT.timeLabel}, {EVENT.venue}.{' '}
-            <Text style={s.heroStatementStrong}>Two-player teams, a shot clock on every hole, and a cash prize.</Text>
+            <Text style={s.heroStatementStrong}>Nine holes under the lights. Two-player teams, a shot clock on every hole, and a cash prize.</Text>
           </Text>
 
           <View style={s.factGrid}>
