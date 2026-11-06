@@ -97,14 +97,14 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 ## CLOCK — 5 Nov, lock-screen alarms
 
 - [x] **Alarms at 1:00, 0:30, 0:10 and 0:00** — local notifications scheduled on START HOLE (`CLOCK_ALARMS` in ClockedRoundScreen), swept on HOLED OUT, hole jump, pause, abandon, finish and on cold-start resume (rescheduled from the original start). `chime.wav` for the warnings, `buzzer.wav` for time, both bundled through the expo-notifications plugin; `timeSensitive` interruption level + entitlement so Focus modes let them through. Foreground: no banner over the clock, chimes still sound, buzzer is the in-app one.
-- [x] **Build 61** carries the sounds + entitlement.
+- [ ] **Time-sensitive entitlement** pulled after build 61 failed: the App Store provisioning profile doesn't include the capability. To bring it back: enable "Time Sensitive Notifications" on `com.civiswings.playthru` at developer.apple.com → Identifiers, regenerate the profile (`eas credentials` → iOS → production → provisioning profile), then re-add `com.apple.developer.usernotifications.time-sensitive` to `app.json`. Until then alarms don't break through Focus modes; `interruptionLevel: 'timeSensitive'` in the payload is harmless without it.
 - [ ] **Silent switch** — iOS mutes notification sounds when the ring switch is off; only Critical Alerts (Apple-approved entitlement) override it. Tell players to leave the ringer on, or apply for the entitlement before the event.
 
 ## RELEASES
 
 - **1.7.0 (build 54)** approved and live on the App Store, 4 Nov: Today tab, course records, head-to-head profiles, course crests, arcade qualifying board.
-- **1.8.0 (build 60)** built 5 Nov with the 5 Nov arcade pass (breaking greens, honest under-clock count, no phantom cart push, SEE LEADERBOARD + SHARE). **Build 61** (`fdfd67f2`, started 5 Nov 7:14 PM, auto-submit) adds the Par 3 event sign-up and the lock-screen clock alarms. Build 60 was uploaded by hand at 7 PM (its auto-submit never ran).
-- **1.8.0 (build 59)** submitted for review 4 Nov: buzzer + HEAT, auto-posting arcade runs, champagne gold, white splash, short-game cones, turbo while steering, Ranks as two boards, profile course/arcade split, course ranking removed, play sessions. Builds 55–58 never reached review (55 and 56 cancelled pre-upload, 57 rejected because the 1.7.0 train had closed, 58 skipped for a Ranks crash found while taking screenshots). Screenshots in `~/Desktop/clocked golf screenshot 2.0`.
+- **1.8.0 (build 60)** built 5 Nov with the 5 Nov arcade pass (breaking greens, honest under-clock count, no phantom cart push, SEE LEADERBOARD + SHARE). **Build 61** (`fdfd67f2`, 1.8.0) errored on EAS. **Build 62 (1.9.0)** carries the arcade pass + Par 3 event sign-up + lock-screen clock alarms + "under the lights". Build 60 was uploaded by hand at 7 PM (its auto-submit never ran).
+- **1.8.0 (build 59)** APPROVED 5 Nov (confirmed by Apple rejecting build 60: "previously approved version [1.8.0]"); train closed, so 60 and 61 were both rejected/doomed. Version bumped to 1.9.0 for build 62. Contents: buzzer + HEAT, auto-posting arcade runs, champagne gold, white splash, short-game cones, turbo while steering, Ranks as two boards, profile course/arcade split, course ranking removed, play sessions. Builds 55–58 never reached review (55 and 56 cancelled pre-upload, 57 rejected because the 1.7.0 train had closed, 58 skipped for a Ranks crash found while taking screenshots). Screenshots in `~/Desktop/clocked golf screenshot 2.0`.
 
 ## OPEN RISKS
 
