@@ -103,7 +103,7 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 ## RELEASES
 
 - **1.7.0 (build 54)** approved and live on the App Store, 4 Nov: Today tab, course records, head-to-head profiles, course crests, arcade qualifying board.
-- **1.8.0 (build 60)** built 5 Nov with the 5 Nov arcade pass (breaking greens, honest under-clock count, no phantom cart push, SEE LEADERBOARD + SHARE). **Build 61** (`fdfd67f2`, 1.8.0) errored on EAS. **Build 62 (1.9.0)** carries the arcade pass + Par 3 event sign-up + lock-screen clock alarms + "under the lights". Build 60 was uploaded by hand at 7 PM (its auto-submit never ran).
+- **1.8.0 (build 60)** built 5 Nov with the 5 Nov arcade pass (breaking greens, honest under-clock count, no phantom cart push, SEE LEADERBOARD + SHARE). **Build 61** (`fdfd67f2`, 1.8.0) errored on EAS. **Build 62 (1.9.0, `b43fc474`, started 5 Nov 7:24 PM, auto-submit)** carries the arcade pass + Par 3 event sign-up + lock-screen clock alarms + "under the lights". Build 60 was uploaded by hand at 7 PM (its auto-submit never ran).
 - **1.8.0 (build 59)** APPROVED 5 Nov (confirmed by Apple rejecting build 60: "previously approved version [1.8.0]"); train closed, so 60 and 61 were both rejected/doomed. Version bumped to 1.9.0 for build 62. Contents: buzzer + HEAT, auto-posting arcade runs, champagne gold, white splash, short-game cones, turbo while steering, Ranks as two boards, profile course/arcade split, course ranking removed, play sessions. Builds 55–58 never reached review (55 and 56 cancelled pre-upload, 57 rejected because the 1.7.0 train had closed, 58 skipped for a Ranks crash found while taking screenshots). Screenshots in `~/Desktop/clocked golf screenshot 2.0`.
 
 ## OPEN RISKS
