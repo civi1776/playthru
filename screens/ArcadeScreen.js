@@ -230,6 +230,8 @@ function Game({ seed, difficulty, avatar, onDone, onQuit, challengeId = null }) 
   }, []);
   useEffect(() => {
     let gone = false;
+    // A re-run of this effect (dev refresh) opens a new session; it must be closable too.
+    endedRef.current = false;
     (async () => {
       await closeOrphanArcadeSessions();
       const id = await startPlaySession({ kind: 'arcade', difficulty, holesPlanned: 9, seed: String(seed), challengeId });
