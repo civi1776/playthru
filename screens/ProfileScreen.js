@@ -16,6 +16,7 @@ import InitialsAvatar from '../components/InitialsAvatar';
 import VerificationBadge from '../components/VerificationBadge';
 import RecentRoundsList from '../components/RecentRoundsList';
 import { computeFullRating, extractPlayerRoundStats, fetchClockedRatingForUser, computeNationalRank, DEFAULT_SCORING_BAND } from '../lib/clockedRating';
+import { isRankedClockedRound, MIN_RANKED_MINUTES_NINE } from '../lib/rankingFilters';
 import { totalPointsFromHoleScores } from '../lib/clockedSport';
 import { scoreTier, COLOR, SCORE_TIERS, RADIUS } from '../lib/theme';
 import ScreenHeader from '../components/ScreenHeader';
@@ -266,6 +267,10 @@ function RoundsTab({ navigation, rounds = [], loading }) {
                   <View style={s.underReviewBadge}>
                     <Text style={s.underReviewText}>Under Review</Text>
                   </View>
+                ) : r.round_format === 'clocked' && !isRankedClockedRound(r) ? (
+                  <View style={s.practiceBadge}>
+                    <Text style={s.practiceText}>PRACTICE</Text>
+                  </View>
                 ) : (
                   <Text style={[s.roundPop, { color: ptsColor(pts) }]}>
                     {pts != null ? (pts > 0 ? `+${pts}` : pts) : '—'}
@@ -347,10 +352,12 @@ function FriendsTab({ navigation }) {
       // confirmed participations, instead of the retired pop_score column.
       const friendIds = followedProfiles.map(p => p.id);
       if (friendIds.length) {
-        const { data: ownRounds } = await supabase
-          .from('rounds').select('id, user_id, hole_scores')
-          .eq('round_format', 'clocked').not('hole_scores', 'is', null)
+        const { data: clockedRows } = await supabase
+          .from('rounds').select('id, user_id, hole_scores, holes, duration_minutes')
+          .eq('round_format', 'clocked').eq('flagged', false).not('hole_scores', 'is', null)
           .in('user_id', friendIds);
+        // Practice-length rounds do not count, same as on the Rankings board.
+        const ownRounds = (clockedRows ?? []).filter(isRankedClockedRound);
         const byUser = {};
         (ownRounds ?? []).forEach(r => { (byUser[r.user_id] ??= []).push(r); });
         const roundIds = (ownRounds ?? []).map(r => r.id);
@@ -568,8 +575,9 @@ export default function ProfileScreen({ navigation }) {
 
   const handleSettings = () => navigation.navigate('Settings');
 
+  // Practice-length rounds are history, not a best: same floor as the boards.
   const bestRound = rounds
-    .filter(r => r.round_format === 'clocked' && r.hole_scores?.length)
+    .filter(r => r.round_format === 'clocked' && r.hole_scores?.length && isRankedClockedRound(r))
     .map(r => ({ ...r, team_score: totalPointsFromHoleScores(r.hole_scores) }))
     .sort((a, b) => (b.team_score ?? 0) - (a.team_score ?? 0))[0];
 
@@ -637,6 +645,11 @@ export default function ProfileScreen({ navigation }) {
                 <Text style={s.heroLabel}>CLOCKED SCORE</Text>
                 <Text style={s.firstRoundTitle}>Your score starts with your first round.</Text>
                 <Text style={s.firstRoundSub}>One number, 0 to 100. Part how you score, part how you handle the clock.</Text>
+                {(clockedRating.practiceRounds ?? 0) > 0 && (
+                  <Text style={[s.firstRoundSub, { marginTop: 8 }]}>
+                    {clockedRating.practiceRounds} practice round{clockedRating.practiceRounds !== 1 ? 's' : ''} on file. A nine under {MIN_RANKED_MINUTES_NINE} minutes does not count toward the score.
+                  </Text>
+                )}
                 <Button label="START A ROUND" icon="timer-outline" onPress={() => navigation.navigate('ClockedSetup')} style={{ marginTop: 16 }} />
               </View>
             );
@@ -742,10 +755,18 @@ export default function ProfileScreen({ navigation }) {
               <Text style={s.statChipLabel}>COURSES</Text>
               <Text style={s.statChipNum}>{stats.uniqueCourses ?? 0}</Text>
             </View>
-            <View style={[s.statChip, nationalRank && s.statChipGold]}>
-              <Text style={s.statChipLabel}>RANK</Text>
+            {/* The same number as YOUR CLOCKED RANK on the Rankings screen:
+                both read lib/clockedRating's board. Tap to open it. */}
+            <TouchableOpacity
+              style={[s.statChip, nationalRank && s.statChipGold]}
+              onPress={() => navigation.navigate('Ranks', { board: 'CLOCKED', ts: Date.now() })}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={nationalRank ? `Clocked rank ${nationalRank}. Open rankings.` : 'Not ranked yet. Open rankings.'}
+            >
+              <Text style={s.statChipLabel} numberOfLines={1}>CLK RANK</Text>
               <Text style={s.statChipNum}>{nationalRank ? `#${nationalRank}` : '\u2014'}</Text>
-            </View>
+            </TouchableOpacity>
             <View style={s.statChip}>
               <Text style={s.statChipLabel}>FOLLOWING</Text>
               <Text style={s.statChipNum}>{followingCount}</Text>
@@ -787,10 +808,10 @@ export default function ProfileScreen({ navigation }) {
         {!loading && bestRound && (
           <View style={s.bestRound}>
             <View>
-              <Text style={s.bestRoundLabel}>BEST ROUND \u00B7 ON THE COURSE</Text>
+              <Text style={s.bestRoundLabel}>BEST ROUND · ON THE COURSE</Text>
               <Text style={s.bestRoundCourse}>
                 {bestRound.course_name ?? 'Quick Play'}
-                <Text style={s.bestRoundMeta}>{' \u00B7 '}{bestRound.holes}h</Text>
+                <Text style={s.bestRoundMeta}>{bestRound.holes ? ` · ${bestRound.holes} holes` : ''}</Text>
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -964,6 +985,8 @@ statSection:         { paddingHorizontal: 16, marginBottom: 16 },
   // Handicap card
   underReviewBadge: { backgroundColor: 'rgba(192,122,106,0.15)', borderWidth: 1, borderColor: 'rgba(192,122,106,0.4)', borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 3 },
   underReviewText:  { fontSize: 9, fontWeight: '700', color: '#C07A6A', letterSpacing: 0.5 },
+  practiceBadge:    { borderWidth: 1, borderColor: COLOR.border, borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 3 },
+  practiceText:     { fontSize: 9, fontWeight: '700', color: COLOR.muted, letterSpacing: 0.5 },
   reviewBanner:     { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(192,122,106,0.1)', borderBottomWidth: 1, borderBottomColor: 'rgba(192,122,106,0.25)', paddingHorizontal: 16, paddingVertical: 10 },
   reviewBannerText: { fontSize: 11, color: '#C07A6A', flex: 1, fontWeight: '500' },
   referralCard:         { marginHorizontal: 16, marginBottom: 24, backgroundColor: COLOR.surface, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: 'rgba(232,204,110,0.25)', padding: 20, gap: 10 },

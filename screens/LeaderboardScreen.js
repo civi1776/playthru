@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,8 @@ import SkeletonLoader from '../components/SkeletonLoader';
 import InitialsAvatar from '../components/InitialsAvatar';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { computeFullRating, extractPlayerRoundStats, DEFAULT_PROVISIONAL_ROUNDS } from '../lib/clockedRating';
+import { fetchClockedBoard, invalidateClockedBoard, DEFAULT_PROVISIONAL_ROUNDS } from '../lib/clockedRating';
+import { fetchTestUserIds, MIN_RANKED_MINUTES_NINE } from '../lib/rankingFilters';
 import { COLOR, SPACING, RADIUS } from '../lib/theme';
 import ScreenHeader from '../components/ScreenHeader';
 import ArcadeBoardRow from '../components/arcade/ArcadeBoardRow';
@@ -88,39 +89,43 @@ function TopThree({ entries, navigation }) {
 }
 
 // ─── Clocked Row ────────────────────────────────────────────────────────────
+// Three fixed columns (rank, avatar, score) and one that flexes. The name and
+// its PROVISIONAL badge share a line and the name gives way first, so a long
+// name can never push the score out of its column.
 function ClockedRow({ entry, navigation }) {
   const isYou = entry.isYou;
   const tappable = entry.userId && !isYou;
   const Wrapper = tappable ? TouchableOpacity : View;
+  const rounds = entry.roundsUsed != null ? `${entry.roundsUsed} round${entry.roundsUsed === 1 ? '' : 's'}` : null;
+  const sub = entry.isLegacy
+    ? ['Before the clock', rounds]
+    : [
+        `Scoring ${entry.scoring != null ? Math.round(entry.scoring) : '—'}`,
+        `Clock ${entry.clock != null ? Math.round(entry.clock) : '—'}`,
+        rounds,
+      ];
   return (
     <Wrapper
       style={[s.row, isYou && s.rowYou]}
       onPress={tappable ? () => navigation?.navigate('PublicProfile', { userId: entry.userId }) : undefined}
       activeOpacity={0.8}
     >
-      <Text style={s.rowRank}>#{entry.rank}</Text>
+      <Text style={s.rowRank}>{entry.rank != null ? `#${entry.rank}` : '—'}</Text>
       <View style={[s.rowAvatar, isYou && { borderColor: COLOR.gold }]}>
         <InitialsAvatar name={entry.name} size={34} avatarUrl={entry.avatarUrl} />
       </View>
       <View style={s.rowInfo}>
-        <Text style={[s.rowName, isYou && { color: COLOR.gold }]} numberOfLines={1}>{entry.name}</Text>
-        <View style={s.rowSubStats}>
-          {entry.isLegacy ? (
-            <Text style={s.rowSubStat}>Legacy{entry.roundsUsed != null ? ` · ${entry.roundsUsed} round${entry.roundsUsed === 1 ? '' : 's'}` : ''}</Text>
-          ) : (
-            <>
-              <Text style={s.rowSubStat}>Scoring {entry.scoring != null ? Math.round(entry.scoring) : '\u2014'}</Text>
-              <Text style={s.rowSubDot}>{'\u00B7'}</Text>
-              <Text style={s.rowSubStat}>Clock {entry.clock != null ? Math.round(entry.clock) : '\u2014'}</Text>
-              {entry.roundsUsed != null && <Text style={s.rowRoundsLabel}>{'\u00B7'} {entry.roundsUsed} round{entry.roundsUsed === 1 ? '' : 's'}</Text>}
-              {entry.isProvisional && <Text style={s.rowProvBadge}>{'\u00B7'} PROVISIONAL</Text>}
-            </>
+        <View style={s.rowNameLine}>
+          <Text style={[s.rowName, isYou && { color: COLOR.gold }]} numberOfLines={1}>{entry.name}</Text>
+          {entry.isProvisional && (
+            <View style={s.provBadge}><Text style={s.provBadgeText}>PROVISIONAL</Text></View>
           )}
         </View>
+        <Text style={s.rowSubStat} numberOfLines={1}>{sub.filter(Boolean).join(' · ')}</Text>
       </View>
       <View style={s.rowRight}>
-        <Text style={[s.rowScore, { color: clockedColor(entry.sortVal) }]}>
-          {entry.sortVal != null ? Math.round(entry.sortVal) : '\u2014'}
+        <Text style={[s.rowScore, { color: entry.isLegacy ? COLOR.muted : clockedColor(entry.sortVal) }]}>
+          {entry.sortVal != null ? Math.round(entry.sortVal) : '—'}
         </Text>
         <Text style={s.rowScoreLabel}>{entry.sortLabel}</Text>
       </View>
@@ -144,211 +149,156 @@ const ARCADE_DIFFS = {
   all:   [['all', 'ALL'], ['beginner', 'BEGINNER'], ['intermediate', 'INTER'], ['pro', 'PRO']],
 };
 
+// ─── Board loaders ───────────────────────────────────────────────────────────
+// Each returns a finished board for one viewer and touches no component
+// state, so a slow response can only ever be stored under its own key.
+async function loadClockedBoard(viewer) {
+  const { ranked, legacy, testIds } = await fetchClockedBoard(supabase);
+  const toRow = e => ({
+    rank: e.rank ?? null, userId: e.userId, name: e.name, handle: e.handle,
+    sortVal: e.rating.clockedScore, sortLabel: e.isLegacy ? 'LEGACY' : 'CLK',
+    scoring: e.rating.scoring, clock: e.rating.clock,
+    roundsUsed: e.rating.roundsUsed, isProvisional: !!e.rating.isProvisional, isLegacy: !!e.isLegacy,
+    avatarUrl: e.avatarUrl, isYou: !!viewer && e.userId === viewer,
+  });
+  const mine = viewer ? ranked.find(e => e.userId === viewer) : null;
+  const viewerIsTest = !!viewer && testIds.has(viewer);
+  let myProjected = null;
+  if (viewer && !viewerIsTest) {
+    if (mine?.rating.isProvisional) myProjected = { roundsNeeded: mine.rating.roundsNeeded ?? 0, hasRounds: true };
+    else if (!mine) myProjected = { roundsNeeded: DEFAULT_PROVISIONAL_ROUNDS, hasRounds: false };
+  }
+  return {
+    rows: ranked.slice(0, 50).map(toRow),
+    legacyRows: legacy.slice(0, 50).map(toRow),
+    myRank: mine?.rank ?? null,
+    myProjected,
+    viewerIsTest,
+  };
+}
+
+async function loadArcadeBoard(viewer, period, difficulty) {
+  const [rows, testIds] = await Promise.all([
+    fetchArcadeBoard({ period, difficulty, limit: 50 }),
+    fetchTestUserIds(supabase),
+  ]);
+  return {
+    rows: rows.map(r => ({ ...r, isYou: !!viewer && r.user_id === viewer })),
+    legacyRows: [],
+    myRank: (viewer && rows.find(r => r.user_id === viewer)?.rank) ?? null,
+    myProjected: null,
+    viewerIsTest: !!viewer && testIds.has(viewer),
+  };
+}
+
+const boardKey = (who, filter, period, diff) =>
+  filter === 'ARCADE' ? `${who}|ARCADE|${period}|${diff}` : `${who}|CLOCKED`;
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function LeaderboardScreen({ navigation, route }) {
   // Rendered inside the tab navigator (as "Ranks") or pushed on the root
   // stack (as "Leaderboard"). The tab instance's immediate navigator is the
   // tab navigator; the pushed instance's is the stack.
   const isTab = navigation.getState()?.type === 'tab';
-  const { session, profile } = useAuth();
+  const { session } = useAuth();
   const uid = session?.user?.id ?? null;
+  const who = uid ?? 'anon';
 
-  const requested = route?.params?.board === 'ARCADE' ? 'ARCADE' : null;
-  const [filter, setFilter]     = useState(requested ?? 'CLOCKED');
-  // The tab stays mounted, so a later navigate with params must switch it too.
-  useEffect(() => {
-    if (requested && requested !== filter) { setData([]); setMyRank(null); setMyProjected(null); setFilter(requested); }
-  }, [route?.params?.board, route?.params?.ts]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(false);
-  const [data, setData]         = useState([]);
-  const [myProjected, setMyProjected] = useState(null);
-  const [myRank, setMyRank]     = useState(null);
-
-
-  // The Clocked board is one board. Rounds at every difficulty feed one
-  // score, so there is nothing to slice; the constant keeps the legacy-round
-  // merge below on its ALL path.
-  const difficulty = 'ALL';
+  const requested = route?.params?.board === 'ARCADE' ? 'ARCADE' : route?.params?.board === 'CLOCKED' ? 'CLOCKED' : null;
+  const [filter, setFilter] = useState(requested ?? 'CLOCKED');
 
   // Arcade board slices.
+  const requestedDiff = route?.params?.difficulty === 'beginner' ? 'beginner' : 'qualifying';
   const [arcadePeriod, setArcadePeriod] = useState('month');
-  const [arcadeDiff, setArcadeDiff] = useState('qualifying');
+  const [arcadeDiff, setArcadeDiff] = useState(requested === 'ARCADE' ? requestedDiff : 'qualifying');
 
-  const filterRef = useRef(filter);
-  filterRef.current = filter;
-  // Last rendered rows: a refetch on focus only shows the skeleton when there
-  // is nothing on screen yet, so tab switches stop flashing.
-  const dataRef = useRef([]);
-  dataRef.current = data;
+  // The tab stays mounted, so a later navigate with params must switch it too.
+  // A run just posted lands on this month's board for its own level.
+  useEffect(() => {
+    if (!requested) return;
+    setFilter(requested);
+    if (requested === 'ARCADE') { setArcadePeriod('month'); setArcadeDiff(requestedDiff); }
+  }, [route?.params?.board, route?.params?.difficulty, route?.params?.ts]);
 
-  // ── Fetch player board (OVERALL) ──
-  const fetchPlayerBoard = useCallback(async () => {
-    setLoading(prev => prev && dataRef.current.length === 0 ? true : dataRef.current.length === 0);
-    setError(false);
-    try {
-      const { data: allClockedRounds, error: err } = await supabase
-        .from('rounds')
-        .select('id, user_id, hole_scores, course_name, difficulty')
-        .eq('round_format', 'clocked')
-        .eq('flagged', false)
-        .not('hole_scores', 'is', null);
-      if (err) throw err;
+  // ── Boards, cached per slice ──
+  // Every slice the player has opened stays in memory under its own key. A
+  // tap shows the cached rows at once and refreshes them underneath; the
+  // skeleton only appears for a slice that has never loaded, and the empty
+  // state only once a request for that slice has come back with no rows.
+  const key = boardKey(who, filter, arcadePeriod, arcadeDiff);
+  const [boards, setBoards] = useState({});
+  const [failed, setFailed] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
+  const boardsRef = useRef(boards);
+  boardsRef.current = boards;
+  const keyRef = useRef(key);
+  keyRef.current = key;
+  const inflight = useRef({});
 
-      // Format filter: when a difficulty segment is selected, only rounds
-      // actually logged at that difficulty count toward the score — this is
-      // "how well they play THIS format," not a re-sort of the same board.
-      const clockedRounds = difficulty === 'ALL'
-        ? (allClockedRounds ?? [])
-        : (allClockedRounds ?? []).filter(r => (r.difficulty ?? 'intermediate') === difficulty.toLowerCase());
-
-
-      const byUser = {};
-      const roundMap = {};
-      for (const r of clockedRounds) {
-        if (!byUser[r.user_id]) byUser[r.user_id] = [];
-        byUser[r.user_id].push(r);
-        roundMap[r.id ?? ''] = r;
+  const load = useCallback((k) => {
+    if (inflight.current[k]) return inflight.current[k];
+    const [viewerPart, kind, period, diff] = k.split('|');
+    const viewer = viewerPart === 'anon' ? null : viewerPart;
+    const p = (async () => {
+      try {
+        const result = kind === 'ARCADE'
+          ? await loadArcadeBoard(viewer, period, diff)
+          : await loadClockedBoard(viewer);
+        setBoards(b => ({ ...b, [k]: result }));
+        setFailed(f => (f[k] ? { ...f, [k]: false } : f));
+      } catch {
+        setFailed(f => ({ ...f, [k]: true }));
+      } finally {
+        delete inflight.current[k];
       }
+    })();
+    inflight.current[k] = p;
+    return p;
+  }, []);
 
-      const roundIds = clockedRounds.map(r => r.id).filter(Boolean);
-      let participations = [];
-      if (roundIds.length) {
-        const { data: parts } = await supabase
-          .from('round_participants')
-          .select('round_id, user_id, player_key, hole_scores, total_points')
-          .eq('status', 'confirmed')
-          .in('round_id', roundIds);
-        participations = parts ?? [];
-      }
+  // Load the slice on screen whenever it changes, and refresh whichever slice
+  // is on screen when the tab regains focus. The focus callback reads the key
+  // from a ref: a closure over the first render would refetch the wrong board.
+  useEffect(() => { load(key); }, [key, load]);
+  useFocusEffect(useCallback(() => { load(keyRef.current); }, [load]));
 
-      for (const p of participations) {
-        if (!byUser[p.user_id]) byUser[p.user_id] = [];
-        const already = byUser[p.user_id].some(r => (r.id ?? r.round_id) === p.round_id);
-        if (!already && roundMap[p.round_id]) {
-          byUser[p.user_id].push({ ...roundMap[p.round_id], _playerKey: p.player_key });
-        }
-      }
+  // Warm the other board and, on Arcade, the sibling levels.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const want = [boardKey(who, 'CLOCKED'), boardKey(who, 'ARCADE', 'month', 'qualifying')];
+      if (filter === 'ARCADE') ARCADE_DIFFS[arcadePeriod].forEach(([d]) => want.push(boardKey(who, 'ARCADE', arcadePeriod, d)));
+      want.forEach(k => { if (!boardsRef.current[k]) load(k); });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [who, filter, arcadePeriod, load]);
 
-      // Legacy (pre-clock) rounds. Until Clocked rounds outnumber them, players
-      // with only legacy rounds are ranked on their stored score (0..5 → 0..100)
-      // and tagged LEGACY, so the board shows the community that actually
-      // exists instead of a single name. Only on the ALL segment: legacy rounds
-      // have no difficulty.
-      const legacyByUser = {};
-      if (difficulty === 'ALL') {
-        const { data: legacyRounds } = await supabase
-          .from('rounds')
-          .select('user_id, pop_score')
-          .eq('round_format', 'pace')
-          .eq('flagged', false)
-          .not('pop_score', 'is', null);
-        for (const r of legacyRounds ?? []) {
-          if (byUser[r.user_id]) continue;             // has Clocked rounds: those rule
-          (legacyByUser[r.user_id] ??= []).push(Number(r.pop_score));
-        }
-      }
-
-      const userIds = [...new Set([...Object.keys(byUser), ...Object.keys(legacyByUser)])];
-      if (!userIds.length) { setData([]); setMyRank(null); setMyProjected({ roundsNeeded: computeFullRating({ roundStats: [] }).roundsNeeded, hasRounds: false }); setLoading(false); return; }
-      const { data: profiles } = await supabase
-        .from('profiles').select('id, full_name, username, handicap_index, avatar_url').in('id', userIds);
-      const profileMap = {};
-      (profiles ?? []).forEach(p => { profileMap[p.id] = p; });
-
-      const allEntries = userIds.map(userId => {
-        const prof = profileMap[userId];
-        const playerName = prof?.full_name || prof?.username || 'Player';
-        if (!byUser[userId]) {
-          const scores = legacyByUser[userId];
-          const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-          const rating = { clockedScore: Math.round(avg * 20), scoring: null, clock: null, roundsUsed: scores.length, isProvisional: false, roundsNeeded: 0 };
-          return { userId, name: playerName, handle: prof?.username ? `@${prof.username}` : '', avatarUrl: prof?.avatar_url, rating, isYou: userId === uid, isLegacy: true };
-        }
-        const rounds = byUser[userId];
-        const roundStats = rounds.map(r => {
-          const key = r._playerKey ?? playerName;
-          return extractPlayerRoundStats(r.hole_scores, key);
-        }).filter(Boolean);
-        const rating = computeFullRating({ roundStats, handicapIndex: prof?.handicap_index });
-        return { userId, name: playerName, handle: prof?.username ? `@${prof.username}` : '', avatarUrl: prof?.avatar_url, rating, isYou: userId === uid };
-      }).filter(e => e.rating.clockedScore != null && e.rating.clockedScore > 0);
-
-      // Only players with at least one clocked round are listed — on every
-      // board, including OVERALL. Zero-round profiles used to be merged in
-      // with the cold-start baseline score, which let people who had never
-      // played tie at ~65 and take podium spots. A player who hasn't clocked
-      // a round has no standing yet; they get the projected/provisional
-      // treatment below instead of a rank.
-      const combined = allEntries;
-
-      const getSortVal = (e) => e.rating.clockedScore ?? 0;
-
-      // Everyone with a score appears in the public list — provisional players
-      // (fewer than 5 clocked rounds) get a full score per the doctrine and are
-      // shown with a PROV marker, not hidden. Requiring 5+ rounds to even
-      // appear made the board look near-empty while the clocked format is new.
-      combined.sort((a, b) => getSortVal(b) - getSortVal(a));
-
-      const rows = combined.slice(0, 50).map((e, i) => ({
-        rank: i + 1, userId: e.userId, name: e.name, handle: e.handle,
-        sortVal: getSortVal(e), sortLabel: 'CLK',
-        clockedScore: e.rating.clockedScore, scoring: e.rating.scoring, clock: e.rating.clock,
-        roundsUsed: e.rating.roundsUsed, isProvisional: e.rating.isProvisional, isLegacy: !!e.isLegacy,
-        avatarUrl: e.avatarUrl, isYou: e.isYou,
-      }));
-
-      const mine = rows.find(r => r.isYou);
-      setMyRank(mine?.rank ?? null);
-
-      const myEntry = combined.find(e => e.isYou);
-      if (mine?.isProvisional) {
-        setMyProjected({ roundsNeeded: myEntry?.rating.roundsNeeded ?? 0, hasRounds: true });
-      } else if ((!myEntry || myEntry.isLegacy) && uid && difficulty === 'ALL') {
-        // No Clocked rounds yet (legacy only, or none): say what it takes.
-        const { roundsNeeded } = computeFullRating({ roundStats: [] });
-        setMyProjected({ roundsNeeded, hasRounds: false });
-      } else {
-        setMyProjected(null);
-      }
-
-      setData(rows);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [uid, difficulty]);
-
-  // ── Fetch arcade board ──
-  const fetchArcadeBoardData = useCallback(async () => {
-    setLoading(dataRef.current.length === 0);
-    setError(false);
-    setMyProjected(null);
-    try {
-      const rows = await fetchArcadeBoard({ period: arcadePeriod, difficulty: arcadeDiff, limit: 50 });
-      setData(rows.map(r => ({ ...r, isYou: r.user_id === uid })));
-      setMyRank(rows.find(r => r.user_id === uid)?.rank ?? null);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [uid, arcadePeriod, arcadeDiff]);
-
-  // ── Fetch dispatch ──
-  const fetchCurrent = useCallback(() => {
-    if (filter === 'ARCADE') fetchArcadeBoardData();
-    else fetchPlayerBoard();
-  }, [filter, fetchPlayerBoard, fetchArcadeBoardData]);
-
-  useEffect(() => { fetchCurrent(); }, [filter, arcadePeriod, arcadeDiff]);
-  useFocusEffect(useCallback(() => { fetchCurrent(); }, []));
+  const retry = () => { setFailed(f => ({ ...f, [key]: false })); load(key); };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    if (filter !== 'ARCADE') invalidateClockedBoard();
+    await load(key);
+    setRefreshing(false);
+  };
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLOR.gold} />;
 
   useEffect(() => { if (!session) navigation.replace('Welcome'); }, [session]);
 
+  const board = boards[key];
+  const loading = !board && !failed[key];
+  const error = !board && !!failed[key];
+  const data = board?.rows ?? [];
+  const legacyRows = board?.legacyRows ?? [];
+  const myRank = board?.myRank ?? null;
+  const myProjected = board?.myProjected ?? null;
+  const viewerIsTest = !!board?.viewerIsTest;
   const isArcade = filter === 'ARCADE';
-  const isEmpty = !loading && !error && data.length === 0;
+  const isEmpty = !!board && data.length === 0 && legacyRows.length === 0;
+
+  const goPlay = () => {
+    const root = navigation.getParent();
+    if (root) root.navigate('ClockedSetup');
+    else navigation.navigate('ClockedSetup');
+  };
 
   return (
     <SafeAreaView style={s.container}>
@@ -363,7 +313,7 @@ export default function LeaderboardScreen({ navigation, route }) {
       <View style={s.filterRow}>
         {FILTERS.map(f => (
           <TouchableOpacity key={f.key} style={[s.filterBtn, filter === f.key && s.filterBtnActive]}
-            onPress={() => { if (filter !== f.key) { setData([]); setMyRank(null); setMyProjected(null); } setFilter(f.key); }} accessibilityRole="tab" accessibilityState={{ selected: filter === f.key }}>
+            onPress={() => setFilter(f.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === f.key }}>
             <Text style={[s.filterText, filter === f.key && s.filterTextActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
@@ -375,7 +325,8 @@ export default function LeaderboardScreen({ navigation, route }) {
           <View style={s.diffRow}>
             {ARCADE_PERIODS.map(([k, l]) => (
               <TouchableOpacity key={k} style={[s.diffPill, arcadePeriod === k && s.diffPillActive]}
-                onPress={() => { setData([]); setArcadePeriod(k); setArcadeDiff(k === 'month' ? 'qualifying' : 'all'); }} activeOpacity={0.8}>
+                onPress={() => { if (arcadePeriod !== k) { setArcadePeriod(k); setArcadeDiff(k === 'month' ? 'qualifying' : 'all'); } }} activeOpacity={0.8}
+                accessibilityRole="tab" accessibilityState={{ selected: arcadePeriod === k }}>
                 <Text style={[s.diffPillText, arcadePeriod === k && s.diffPillTextActive]}>{l}</Text>
               </TouchableOpacity>
             ))}
@@ -383,7 +334,8 @@ export default function LeaderboardScreen({ navigation, route }) {
           <View style={s.diffRow}>
             {ARCADE_DIFFS[arcadePeriod].map(([k, l]) => (
               <TouchableOpacity key={k} style={[s.diffPill, arcadeDiff === k && s.diffPillActive]}
-                onPress={() => { setData([]); setArcadeDiff(k); }} activeOpacity={0.8}>
+                onPress={() => setArcadeDiff(k)} activeOpacity={0.8}
+                accessibilityRole="tab" accessibilityState={{ selected: arcadeDiff === k }}>
                 <Text style={[s.diffPillText, arcadeDiff === k && s.diffPillTextActive]}>{l}</Text>
               </TouchableOpacity>
             ))}
@@ -398,7 +350,7 @@ export default function LeaderboardScreen({ navigation, route }) {
         <View style={s.emptyState}>
           <Ionicons name="cloud-offline-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 14 }} />
           <Text style={s.emptyText}>Could not load rankings.</Text>
-          <TouchableOpacity style={s.ctaBtn} onPress={fetchCurrent} activeOpacity={0.8}>
+          <TouchableOpacity style={s.ctaBtn} onPress={retry} activeOpacity={0.8}>
             <Text style={s.ctaBtnText}>RETRY</Text>
           </TouchableOpacity>
         </View>
@@ -420,25 +372,22 @@ export default function LeaderboardScreen({ navigation, route }) {
         <View style={s.emptyState}>
           <Ionicons name="trophy-outline" size={56} color="rgba(232,204,110,0.2)" style={{ marginBottom: 18 }} />
           <Text style={s.emptyTitle}>Be the first.</Text>
-          <Text style={s.emptyText}>No one's ranked here yet. Play a round and claim the top spot.</Text>
-          <TouchableOpacity style={s.ctaBtn} onPress={() => {
-            const root = navigation.getParent();
-            if (root) root.navigate('ClockedSetup');
-            else navigation.navigate('ClockedSetup');
-          }} activeOpacity={0.85}>
+          <Text style={s.emptyText}>No one is ranked here yet. Play nine on the clock and claim the top spot.</Text>
+          <TouchableOpacity style={s.ctaBtn} onPress={goPlay} activeOpacity={0.85}>
             <Ionicons name="timer-outline" size={16} color={COLOR.bg} style={{ marginRight: 6 }} />
             <Text style={s.ctaBtnText}>PLAY</Text>
           </TouchableOpacity>
         </View>
       ) : isArcade ? (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} refreshControl={refreshControl}>
           <Text style={s.courseListHeader}>
-            {arcadePeriod === 'month' ? `${seasonLabel(currentSeason())} \u00B7 best nine per player` : 'All time \u00B7 best nine per player'}
-            {arcadeDiff === 'qualifying' ? ` \u00B7 intermediate and pro \u00B7 ${daysLeftInSeason()} days left` : ''}
+            {arcadePeriod === 'month' ? `${seasonLabel(currentSeason())} · best nine per player` : 'All time · best nine per player'}
+            {arcadeDiff === 'qualifying' ? ` · intermediate and pro · ${daysLeftInSeason()} days left` : ''}
           </Text>
           {arcadePeriod === 'month' && arcadeDiff === 'qualifying' && (
             <Text style={s.glossaryWide}>Top {QUALIFY_TOP} at month end earn a spot in the first Clocked event's qualifier.</Text>
           )}
+          {viewerIsTest && <Text style={s.glossaryWide}>This is a test account. Its runs are saved but not ranked.</Text>}
           {myRank != null && (
             <View style={s.yourRankCard}>
               <Text style={s.yourRankLabel}>{arcadeDiff === 'qualifying' ? 'YOUR QUALIFYING RANK' : 'YOUR RANK ON THIS BOARD'}</Text>
@@ -461,7 +410,8 @@ export default function LeaderboardScreen({ navigation, route }) {
           </View>
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} refreshControl={refreshControl}>
+          {/* The podium is for scores with a clock behind them. */}
           {data.length >= 2 && <TopThree entries={data.slice(0, 3)} navigation={navigation} />}
 
           {myRank != null && (
@@ -477,18 +427,41 @@ export default function LeaderboardScreen({ navigation, route }) {
               <Text style={s.provCardHint}>
                 {myProjected.hasRounds
                   ? `Play ${myProjected.roundsNeeded} more Clocked round${myProjected.roundsNeeded !== 1 ? 's' : ''} to make it official`
-                  : `Play ${myProjected.roundsNeeded} Clocked rounds to get ranked`}
+                  : `Play nine on the clock to get on the board. ${myProjected.roundsNeeded} rounds make it official.`}
               </Text>
             </View>
           )}
+          {viewerIsTest && <Text style={s.glossaryWide}>This is a test account. Its rounds are saved but not ranked.</Text>}
 
           <View style={s.listSection}>
             <Text style={s.sectionLabel}>CLOCKED SCORE RANKINGS</Text>
-            <Text style={s.glossary}>Real rounds on the clock. CLK is the Clocked Score, 0 to 100. Legacy rows are pre-clock rounds.</Text>
+            <Text style={s.glossary}>
+              Real rounds on the clock. CLK is the Clocked Score, 0 to 100. A nine under {MIN_RANKED_MINUTES_NINE} minutes counts as practice.
+            </Text>
             {data.map((entry, i) => (
               <ClockedRow key={entry.userId ?? i} entry={entry} navigation={navigation} />
             ))}
+            {data.length === 0 && (
+              <View style={s.openCard}>
+                <Text style={s.openTitle}>No ranked rounds yet.</Text>
+                <Text style={s.openText}>The first counted nine takes #1.</Text>
+                <TouchableOpacity style={[s.ctaBtn, { marginTop: SPACING.md }]} onPress={goPlay} activeOpacity={0.85}>
+                  <Ionicons name="timer-outline" size={16} color={COLOR.bg} style={{ marginRight: 6 }} />
+                  <Text style={s.ctaBtnText}>PLAY</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
+
+          {legacyRows.length > 0 && (
+            <View style={[s.listSection, { marginTop: SPACING.md }]}>
+              <Text style={s.sectionLabelMuted}>LEGACY</Text>
+              <Text style={s.glossary}>Rounds logged before the clock. Kept for the record and not ranked against Clocked Scores.</Text>
+              {legacyRows.map((entry, i) => (
+                <ClockedRow key={entry.userId ?? i} entry={entry} navigation={navigation} />
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -533,18 +506,17 @@ const s = StyleSheet.create({
   // Player rows
   row:          { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, padding: SPACING.md, marginBottom: SPACING.sm, gap: 10 },
   rowYou:       { borderColor: '#E8CC6E44', backgroundColor: '#E8CC6E0A' },
-  rowRank:      { fontSize: 12, fontWeight: '700', color: COLOR.muted, width: 28 },
+  rowRank:      { fontSize: 12, fontWeight: '700', color: COLOR.muted, width: 30, fontVariant: ['tabular-nums'] },
   rowAvatar:    { width: 36, height: 36, borderRadius: RADIUS.lg, backgroundColor: '#7DC87A11', borderWidth: 1, borderColor: '#7DC87A33', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  rowInfo:      { flex: 1 },
-  rowName:      { fontSize: 14, fontWeight: '500', color: COLOR.cream },
-  rowRight:     { alignItems: 'flex-end', minWidth: 40 },
+  rowInfo:      { flex: 1, minWidth: 0 },
+  rowNameLine:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rowName:      { flexShrink: 1, fontSize: 14, fontWeight: '500', color: COLOR.cream },
+  provBadge:    { flexShrink: 0, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: COLOR.borderGold, backgroundColor: '#E8CC6E12' },
+  provBadgeText:{ fontSize: 7, fontWeight: '800', color: COLOR.gold, letterSpacing: 0.8 },
+  rowRight:     { width: 46, alignItems: 'flex-end' },
   rowScore:     { fontSize: 22, fontWeight: '300', fontVariant: ['tabular-nums'] },
   rowScoreLabel:{ fontSize: 7, fontWeight: '700', color: COLOR.dim, letterSpacing: 1, marginTop: 1 },
-  rowSubStats:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  rowSubStat:   { fontSize: 10, fontWeight: '600', color: COLOR.dim },
-  rowSubDot:    { fontSize: 10, color: COLOR.dim },
-  rowRoundsLabel:{ fontSize: 9, color: '#7A6E5866' },
-  rowProvBadge: { fontSize: 9, fontWeight: '700', color: '#E8CC6E88' },
+  rowSubStat:   { fontSize: 10, fontWeight: '600', color: COLOR.muted, marginTop: 3 },
 
   // Course + tournament rows
   courseRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, padding: SPACING.md, marginBottom: SPACING.sm },
@@ -571,6 +543,10 @@ const s = StyleSheet.create({
   // List section
   listSection:   { paddingHorizontal: SPACING.lg, paddingTop: SPACING.sm },
   sectionLabel:  { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 2, marginBottom: 10 },
+  sectionLabelMuted: { fontSize: 9, fontWeight: '700', color: COLOR.muted, letterSpacing: 2, marginBottom: 10 },
+  openCard:      { alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.border, paddingVertical: SPACING.xl, paddingHorizontal: SPACING.lg, marginBottom: SPACING.sm },
+  openTitle:     { fontSize: 16, fontWeight: '600', color: COLOR.cream, marginBottom: 4 },
+  openText:      { fontSize: 13, color: COLOR.dim, textAlign: 'center' },
 
   // Empty state
   emptyState:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 40 },

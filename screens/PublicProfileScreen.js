@@ -296,7 +296,7 @@ export default function PublicProfileScreen({ navigation, route }) {
             </View>
             <View style={s.credDiv} />
             <View style={s.cred}>
-              <Text style={s.credLabel}>NATIONAL RANK</Text>
+              <Text style={s.credLabel}>CLOCKED RANK</Text>
               <Text style={[s.credValue, rank && { color: COLOR.gold }]}>{rank ? `#${rank}` : '—'}</Text>
             </View>
             <View style={s.credDiv} />

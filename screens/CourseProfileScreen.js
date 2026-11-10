@@ -51,6 +51,7 @@ import CourseAvatar from '../components/CourseAvatar';
 import InitialsAvatar from '../components/InitialsAvatar';
 import ScreenHeader from '../components/ScreenHeader';
 import { COLOR, RADIUS } from '../lib/theme';
+import { coursePar } from '../lib/courses';
 
 function CourseProfileSkeleton() {
   return (
@@ -90,8 +91,10 @@ function CourseProfileSkeleton() {
 
 function formatDuration(minutes) {
   if (!minutes && minutes !== 0) return '—';
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+  const total = Math.round(Number(minutes));
+  if (!Number.isFinite(total)) return '—';
+  const h = Math.floor(total / 60);
+  const m = total % 60;
   return `${h}h ${String(m).padStart(2, '0')}m`;
 }
 
@@ -161,7 +164,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     if (initialCourse.id != null) {
       const { data } = await supabase
         .from('courses')
-        .select('id, name, city, state, latitude, longitude, par, total_rounds, avg_time, description, website, clocked_certified, certified_at')
+        .select('id, name, city, state, latitude, longitude, par, source, hole_data, total_rounds, avg_time, description, website, clocked_certified, certified_at')
         .eq('id', initialCourse.id)
         .maybeSingle();
       course = data;
@@ -169,7 +172,7 @@ export default function CourseProfileScreen({ navigation, route }) {
     if (!course && initialCourse.name) {
       const { data } = await supabase
         .from('courses')
-        .select('id, name, city, state, latitude, longitude, par, total_rounds, avg_time, description, website, clocked_certified, certified_at')
+        .select('id, name, city, state, latitude, longitude, par, source, hole_data, total_rounds, avg_time, description, website, clocked_certified, certified_at')
         .eq('name', initialCourse.name)
         .maybeSingle();
       course = data;
@@ -323,7 +326,7 @@ export default function CourseProfileScreen({ navigation, route }) {
   };
 
   const totalRounds  = liveRoundCount || courseData?.total_rounds || initialCourse.rounds || 0;
-  const par          = courseData?.par ?? initialCourse.par ?? 72;
+  const par          = coursePar(courseData ?? initialCourse);
   const description  = courseData?.description;
   const location     = initialCourse.location
     ?? [initialCourse.city, initialCourse.state].filter(Boolean).join(', ')
@@ -409,12 +412,12 @@ export default function CourseProfileScreen({ navigation, route }) {
             </View>
             <View style={s.statDivider} />
             <View style={s.statItem}>
-              <Text style={s.statValue}>{par}</Text>
+              <Text style={s.statValue}>{par ?? '—'}</Text>
               <Text style={s.statLabel}>PAR</Text>
             </View>
             <View style={s.statDivider} />
             <View style={s.statItem}>
-              <Text style={s.statValue}>{formatDuration(avgDuration)}</Text>
+              <Text style={s.statValue}>{formatDuration(avgDuration ?? courseData?.avg_time)}</Text>
               <Text style={s.statLabel}>AVG TIME</Text>
             </View>
             <View style={s.statDivider} />
@@ -431,7 +434,7 @@ export default function CourseProfileScreen({ navigation, route }) {
                 <>
                   <Text style={s.avgTimeLabel}>AVERAGE ROUND TIME</Text>
                   <Text style={s.avgTimeValue}>
-                    {formatDuration(courseData?.avg_time ?? avgDuration)}
+                    {formatDuration(avgDuration ?? courseData?.avg_time)}
                   </Text>
                   {totalRounds > 0 && (
                     <Text style={s.avgTimeSub}>

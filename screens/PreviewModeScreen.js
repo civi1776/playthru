@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import InitialsAvatar from '../components/InitialsAvatar';
 import CourseAvatar from '../components/CourseAvatar';
-import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import { fetchClockedBoard } from '../lib/clockedRating';
 import { totalPointsFromHoleScores } from '../lib/clockedSport';
 import { COLOR, RADIUS } from '../lib/theme';
 
@@ -124,72 +124,23 @@ function LeaderboardTab({ navigation, showGate }) {
         // Clocked Score board LeaderboardScreen uses (one query for clocked
         // rounds, one for confirmed participations), instead of the retired
         // profiles.pop_score column, which is frozen/stale on real accounts.
-        const [{ count }, { data: clockedRounds }] = await Promise.all([
+        const [{ count }, board] = await Promise.all([
           supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('account_type', 'golfer'),
-          supabase
-            .from('rounds')
-            .select('id, user_id, hole_scores')
-            .eq('round_format', 'clocked')
-            .eq('flagged', false)
-            .not('hole_scores', 'is', null),
+          fetchClockedBoard(supabase),
         ]);
         setTotal(count ?? 0);
 
-        if (!clockedRounds?.length) { setData([]); setLoading(false); return; }
-
-        const byUser = {};
-        const roundMap = {};
-        for (const r of clockedRounds) {
-          if (!byUser[r.user_id]) byUser[r.user_id] = [];
-          byUser[r.user_id].push(r);
-          roundMap[r.id ?? ''] = r;
-        }
-
-        const roundIds = clockedRounds.map(r => r.id).filter(Boolean);
-        let participations = [];
-        if (roundIds.length) {
-          const { data: parts } = await supabase
-            .from('round_participants')
-            .select('round_id, user_id, player_key')
-            .eq('status', 'confirmed')
-            .in('round_id', roundIds);
-          participations = parts ?? [];
-        }
-        for (const pt of participations) {
-          if (!byUser[pt.user_id]) byUser[pt.user_id] = [];
-          const already = byUser[pt.user_id].some(r => (r.id ?? r.round_id) === pt.round_id);
-          if (!already && roundMap[pt.round_id]) {
-            byUser[pt.user_id].push({ ...roundMap[pt.round_id], _playerKey: pt.player_key });
-          }
-        }
-
-        const userIds = Object.keys(byUser);
-        const { data: profiles } = await supabase
-          .from('profiles').select('id, full_name, username, handicap_index, hometown')
-          .in('id', userIds);
-        const profileMap = {};
-        (profiles ?? []).forEach(pr => { profileMap[pr.id] = pr; });
-
-        const entries = userIds.map(userId => {
-          const prof = profileMap[userId];
-          const playerName = prof?.full_name || prof?.username || 'Golfer';
-          const roundStats = byUser[userId]
-            .map(r => extractPlayerRoundStats(r.hole_scores, r._playerKey ?? playerName))
-            .filter(Boolean);
-          const rating = computeFullRating({ roundStats, handicapIndex: prof?.handicap_index });
-          return {
-            userId,
-            name: playerName,
-            handle: prof?.username ? `@${prof.username}` : '',
-            pop: rating.clockedScore,
-            roundsUsed: rating.roundsUsed,
-            city: prof?.hometown ?? null,
-          };
-        }).filter(e => e.pop != null && e.pop > 0);
-
-        entries.sort((a, b) => (b.pop - a.pop) || (b.roundsUsed - a.roundsUsed));
-
-        setData(entries.slice(0, 50).map((e, i) => ({ ...e, rank: i + 1 })));
+        // Same board the signed-in Rankings screen shows: counted Clocked
+        // rounds only, no test accounts.
+        setData(board.ranked.slice(0, 50).map(e => ({
+          userId: e.userId,
+          name: e.name,
+          handle: e.handle,
+          pop: e.rating.clockedScore,
+          roundsUsed: e.rating.roundsUsed,
+          city: e.hometown ?? null,
+          rank: e.rank,
+        })));
       } catch (e) {
         // silent fail
       } finally {
@@ -232,9 +183,18 @@ function LeaderboardTab({ navigation, showGate }) {
         </View>
       )}
 
+      {data.length === 0 && (
+        <View style={{ paddingHorizontal: 32, paddingTop: 56, alignItems: 'center' }}>
+          <Text style={{ fontSize: 20, fontWeight: '600', color: COLOR.cream, textAlign: 'center', marginBottom: 8 }}>The board is open.</Text>
+          <Text style={{ fontSize: 14, color: COLOR.dim, textAlign: 'center', lineHeight: 20 }}>
+            No one has a ranked Clocked round yet. Sign up, play nine on the clock and take the first spot.
+          </Text>
+        </View>
+      )}
+
       {/* Rows 4–50 */}
       <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-        <Text style={p.sectionLabel}>FULL STANDINGS</Text>
+        {rest.length > 0 && <Text style={p.sectionLabel}>FULL STANDINGS</Text>}
         {rest.map(entry => (
           <TouchableOpacity
             key={entry.userId}

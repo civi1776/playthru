@@ -257,14 +257,23 @@ function StepHomeCourse({ selected, onSelect, onSkip }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const seqRef = useRef(0);
 
   useEffect(() => {
-    if (query.trim().length < 2) { setResults([]); return; }
+    const q = query.trim();
+    const seq = ++seqRef.current;
+    setSearched(false);
+    if (q.length < 2) { setResults([]); setLoading(false); return; }
     setLoading(true);
     const t = setTimeout(async () => {
-      const r = await searchCourses(query);
+      const r = await searchCourses(q, {
+        onPartial: (rows) => { if (seqRef.current === seq) setResults(rows); },
+      });
+      if (seqRef.current !== seq) return;
       setResults(r);
       setLoading(false);
+      setSearched(true);
     }, 300);
     return () => clearTimeout(t);
   }, [query]);
@@ -288,11 +297,14 @@ function StepHomeCourse({ selected, onSelect, onSkip }) {
             {loading && <ActivityIndicator size="small" color={GOLD} />}
           </View>
           {results.map((c) => (
-            <TouchableOpacity key={c.id ?? c.name} style={st.courseRow} onPress={() => onSelect(c)} activeOpacity={0.7}>
+            <TouchableOpacity key={c.id ?? `${c.name}|${c.city ?? ''}`} style={st.courseRow} onPress={() => onSelect(c)} activeOpacity={0.7}>
               <Text style={st.courseName} numberOfLines={1}>{c.name}</Text>
               {!!c.city && <Text style={st.courseMeta} numberOfLines={1}>{c.city}{c.state ? `, ${c.state}` : ''}</Text>}
             </TouchableOpacity>
           ))}
+          {searched && !loading && results.length === 0 && (
+            <Text style={st.courseMeta}>No course found. Try the club name or the city, or set this later.</Text>
+          )}
         </KeyboardAvoidingView>
       </ScrollView>
       <TouchableOpacity style={st.skipInline} onPress={onSkip} activeOpacity={0.7}>

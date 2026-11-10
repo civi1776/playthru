@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Constants from 'expo-constants';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking, AppState, Animated, AccessibilityInfo, Alert } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, StackActions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -13,7 +13,7 @@ import { supabase } from './lib/supabase';
 import { setupNotifications, refreshPushToken } from './lib/notifications';
 import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { endPlaySession } from './lib/playSessions';
+import { endPlaySession, closeOrphanArcadeSessions } from './lib/playSessions';
 import { CLOCKED_ROUND_STATE_KEY } from './lib/clockedRoundConstants';
 import { ActiveRoundContext, ACTIVE_ROUND_MAX_AGE_MS } from './lib/activeRound';
 import { COLOR } from './lib/theme';
@@ -284,8 +284,14 @@ const nav = StyleSheet.create({
 
 // ─── Main app (tab navigator) ─────────────────────────────────────────────────
 // Rendered as the 'Main' screen in the root stack.
+// The splash plays once per cold start. It used to be plain component state,
+// so anything that mounted Main a second time replayed the launch animation
+// in the middle of a session.
+let splashPlayedThisLaunch = false;
+
 function MainApp({ navigation }) {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => !splashPlayedThisLaunch);
+  useEffect(() => { splashPlayedThisLaunch = true; }, []);
   // The parsed saved round, or null. This is the single source of truth for
   // "round in progress" across the tabs: the floating banner, the PLAY button
   // and the tab screens' bottom inset all read from it.
@@ -312,6 +318,10 @@ function MainApp({ navigation }) {
       setActiveRound(null);
     }
   }, []);
+
+  // An arcade run that was killed mid-hole leaves its session row open for
+  // good. Close those as abandoned on launch so starts and finishes add up.
+  useEffect(() => { closeOrphanArcadeSessions(); }, []);
 
   useEffect(() => {
     checkActiveRound();
@@ -505,7 +515,9 @@ function AppNavigator() {
         break;
       case 'arcade_challenge':
       case 'arcade_qualifier':
-        navRef.current.navigate('Main', { screen: 'Arcade' });
+        // popTo, not navigate: in React Navigation 7 navigate pushes a second
+        // copy of Main when another screen is on top of it.
+        navRef.current.dispatch(StackActions.popTo('Main', { screen: 'Arcade' }));
         break;
       case 'milestone':
       case 'clocked_score':
@@ -641,9 +653,11 @@ function AppNavigator() {
         <RootStack.Screen name="RulesScreen" component={RulesScreen} />
         <RootStack.Screen name="Leaderboard"   component={LeaderboardScreen} />
         <RootStack.Screen name="ClockedSetup"   component={ClockedSetupScreen} />
-        <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} />
+        {/* No swipe back on either live screen: an edge swipe mid-round used to
+            dismiss the game with the clock running and no confirmation. */}
+        <RootStack.Screen name="ClockedRound"   component={ClockedRoundScreen} options={{ gestureEnabled: false }} />
         <RootStack.Screen name="ConfirmRound"  component={ConfirmRoundScreen} />
-        <RootStack.Screen name="ArcadeGame"    component={ArcadeScreen} />
+        <RootStack.Screen name="ArcadeGame"    component={ArcadeScreen} options={{ gestureEnabled: false }} />
         <RootStack.Screen name="Tournament"       component={TournamentScreen} />
         <RootStack.Screen name="TournamentApply"  component={TournamentApplyScreen} />
       </RootStack.Navigator>

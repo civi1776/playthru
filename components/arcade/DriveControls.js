@@ -107,7 +107,7 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
   return (
     <View ref={rowRef} style={[st.row, disabled && { opacity: 0.4 }]} {...pan.panHandlers}>
       {/* Stick */}
-      <View ref={stickRef} onLayout={measure} style={st.base} accessibilityLabel="Cart joystick. Any second finger boosts." accessibilityRole="adjustable">
+      <View ref={stickRef} onLayout={measure} style={st.base} accessibilityLabel="Cart joystick. A second finger anywhere fires turbo." accessibilityRole="adjustable">
         <View style={st.cross} pointerEvents="none" />
         <View style={[st.cross, { transform: [{ rotate: '90deg' }] }]} pointerEvents="none" />
         <Animated.View style={[st.knob, { transform: knob.getTranslateTransform() }]} pointerEvents="none" />
@@ -116,7 +116,7 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
       <View style={st.middle} pointerEvents="none">{children}</View>
 
       {/* Turbo (visual only; the row's responder handles the touch) */}
-      <View style={[st.turbo, pressed && turbo.ready && st.turboPressed]} accessibilityRole="button" accessibilityLabel="Turbo boost"
+      <View style={[st.turbo, pressed && turbo.ready && st.turboPressed]} accessibilityRole="button" accessibilityLabel="Turbo"
         onTouchStart={() => { if (!disabled) { setPressed(true); onTurboRef.current?.(); } }} onTouchEnd={() => setPressed(false)}>
         <Svg width={TSIZE} height={TSIZE} style={StyleSheet.absoluteFill}>
           <Circle cx={TSIZE / 2} cy={TSIZE / 2} r={TR} stroke={COLOR.border} strokeWidth={TSTROKE} fill={turbo.active ? '#E8CC6E22' : COLOR.surface} />
@@ -125,7 +125,7 @@ export default function DriveControls({ onChange, onTurbo, turbo = { charge: 1, 
             transform={`rotate(-90 ${TSIZE / 2} ${TSIZE / 2})`} />
         </Svg>
         <Ionicons name="flash" size={22} color={tColor} />
-        <Text style={[st.tLabel, { color: tColor }]}>{turbo.active ? 'BOOST' : turbo.ready ? 'TURBO' : `${Math.round(turbo.charge * 100)}%`}</Text>
+        <Text style={[st.tLabel, { color: tColor }]}>{turbo.active || turbo.ready ? 'TURBO' : `${Math.round(turbo.charge * 100)}%`}</Text>
       </View>
     </View>
   );

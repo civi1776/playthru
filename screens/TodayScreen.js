@@ -183,8 +183,8 @@ export default function TodayScreen({ navigation }) {
                 {hasScore && <Text style={s.heroMax}>/100</Text>}
               </View>
               <Text style={[s.heroTier, { color: tier.color }]}>
-                {hasScore ? tier.name : 'PLAY YOUR FIRST ROUND'}
-                {hasScore && rank ? <Text style={s.heroRank}>{`   ·   #${rank} NATIONALLY`}</Text> : null}
+                {hasScore ? tier.name : ((rating.practiceRounds ?? 0) > 0 ? 'PLAY YOUR FIRST RANKED ROUND' : 'PLAY YOUR FIRST ROUND')}
+                {hasScore && rank ? <Text style={s.heroRank}>{`   ·   #${rank} ON THE CLOCKED BOARD`}</Text> : null}
               </Text>
             </View>
             {hasScore && (
@@ -200,7 +200,9 @@ export default function TodayScreen({ navigation }) {
           {rating.isProvisional && (rating.roundsNeeded ?? 0) > 0 && (
             <Text style={s.provisional}>
               {rating.roundsUsed === 0
-                ? 'Your score starts with your first clocked round.'
+                ? ((rating.practiceRounds ?? 0) > 0
+                    ? 'Practice rounds do not count. Your score starts with a full-length clocked round.'
+                    : 'Your score starts with your first clocked round.')
                 : `${rating.roundsNeeded} more round${rating.roundsNeeded === 1 ? '' : 's'} and your score is established.`}
             </Text>
           )}

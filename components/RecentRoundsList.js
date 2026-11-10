@@ -7,6 +7,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import CourseAvatar from './CourseAvatar';
 import { COLOR, RADIUS } from '../lib/theme';
+import { isRankedClockedRound } from '../lib/rankingFilters';
 
 function formatShortDate(isoStr) {
   if (!isoStr) return '';
@@ -87,6 +88,7 @@ export default function RecentRoundsList({ rounds, navigation, limit = 10, title
                 {playerCount > 1 ? ` · ${playerCount} players` : ''}
                 {clocked && <Text style={{ color: difficultyColor(r.difficulty) }}>{` · ${formatLabel(r)}`}</Text>}
                 {clocked && r._confirmed === false && <Text style={{ color: COLOR.dim }}>{' · unconfirmed'}</Text>}
+                {clocked && 'duration_minutes' in r && !isRankedClockedRound(r) && <Text style={{ color: COLOR.dim }}>{' · practice'}</Text>}
               </Text>
             </View>
             <View style={s.resultCol}>

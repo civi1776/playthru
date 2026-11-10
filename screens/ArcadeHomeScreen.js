@@ -165,7 +165,7 @@ export default function ArcadeHomeScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={st.heroTitle}>Nine holes.{'\n'}One clock.</Text>
-            <Text style={st.heroSub}>Drive the cart, swing on the meter, beat time par. The clock never stops, not even between holes.</Text>
+            <Text style={st.heroSub}>Drive the cart, swing on the meter, beat time par. Every hole has its own clock, tee to cup.</Text>
             {myRank ? (
               <View style={st.bestPill}>
                 <Text style={st.bestLabel}>THIS MONTH</Text>

@@ -20,7 +20,8 @@ import {
 } from '../lib/clockedSport';
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
 import { startPlaySession, endPlaySession } from '../lib/playSessions';
-import { fetchClockedRatingForUser } from '../lib/clockedRating';
+import { fetchClockedRatingForUser, invalidateClockedBoard } from '../lib/clockedRating';
+import { isRankedClockedRound } from '../lib/rankingFilters';
 import { claimCourseRecord } from '../lib/courseRecords';
 import { sendPushToUser, sendLocalNotification, sendRankMoveNotification, checkAndSendMilestone, scheduleInactivityReminder, scheduleInteractionLadder, cancelInteractionLadder } from '../lib/notifications';
 import * as Notifications from 'expo-notifications';
@@ -673,7 +674,15 @@ export default function ClockedRoundScreen({ navigation, route }) {
   };
 
   // ── Finish round ──
+  // A round is saved once. The ref closes the gap a state flag leaves open
+  // (two taps inside one render), and the lookup below covers everything the
+  // ref cannot see: a retry after a dropped response, or a return to this
+  // screen after the save already landed.
+  const finishingRef = useRef(false);
+  const savedRoundRef = useRef(null);
   const finishRound = async (results) => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     setIsFinishing(true);
     endActivity().catch(() => {});
     cancelClockAlarms();
@@ -708,8 +717,21 @@ export default function ClockedRoundScreen({ navigation, route }) {
       const uid = authUser?.id ?? user?.id;
       if (!uid) { Alert.alert('Not signed in', 'Restart the app and sign in again, then save the round.'); return; }
 
+      // The start time identifies this round. If a row already carries it,
+      // the round is saved and this call only has to finish the hand-off.
+      const teeTimeIso = new Date(roundStartTs).toISOString();
+      const findSaved = async () => {
+        const { data } = await supabase
+          .from('rounds').select('id')
+          .eq('user_id', uid).eq('round_format', 'clocked').eq('tee_time', teeTimeIso)
+          .order('created_at', { ascending: true }).limit(1);
+        return data?.[0]?.id ?? null;
+      };
+      let savedRoundId = savedRoundRef.current ?? await findSaved();
+      const alreadySaved = !!savedRoundId;
+
       // Daily rate limit (20 rounds per 24h)
-      const { count: todayCount } = await supabase
+      const { count: todayCount } = alreadySaved ? { count: 0 } : await supabase
         .from('rounds').select('id', { count: 'exact', head: true })
         .eq('user_id', uid)
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
@@ -720,19 +742,23 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
       let row = {
         user_id: uid, course_name: course?.name ?? null, holes: String(holeCount), transport,
-        difficulty, players: String(playerCount), tee_time: new Date(roundStartTs).toISOString(),
+        difficulty, players: String(playerCount), tee_time: teeTimeIso,
         finish_time: new Date().toISOString(), duration_minutes: durationMinutes,
         round_format: 'clocked', hole_scores: holeScoresJson, active_game: activeGameJson,
         flagged: false, verification_level: 'self_reported',
       };
 
 
-      let savedRoundId = null;
-      for (let attempt = 0; attempt < 5; attempt++) {
+      for (let attempt = 0; !alreadySaved && attempt < 5; attempt++) {
         const result = await supabase.from('rounds').insert([row]).select('id');
 
         if (!result.error) {
           savedRoundId = result.data?.[0]?.id ?? null;
+          break;
+        }
+        // The server refused a second copy of this round: the first is in.
+        if (result.error.code === '23505') {
+          savedRoundId = await findSaved();
           break;
         }
 
@@ -753,7 +779,11 @@ export default function ClockedRoundScreen({ navigation, route }) {
         holesCompleted: Array.isArray(holeScoresJson) ? holeScoresJson.length : holeResults.length,
         roundId: savedRoundId,
       });
-      if (savedRoundId) {
+      savedRoundRef.current = savedRoundId;
+      invalidateClockedBoard();
+      // A nine this quick is practice: saved to history, not counted.
+      const countsTowardScore = isRankedClockedRound({ holes: holeCount, duration_minutes: durationMinutes });
+      if (savedRoundId && !alreadySaved) {
         const participantRows = playerDefs
           .map((p, i) => {
             if (!p.userId) return null; // guest — no account
@@ -802,7 +832,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       // one is the thing that brings them back. This replaces the activity
       // feed: a notification reaches the person who cares, where a feed card
       // waited for someone to come looking.
-      if (savedRoundId && course?.name) {
+      if (savedRoundId && !alreadySaved && course?.name) {
         (async () => {
           try {
             const mine = playerDefs.find(p => p.userId === uid)?.name;
@@ -830,7 +860,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       // — milestone-flavored when this round hit one (1/5/10/25 rounds),
       // otherwise the generic score nudge. Never both, so a round never
       // double-buzzes the player.
-      (async () => {
+      if (!alreadySaved) (async () => {
         let milestoneHit = null;
         try {
           const { count: totalRoundsCount } = await supabase
@@ -850,7 +880,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
         } catch {}
         scheduleInactivityReminder().catch(() => {});
 
-        if (!milestoneHit) {
+        if (!milestoneHit && countsTowardScore) {
           Notifications.scheduleNotificationAsync({
             content: { title: 'Check your Clocked Score', body: 'Your round is logged. See how it moved your score →' },
             trigger: { seconds: 3600, repeats: false },
@@ -863,6 +893,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       navigation.navigate('Share', {
         roundFormat: 'clocked', courseName: course?.name ?? 'Quick Play', date: dateStr,
         holes: String(holeCount), transport, difficulty, durationMinutes,
+        isPractice: !countsTowardScore,
         teamScore: summary.totalScore, totalTimePar: summary.totalTimePar,
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty,
         playerTotals: summary.playerTotals, formatBadge: formatBadge(playerCount),
@@ -871,6 +902,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     } catch (e) {
       Alert.alert('Round not saved', 'Check your connection and tap Save again. Your scores are still here.');
     } finally {
+      finishingRef.current = false;
       setIsFinishing(false);
     }
   };
@@ -886,7 +918,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       const pausedElapsed = clockStartedAt ? Math.max(0, Math.floor((Date.now() - clockStartedAt) / 1000)) : 0;
       persistRound({ clockRunning: false, holeFrozenTime: pausedElapsed });
     }
-    navigation.navigate('Main');
+    navigation.popTo('Main');
   };
 
   // Abandon round — destructive, clears state
@@ -898,7 +930,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
         endActivity().catch(() => {});
         cancelClockAlarms();
         await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
-        navigation.navigate('Main');
+        navigation.popTo('Main');
       }},
     ]);
   };

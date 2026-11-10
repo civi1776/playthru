@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView, Platform,
-  KeyboardAvoidingView, StyleSheet, Alert,
+  KeyboardAvoidingView, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { sanitizeSearchText } from '../lib/profileColumns';
 import { CLOCKED_LAST_TRANSPORT_KEY, CLOCKED_DEFAULT_TRANSPORT } from '../lib/clockedRoundConstants';
-import { searchCourses } from '../lib/courses';
+import { searchCourses, courseKey } from '../lib/courses';
 import { useAuth } from '../context/AuthContext';
 import CourseAvatar from '../components/CourseAvatar';
 import { fetchClockedConfig } from '../lib/clockedConfig';
@@ -64,12 +64,24 @@ export default function ClockedSetupScreen({ navigation }) {
   // ── Course search ──
   const [query, setQuery]     = useState('');
   const [results, setResults] = useState([]);
+  // 'idle' | 'searching' | 'done'. Without it an empty list reads the same
+  // whether the search is still running, found nothing, or never ran.
+  const [searchState, setSearchState] = useState('idle');
+  const searchSeq = useRef(0);
 
   useEffect(() => {
-    if (!query.trim() || query.trim().length < 2) { setResults([]); return; }
+    const q = query.trim();
+    const seq = ++searchSeq.current;
+    if (q.length < 2) { setResults([]); setSearchState('idle'); return; }
+    setSearchState('searching');
     const t = setTimeout(async () => {
-      const r = await searchCourses(query);
+      // The table answers first; the wider lookup replaces it when it lands.
+      const r = await searchCourses(q, {
+        onPartial: (rows) => { if (searchSeq.current === seq) setResults(rows); },
+      });
+      if (searchSeq.current !== seq) return;
       setResults(r);
+      setSearchState('done');
     }, 300);
     return () => clearTimeout(t);
   }, [query]);
@@ -320,31 +332,10 @@ export default function ClockedSetupScreen({ navigation }) {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            {/* Quick-play: skip course selection */}
-            <TouchableOpacity
-              style={s.skipCourseBtn}
-              onPress={() => { setCourse(null); setPhase(PHASE.MODE); }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="flash-outline" size={14} color="#E8CC6E88" />
-              <Text style={s.skipCourseText}>Skip. I'll set par manually</Text>
-            </TouchableOpacity>
-            {/* Not at a course — play the arcade on the same rules */}
-            <TouchableOpacity
-              style={s.arcadeCard}
-              onPress={() => navigation.navigate('Main', { screen: 'Arcade' })}
-              activeOpacity={0.8}
-              accessibilityLabel="Play Clocked Arcade"
-            >
-              <Ionicons name="game-controller-outline" size={20} color={COLOR.gold} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.arcadeTitle}>Not at a course? Play Clocked Arcade →</Text>
-                <Text style={s.arcadeSub}>Same rules, same clock. Never touches your real stats.</Text>
-              </View>
-            </TouchableOpacity>
+            {/* Results sit directly under the field so they are above the keyboard. */}
             {results.map(c => (
               <TouchableOpacity
-                key={c.name}
+                key={courseKey(c)}
                 style={s.courseRow}
                 onPress={() => handleCourseSelected(c)}
                 activeOpacity={0.8}
@@ -358,6 +349,39 @@ export default function ClockedSetupScreen({ navigation }) {
                 </View>
               </TouchableOpacity>
             ))}
+            {searchState === 'searching' && results.length === 0 && (
+              <View style={s.searchStatus}>
+                <ActivityIndicator size="small" color={COLOR.gold} />
+                <Text style={s.searchStatusText}>Searching courses…</Text>
+              </View>
+            )}
+            {searchState === 'done' && results.length === 0 && (
+              <View style={s.searchStatus}>
+                <Text style={s.searchStatusText}>No course found for “{query.trim()}”. Try the club name or the city, or skip and set par yourself.</Text>
+              </View>
+            )}
+            {/* Quick-play: skip course selection */}
+            <TouchableOpacity
+              style={s.skipCourseBtn}
+              onPress={() => { setCourse(null); setPhase(PHASE.MODE); }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="flash-outline" size={14} color="#E8CC6E88" />
+              <Text style={s.skipCourseText}>Skip. I'll set par manually</Text>
+            </TouchableOpacity>
+            {/* Not at a course — play the arcade on the same rules */}
+            <TouchableOpacity
+              style={s.arcadeCard}
+              onPress={() => navigation.popTo('Main', { screen: 'Arcade' })}
+              activeOpacity={0.8}
+              accessibilityLabel="Play Clocked Arcade"
+            >
+              <Ionicons name="game-controller-outline" size={20} color={COLOR.gold} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.arcadeTitle}>Not at a course? Play Clocked Arcade →</Text>
+                <Text style={s.arcadeSub}>Same rules, same clock. Never touches your real stats.</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -651,6 +675,8 @@ const s = StyleSheet.create({
   searchInput: { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.md, padding: 14, color: COLOR.cream, fontSize: 15, marginBottom: 12 },
   skipCourseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: 12 },
   skipCourseText:{ fontSize: 12, color: '#E8CC6E88', fontWeight: '500' },
+  searchStatus:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 4, marginBottom: 6 },
+  searchStatusText: { flex: 1, fontSize: 13, color: COLOR.dim, lineHeight: 18 },
   arcadeCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#E8CC6E33', paddingVertical: 12, paddingHorizontal: 14, marginBottom: 14 },
   arcadeTitle:   { fontSize: 13, color: COLOR.cream, fontWeight: '600' },
   arcadeSub:     { fontSize: 11, color: COLOR.dim, marginTop: 2 },

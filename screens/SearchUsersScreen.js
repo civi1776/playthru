@@ -14,7 +14,7 @@
  * create policy "delete_follows" on follows for delete using (true);
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator,
@@ -28,8 +28,11 @@ import { sendLocalNotification, sendPushToUser } from '../lib/notifications';
 import SkeletonLoader from '../components/SkeletonLoader';
 import InitialsAvatar from '../components/InitialsAvatar';
 import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import { isRankedClockedRound } from '../lib/rankingFilters';
 import ScreenHeader from '../components/ScreenHeader';
 import { COLOR, RADIUS } from '../lib/theme';
+import { searchCourses, courseKey, courseLocation, coursePar } from '../lib/courses';
+import CourseAvatar from '../components/CourseAvatar';
 
 function SearchSkeletons() {
   return (
@@ -59,8 +62,13 @@ function clockedColor(score) {
   return COLOR.muted;
 }
 
-export default function SearchUsersScreen({ navigation }) {
+export default function SearchUsersScreen({ navigation, route }) {
   const { user, profile: authProfile } = useAuth();
+  // One search screen for both things a golfer looks up: people and courses.
+  const [mode, setMode]             = useState(route?.params?.mode === 'courses' ? 'courses' : 'players');
+  const [courses, setCourses]       = useState([]);
+  const [courseState, setCourseState] = useState('idle'); // idle | searching | done
+  const courseSeq = useRef(0);
   const [query, setQuery]           = useState('');
   const [results, setResults]       = useState([]);
   const [following, setFollowing]   = useState(new Set());
@@ -78,6 +86,36 @@ export default function SearchUsersScreen({ navigation }) {
       if (data) setFollowing(new Set(data.map(r => r.following_id)));
     })();
   }, [myUid]);
+
+  // Course search: debounced, table results first, wider lookup after.
+  useEffect(() => {
+    if (mode !== 'courses') return;
+    const q = query.trim();
+    const seq = ++courseSeq.current;
+    if (q.length < 2) { setCourses([]); setCourseState('idle'); return; }
+    setCourseState('searching');
+    const t = setTimeout(async () => {
+      const r = await searchCourses(q, {
+        onPartial: (rows) => { if (courseSeq.current === seq) setCourses(rows); },
+      });
+      if (courseSeq.current !== seq) return;
+      setCourses(r);
+      setCourseState('done');
+    }, 300);
+    return () => clearTimeout(t);
+  }, [query, mode]);
+
+  const onChangeQuery = (text) => {
+    if (mode === 'players') search(text);
+    else setQuery(text);
+  };
+
+  const switchMode = (next) => {
+    if (next === mode) return;
+    setMode(next);
+    // Carry the text across so the same words search the other list.
+    if (next === 'players') search(query);
+  };
 
   const search = async (text) => {
     setQuery(text);
@@ -101,10 +139,12 @@ export default function SearchUsersScreen({ navigation }) {
       // column. Avoids N individual per-result queries.
       const resultIds = found.map(p => p.id);
       if (resultIds.length) {
-        const { data: ownRounds } = await supabase
-          .from('rounds').select('id, user_id, hole_scores')
-          .eq('round_format', 'clocked').not('hole_scores', 'is', null)
+        const { data: clockedRows } = await supabase
+          .from('rounds').select('id, user_id, hole_scores, holes, duration_minutes')
+          .eq('round_format', 'clocked').eq('flagged', false).not('hole_scores', 'is', null)
           .in('user_id', resultIds);
+        // Practice-length rounds do not count, same as on the Rankings board.
+        const ownRounds = (clockedRows ?? []).filter(isRankedClockedRound);
         const byUser = {};
         (ownRounds ?? []).forEach(r => { (byUser[r.user_id] ??= []).push(r); });
         const roundIds = (ownRounds ?? []).map(r => r.id);
@@ -167,22 +207,71 @@ export default function SearchUsersScreen({ navigation }) {
 
   return (
     <SafeAreaView style={s.container}>
-      <ScreenHeader title="FIND PLAYERS" onBack={() => navigation.goBack()} borderless />
+      <ScreenHeader title="SEARCH" onBack={() => navigation.goBack()} borderless />
+
+      <View style={s.modeRow}>
+        {[['players', 'PLAYERS'], ['courses', 'COURSES']].map(([k, l]) => (
+          <TouchableOpacity key={k} style={[s.modeBtn, mode === k && s.modeBtnActive]} onPress={() => switchMode(k)}
+            activeOpacity={0.8} accessibilityRole="tab" accessibilityState={{ selected: mode === k }}>
+            <Text style={[s.modeText, mode === k && s.modeTextActive]}>{l}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <View style={s.searchWrap}>
         <TextInput
           style={s.searchInput}
-          placeholder="Search by name or @username…"
+          placeholder={mode === 'courses' ? 'Search by course name or city…' : 'Search by name or @username…'}
           placeholderTextColor="#B8A88266"
           value={query}
-          onChangeText={search}
+          onChangeText={onChangeQuery}
           autoFocus
           autoCapitalize="none"
           autoCorrect={false}
         />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+
+        {mode === 'courses' && (
+          <>
+            {query.trim().length < 2 && (
+              <View style={s.emptyState}>
+                <Ionicons name="golf-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 14 }} />
+                <Text style={s.emptyText}>Search for a course by name or city</Text>
+              </View>
+            )}
+            {courseState === 'searching' && courses.length === 0 && <SearchSkeletons />}
+            {courseState === 'done' && courses.length === 0 && (
+              <View style={s.emptyState}>
+                <Ionicons name="search-outline" size={48} color="rgba(232,204,110,0.3)" style={{ marginBottom: 14 }} />
+                <Text style={s.emptyText}>No course found. Try the club name or the city.</Text>
+              </View>
+            )}
+            {courses.map(c => (
+              <TouchableOpacity
+                key={courseKey(c)}
+                style={s.row}
+                onPress={() => navigation.navigate('CourseProfile', { course: { id: c.id, name: c.name } })}
+                activeOpacity={0.8}
+                accessibilityLabel={`Open ${c.name}`}
+              >
+                <CourseAvatar courseName={c.name} city={c.city} size={42} />
+                <View style={s.info}>
+                  <Text style={s.name} numberOfLines={1}>{c.name}</Text>
+                  {!!courseLocation(c) && <Text style={s.handle} numberOfLines={1}>{courseLocation(c)}</Text>}
+                </View>
+                <View style={s.right}>
+                  {coursePar(c) != null && <Text style={s.coursePar}>PAR {coursePar(c)}</Text>}
+                  <Ionicons name="chevron-forward" size={16} color={COLOR.dim} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
+        {mode === 'players' && (
+          <>
 
         {/* Pre-search empty state */}
         {query.length === 0 && (
@@ -245,6 +334,8 @@ export default function SearchUsersScreen({ navigation }) {
             </TouchableOpacity>
           );
         })}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -253,6 +344,12 @@ export default function SearchUsersScreen({ navigation }) {
 const s = StyleSheet.create({
   container:       { flex: 1, backgroundColor: COLOR.bg },
   title:           { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 4 },
+  modeRow:         { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 3 },
+  modeBtn:         { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: RADIUS.sm },
+  modeBtnActive:   { backgroundColor: COLOR.gold },
+  modeText:        { fontSize: 10, fontWeight: '700', color: COLOR.muted, letterSpacing: 2 },
+  modeTextActive:  { color: COLOR.bg },
+  coursePar:       { fontSize: 10, fontWeight: '700', color: COLOR.muted, letterSpacing: 1 },
   searchWrap:      { paddingHorizontal: 16, paddingBottom: 12 },
   searchInput:     { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.md, padding: 14, color: COLOR.cream, fontSize: 15 },
   row:             { flexDirection: 'row', alignItems: 'center', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', padding: 14, marginBottom: 10, gap: 12 },

@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { getReferralStats } from '../lib/referrals';
 import { supabase } from '../lib/supabase';
 import { computeFullRating, extractPlayerRoundStats } from '../lib/clockedRating';
+import { isRankedClockedRound, MIN_RANKED_MINUTES_NINE } from '../lib/rankingFilters';
 import ScreenHeader from '../components/ScreenHeader';
 import { COLOR, RADIUS } from '../lib/theme';
 
@@ -75,23 +76,25 @@ export default function ShareScreen({ navigation, route }) {
       try {
         const { data: rounds } = await supabase
           .from('rounds')
-          .select('id, hole_scores, created_at')
+          .select('id, hole_scores, created_at, holes, duration_minutes')
           .eq('user_id', user.id)
           .eq('round_format', 'clocked')
           .eq('flagged', false)
           .not('hole_scores', 'is', null)
           .order('created_at', { ascending: false })
-          .limit(20);
+          .limit(60);
 
         const { data: profileRow } = await supabase
           .from('profiles').select('full_name, username, handicap_index').eq('id', user.id).maybeSingle();
         const playerName = profileRow?.full_name || profileRow?.username || 'Player';
 
         const roundStats = (rounds ?? [])
+          .filter(isRankedClockedRound)
           .map(r => extractPlayerRoundStats(r.hole_scores, playerName))
           .filter(Boolean);
         const rating = computeFullRating({ roundStats, handicapIndex: profileRow?.handicap_index });
-        setClockedScore(rating.clockedScore);
+        // No ranked rounds means no score: never show the cold-start baseline.
+        setClockedScore(roundStats.length ? rating.clockedScore : null);
       } catch {
         setClockedScore(null);
       }
@@ -220,6 +223,10 @@ export default function ShareScreen({ navigation, route }) {
         ))}
       </View>
 
+      {p.isPractice === true && (
+        <Text style={s.practiceNote}>Practice round. A nine under {MIN_RANKED_MINUTES_NINE} minutes is saved to your history and does not count toward your Clocked Score.</Text>
+      )}
+
       {/* Invite a friend — the new primary referral moment */}
       {!!referralCode && (
         <TouchableOpacity style={s.inviteCard} onPress={inviteFriend} activeOpacity={0.85}>
@@ -272,6 +279,7 @@ const s = StyleSheet.create({
   skipText:     { fontSize: 10, fontWeight: '700', color: COLOR.muted, letterSpacing: 2 },
   title:        { fontSize: 11, fontWeight: '700', color: COLOR.gold, letterSpacing: 4 },
 
+  practiceNote:   { color: COLOR.muted, fontSize: 12, lineHeight: 17, textAlign: 'center', paddingHorizontal: 28, marginBottom: 10 },
   toggleRow:      { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 8 },
   togglePill:     { paddingVertical: 6, paddingHorizontal: 16, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#E8CC6E55' },
   togglePillActive: { backgroundColor: COLOR.gold, borderColor: COLOR.gold },

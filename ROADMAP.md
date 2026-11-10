@@ -100,7 +100,50 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 - [ ] **Time-sensitive entitlement** pulled after build 61 failed: the App Store provisioning profile doesn't include the capability. To bring it back: enable "Time Sensitive Notifications" on `com.civiswings.playthru` at developer.apple.com → Identifiers, regenerate the profile (`eas credentials` → iOS → production → provisioning profile), then re-add `com.apple.developer.usernotifications.time-sensitive` to `app.json`. Until then alarms don't break through Focus modes; `interruptionLevel: 'timeSensitive'` in the payload is harmless without it.
 - [ ] **Silent switch** — iOS mutes notification sounds when the ring switch is off; only Critical Alerts (Apple-approved entitlement) override it. Tell players to leave the ringer on, or apply for the entitlement before the event.
 
+## AUDIT PASS — 9 Nov (CLOCKED_GOLF_APP_AUDIT_REPORT, 32 issues on 1.9.0)
+
+Code is committed. Two things are NOT live until they are run by hand (the permission classifier blocks both):
+
+- [ ] `npx supabase functions deploy search-courses` — the live function still returns HTTP 500 (`.find()` on a non-array `tees.male`). Shipped builds have dead course search until this is deployed. The next build also falls back to a direct `courses` table search when the function fails.
+- [ ] `npx supabase db query --linked --file supabase/migrations/20261109120000_audit_hardening.sql && npx supabase migration repair --status applied 20261109120000 --linked` — server half of CG-002, 003, 008, 023, 032.
+- [ ] Supabase dashboard, Auth: turn on leaked-password protection (CG-032, cannot be done from SQL).
+- [ ] New EAS build. The 1.9.0 content went live 8 Nov, so the train is closed and the version must go up first. The App Store lookup reports the live version string as `63`; confirm the number in App Store Connect before picking the next one.
+
+Fixed in the app:
+
+- [x] **CG-001** swipe-back disabled on `ArcadeGame` and `ClockedRound`.
+- [x] **CG-002** client: runs post with session, app version and ruleset; one score per run handled. Server: guard trigger with range checks and session link (migration). Plausibility checking, not replay validation.
+- [x] **CG-003** finish is re-entrancy guarded and idempotent (looks up user + tee time, treats 23505 as saved). Unique index in the migration. Verified: double-tap FINISH saved one round.
+- [x] **CG-004** app background or the pause button freezes the clock, shifts every timestamp on resume, covers the map. Pause count and seconds are recorded with the run. Verified in the simulator.
+- [x] **CG-005** no walk back to the cart; walks are bounded (1.0 s on the green, 1.6 s off it, 2.5 s from the cart).
+- [~] **CG-006** HUD, verdict, shot panel and controls memoised. Frame rate NOT measured on a device; the per-frame JS render loop is still there.
+- [x] **CG-007** power meter shows carry at the current power and a pin notch; clubs fitted so the pin sits inside the bar.
+- [x] **CG-008** `lib/rankingFilters.js`: test accounts and rounds under the floor (20 min per nine) are practice, off every score and rank. Legacy listed separately. `profiles.is_test` in the migration.
+- [x] **CG-009** orphaned arcade sessions closed as abandoned on launch and on unmount.
+- [x] **CG-010** splash plays once per cold start; SEE LEADERBOARD pops to the existing Main.
+- [x] **CG-011/012** next hole's clock starts on its tee; verdict and hole card are tap-to-skip; HUD holds the finished hole's time until the card flips.
+- [x] **CG-013/026** arcade timer zones follow the fraction of time par; last ten seconds pulse faster.
+- [x] **CG-014/015** verdict is a ledger (stroke points, clock, HEAT, THIS HOLE total) that fits the circle.
+- [x] **CG-016/017/018** cone freezes at the strike; putts read in feet; four-column shot panel.
+- [x] **CG-019/020/031** Ranks: per-board cache, no false empty state, fixed row columns.
+- [x] **CG-021/029** summary leads with points, arcade score shown out of 100; HEAT is a chip.
+- [x] **CG-022** one board builder feeds Ranks, profile chip (`CLK RANK`), Today and public profile.
+- [x] **CG-023** `RULESET = 2` and app version stored on every run (columns in the migration). Scores run about 2 to 3 points per nine higher than ruleset 1.
+- [x] **CG-024** shot result toast. **CG-025** HUD row fixed height. **CG-027** card says PLAYS n YDS. **CG-028** one clock feeds the round timer and TOTAL TIME. **CG-030** TURBO naming, tips retire.
+- [x] **CG-032** anon EXECUTE revoked, duplicate index dropped, FK indexes, policy `(select auth.uid())` (migration).
+- [x] **Course search** works in Play setup and in header Search (new COURSES tab opens the course profile). Placeholder pars (default 72 on hand-entered rows) are hidden.
+
+Decisions and data left for Billy:
+
+- [ ] Time pars are unchanged. Walking and transitions no longer charge the clock, so judge the pars again on a device before tuning.
+- [ ] The 20 minute per nine ranked floor is a guess. Every production clocked round so far is 1 to 3 minutes, so the Clocked board is empty until a real round is logged.
+- [ ] Palm Beach Par 3 (course id 1235, the event venue) has par 72 and no hole data in the DB. Real card is 18 holes, par 54. Needs a data fix.
+- [ ] Test rows awaiting a delete decision: practice round `f9cfb8cb-560b-424f-b953-dec791bb69b9` under `billycivi` (9 Nov, made while verifying) and the duplicate `civbilly` round rows from June and July.
+- [ ] After the migration, runs with no matching session are stored unverified and stay off the arcade boards (includes anything posted from 1.7.0). Older builds that double-save a round get an error on the second insert.
+
 ## RELEASES
+
+- **1.9.0 (build 62)** live on the App Store 8 Nov (store lookup shows the 1.9.0 release notes; version string reads `63`). Train closed. The 9 Nov audit pass is not in any build yet.
 
 - **1.7.0 (build 54)** approved and live on the App Store, 4 Nov: Today tab, course records, head-to-head profiles, course crests, arcade qualifying board.
 - **1.8.0 (build 60)** built 5 Nov with the 5 Nov arcade pass (breaking greens, honest under-clock count, no phantom cart push, SEE LEADERBOARD + SHARE). **Build 61** (`fdfd67f2`, 1.8.0) errored on EAS. **Build 62 (1.9.0, `b43fc474`, started 5 Nov 7:24 PM, auto-submit)** carries the arcade pass + Par 3 event sign-up + lock-screen clock alarms + "under the lights". Build 60 was uploaded by hand at 7 PM (its auto-submit never ran).
@@ -108,7 +151,7 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 
 ## OPEN RISKS
 
-- **Arcade qualifier spots are cheatable.** The game posts its own score from the client. Before a real purse is attached, either validate runs server-side from an input log or make the reward free entry rather than a guaranteed spot.
+- **Arcade qualifier spots are cheatable.** The game posts its own score from the client. The 9 Nov migration adds range checks and a session link (a soft guard); it does not replay runs, so review the top ten by hand. Before a real purse is attached, either validate runs server-side from an input log or make the reward free entry rather than a guaranteed spot.
 - **Entry fees and Apple.** A real-world tournament entry should qualify as a physical-world service and route through Stripe, but this is where review gets strict. Settle it early.
 - [x] **Arcade seasons migration** applied 3 Nov. Board and duels live.
 - [x] **Play sessions migration** applied 4 Nov. Backfilled 8 arcade runs and 13 Clocked rounds; PLAY DATA tab verified live. Finish rates read 100% until live starts accumulate, because only completed rounds existed to backfill.

@@ -99,7 +99,7 @@ export default function TournamentApplyScreen({ navigation }) {
             We read every one and hand-pick the field. You'll hear from us either way: a spot with payment details, or a place on the waitlist with your number in line. Nobody pays until they're in.
           </Text>
           <Text style={s.successClosing}>The game is yours. The clock is running.</Text>
-          <TouchableOpacity style={s.doneBtn} onPress={() => navigation.navigate('Main')} activeOpacity={0.85}>
+          <TouchableOpacity style={s.doneBtn} onPress={() => navigation.popTo('Main')} activeOpacity={0.85}>
             <Text style={s.doneBtnText}>DONE</Text>
           </TouchableOpacity>
         </View>
