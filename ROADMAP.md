@@ -93,6 +93,9 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 - [x] **`website-forms` deployed, site live** 5 Nov; the form validates against the live function.
 - [ ] **Payment tracking** — admin can mark accepted/waitlisted; there is no paid flag yet. Track Zelle/Venmo receipts by hand for this one, add `paid_at` before the next event.
 - [x] **Lights confirmed** — the course is lit; 6:00 PM is deliberate. "Under the lights" is in the copy.
+- [x] **Sign-up on the homepage** — 13 Nov, ahead of the promo. Gold strip under the header, hero button, and the full team application at `clocked.golf/#apply` (same `event_application` form as /tournaments, success block `#apply-done`). Stylesheet stamp `20261113a`. Draft deploy checked; production deploy is the user's to run.
+- [ ] **Send one test application before the promo** — `tournament_applications` had zero rows on 13 Nov, so the path has never stored a real application from the site or the app. Confirm the row and the hello@clocked.golf email, then delete the test row.
+- [ ] **Take the event content off the homepage after 19 Nov** — strip, hero button, `#apply` section and the meta description are all event-specific. Pre-event homepage is in `clocked html - backup 2026-11-13`.
 
 ## CLOCK — 5 Nov, lock-screen alarms
 
