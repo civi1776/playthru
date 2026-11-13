@@ -232,10 +232,20 @@ export default function AdminScreen({ navigation }) {
               {tab === 'applications' && (
                 <>
                   <Text style={s.cardLine}>{item.player1_name} & {item.player2_name}</Text>
+                  {(!!item.player1_sport || !!item.player2_sport) && (
+                    <Text style={s.cardMeta}>
+                      Sport: {item.player1_sport || '—'} · {item.player2_sport || '—'}
+                    </Text>
+                  )}
                   <Text style={s.cardMeta}>
-                    Sport: {item.player1_sport || '—'} · {item.player2_sport || '—'}
+                    P1: {[item.contact_email, item.contact_phone, item.player1_instagram].filter(Boolean).join(' · ')}
                   </Text>
-                  <Text style={s.cardMeta}>{item.contact_email} · {item.tournament_slug}</Text>
+                  {(!!item.player2_email || !!item.player2_phone || !!item.player2_instagram) && (
+                    <Text style={s.cardMeta}>
+                      P2: {[item.player2_email, item.player2_phone, item.player2_instagram].filter(Boolean).join(' · ')}
+                    </Text>
+                  )}
+                  <Text style={s.cardMeta}>{item.source} · {item.tournament_slug}</Text>
                   {!!item.why_compete && <Text style={s.cardBody} numberOfLines={4}>{item.why_compete}</Text>}
                 </>
               )}

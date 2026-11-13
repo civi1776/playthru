@@ -190,34 +190,33 @@ Deno.serve(async (req) => {
       ['Handicap', handicap], ['Home course', home_course], ['Comments', message], ['Consent', consent ? 'Yes' : 'No'], ['Page', source_page ?? ''],
     ]);
   } else if (kind === 'event_application') {
+    // Sign-up asks for exactly: team name, and for each player a full name,
+    // email and phone, with Instagram optional. `email` / `phone` are player 1
+    // and double as the team contact. Entry terms are shown beside the submit
+    // button; there is no checkbox.
     const slugIn = str(body.tournament_slug, 60);
     const tournament_slug = EVENT_SLUGS.includes(slugIn) ? slugIn : EVENT_SLUGS[0];
     const team_name = str(body.team_name), phone = str(body.phone, 40);
-    const player1_name = str(body.player1_name), player1_handicap = str(body.player1_handicap, 40);
-    const player1_sport = str(body.player1_sport), player1_instagram = str(body.player1_instagram, 80);
-    const player2_name = str(body.player2_name), player2_handicap = str(body.player2_handicap, 40);
-    const player2_sport = str(body.player2_sport), player2_instagram = str(body.player2_instagram, 80);
-    const why_compete = text(body.why_compete, 2000);
-    const consent = truthy(body.consent);
+    const player1_name = str(body.player1_name), player1_instagram = str(body.player1_instagram, 80);
+    const player2_name = str(body.player2_name), player2_instagram = str(body.player2_instagram, 80);
+    const player2_email = str(body.player2_email).toLowerCase(), player2_phone = str(body.player2_phone, 40);
     if (!team_name)     return json(400, { ok: false, error: 'Please enter a team name.' });
-    if (!phone)         return json(400, { ok: false, error: 'Please enter a phone number.' });
-    if (!player1_name || !player2_name) return json(400, { ok: false, error: 'Please enter both player names.' });
-    if (!player1_sport || !player2_sport) return json(400, { ok: false, error: 'Please tell us the sport each player played.' });
-    if (!why_compete)   return json(400, { ok: false, error: 'Tell us why your team should be in the field.' });
-    if (!consent)       return json(400, { ok: false, error: 'Please confirm the entry fee and selection terms.' });
+    if (!player1_name || !player2_name) return json(400, { ok: false, error: 'Please enter both players\' full names.' });
+    if (!phone)         return json(400, { ok: false, error: 'Please enter a phone number for player 1.' });
+    if (!isEmail(player2_email)) return json(400, { ok: false, error: 'Please enter a valid email address for player 2.' });
+    if (!player2_phone) return json(400, { ok: false, error: 'Please enter a phone number for player 2.' });
     insert = {
       source: 'website', tournament_slug, status: 'pending',
-      team_name, contact_email: email, contact_phone: orNull(phone),
-      player1_name, player1_handicap: orNull(player1_handicap), player1_sport, player1_instagram: orNull(player1_instagram),
-      player2_name, player2_handicap: orNull(player2_handicap), player2_sport, player2_instagram: orNull(player2_instagram),
-      why_compete,
+      team_name, contact_email: email, contact_phone: phone,
+      player1_name, player1_instagram: orNull(player1_instagram),
+      player2_name, player2_email, player2_phone, player2_instagram: orNull(player2_instagram),
     };
     subject = `Event application — ${team_name} (${player1_name} & ${player2_name})`;
     html = notifyHtml(`New team application · ${tournament_slug}`, [
-      ['Team', team_name], ['Email', email], ['Phone', phone],
-      ['Player 1', `${player1_name} · hcp ${player1_handicap || '—'} · ${player1_sport} · ${player1_instagram || ''}`],
-      ['Player 2', `${player2_name} · hcp ${player2_handicap || '—'} · ${player2_sport} · ${player2_instagram || ''}`],
-      ['Why', why_compete], ['Entry terms', consent ? 'Acknowledged' : 'No'], ['Page', source_page ?? ''],
+      ['Team', team_name],
+      ['Player 1', [player1_name, email, phone, player1_instagram].filter(Boolean).join(' · ')],
+      ['Player 2', [player2_name, player2_email, player2_phone, player2_instagram].filter(Boolean).join(' · ')],
+      ['Page', source_page ?? ''],
     ]);
   } else if (kind === 'course_partnership') {
     const contact_name = str(body.contact_name), facility = str(body.facility), job_title = str(body.job_title);
