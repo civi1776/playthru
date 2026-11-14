@@ -14,6 +14,8 @@ import { useAuth } from '../context/AuthContext';
 import CourseAvatar from '../components/CourseAvatar';
 import { fetchClockedConfig } from '../lib/clockedConfig';
 import { isPar3Course } from '../lib/popScore';
+import { computeTimePar, formatSeconds, DIFFICULTY_LABEL } from '../lib/clockedSport';
+import EVENT, { EVENT_PLAY, eventPlayOpen } from '../lib/event';
 import InitialsAvatar from '../components/InitialsAvatar';
 import Button from '../components/Button';
 import { COLOR, RADIUS } from '../lib/theme';
@@ -28,17 +30,44 @@ const TEE_COLORS = {
 const PHASE = { COURSE: 0, HOLES: 1, TEE: 2, MODE: 3, PLAYERS: 4, TRANSPORT: 5 };
 // Dots are built from the steps this round will actually show (see visibleSteps).
 
-export default function ClockedSetupScreen({ navigation }) {
+// The event's course, as a course row. No id: the round is saved by course
+// name, and the tournament supplies its own par and clock.
+const EVENT_COURSE = { id: null, name: EVENT_PLAY.courseName, city: EVENT_PLAY.city, state: EVENT_PLAY.state, is_par3: true };
+
+const LEVELS = [
+  { key: 'beginner',     color: COLOR.green },
+  { key: 'intermediate', color: COLOR.amber },
+  { key: 'pro',          color: COLOR.red },
+];
+
+export default function ClockedSetupScreen({ navigation, route }) {
   const { profile, user } = useAuth();
 
+  // The signed-in player plus empty seats for the rest of the group.
+  const seedPlayers = (count) => {
+    const userName = profile?.full_name || profile?.username || 'You';
+    const userHcp = profile?.handicap_index != null ? String(Math.round(profile.handicap_index)) : '';
+    const list = [{ name: userName, handicap: userHcp, isUser: true, userId: user?.id }];
+    for (let i = 1; i < count; i++) list.push({ name: '', handicap: '', isUser: false, userId: null, username: null });
+    return list;
+  };
+
+  // Opened from the Tournament screen: skip the course search and land on the
+  // team step of the tournament round.
+  const startInEvent = !!route?.params?.tournament;
+
   // ── State ──
-  const [phase, setPhase]             = useState(PHASE.COURSE);
-  const [course, setCourse]           = useState(null);
+  const [phase, setPhase]             = useState(startInEvent ? PHASE.PLAYERS : PHASE.COURSE);
+  const [course, setCourse]           = useState(startInEvent ? EVENT_COURSE : null);
+  // Tournament round: the event's course, nine par 3s, one fixed clock.
+  const [tournament, setTournament]   = useState(startInEvent);
+  // Par the player sets by hand, by hole index, for a round with no hole data.
+  const [manualPars, setManualPars]   = useState({});
   const [holes, setHoles]             = useState('9');
   const [courseTees, setCourseTees]   = useState(null);
   const [selectedTeeIdx, setSelectedTeeIdx] = useState(null);
   const [selectedNine, setSelectedNine]     = useState('front');
-  const [mode, setMode]               = useState(1); // 1=solo, 2/3/4
+  const [mode, setMode]               = useState(startInEvent ? EVENT_PLAY.players : 1); // 1=solo, 2/3/4
   // Pre-selected so CONTINUE is live the moment the step appears: last-used
   // transport if we have one, otherwise Cart. The user can still change it.
   const [transport, setTransport]     = useState(CLOCKED_DEFAULT_TRANSPORT);
@@ -55,7 +84,7 @@ export default function ClockedSetupScreen({ navigation }) {
   // Defaults to the league picked during onboarding, if set — still fully
   // changeable per round.
   const [difficulty, setDifficulty]   = useState(() => profile?.preferred_difficulty ?? 'intermediate');
-  const [players, setPlayers]         = useState([]);
+  const [players, setPlayers]         = useState(() => (startInEvent ? seedPlayers(EVENT_PLAY.players) : []));
   const [certData, setCertData]       = useState(null); // { timePars, holeInfo }
 
   // Pre-fetch remote config on mount
@@ -97,8 +126,46 @@ export default function ClockedSetupScreen({ navigation }) {
   // missing.
   const defaultPar = isPar3Course(course) ? 3 : 4;
 
+  // No hole-by-hole data for this round (no course picked, or the course has
+  // none on file): the player sets par on each hole before starting.
+  const manualPar = !tournament && (!teeHoles || teeHoles.length < holeCount);
+  const holeOffset = (holes === '9' && selectedNine === 'back') ? 9 : 0;
+  const manualParFor = (i) => manualPars[i] ?? certData?.holeInfo?.[i + 1 + holeOffset]?.par ?? defaultPar;
+  const setManualPar = (i, par) => setManualPars(prev => ({ ...prev, [i]: par }));
+  const setAllManualPars = (par) =>
+    setManualPars(Object.fromEntries(Array.from({ length: 18 }, (_, i) => [i, par])));
+  const manualAllSame = (par) => Array.from({ length: holeCount }, (_, i) => manualParFor(i)).every(p => p === par);
+  // The level table only decides the clock when the course has no certified
+  // time pars of its own.
+  const hasCertifiedClock = !!certData?.timePars && Object.keys(certData.timePars).length > 0;
+  const clockPlayers = Math.max(1, players.length || mode);
+
   // ── Handlers ──
+  const startTournament = () => {
+    setTournament(true);
+    setCourse(EVENT_COURSE);
+    setCourseTees(null);
+    setSelectedTeeIdx(null);
+    setSelectedNine('front');
+    setCertData(null);
+    setHoles(String(EVENT_PLAY.holes));
+    setQuery('');
+    handleModeSelected(EVENT_PLAY.players);
+  };
+
+  const startManual = () => {
+    setTournament(false);
+    setCourse(null);
+    setCourseTees(null);
+    setSelectedTeeIdx(null);
+    setCertData(null);
+    setManualPars({});
+    setPhase(PHASE.MODE);
+  };
+
   const handleCourseSelected = async (c) => {
+    setTournament(false);
+    setManualPars({});
     setCourse(c);
     setCourseTees(null);
     setSelectedTeeIdx(null);
@@ -181,19 +248,8 @@ export default function ClockedSetupScreen({ navigation }) {
 
   const handleModeSelected = (m) => {
     setMode(m);
-    const userName = profile?.full_name || profile?.username || 'You';
-    const userHcp = profile?.handicap_index != null ? String(Math.round(profile.handicap_index)) : '';
-    const initial = [{ name: userName, handicap: userHcp, isUser: true, userId: user?.id }];
-    for (let i = 1; i < m; i++) {
-      initial.push({ name: '', handicap: '', isUser: false, userId: null, username: null });
-    }
-    setPlayers(initial);
-    if (m === 1) {
-      setPlayers([{ name: userName, handicap: userHcp, isUser: true, userId: user?.id }]);
-      setPhase(PHASE.TRANSPORT);
-    } else {
-      setPhase(PHASE.PLAYERS);
-    }
+    setPlayers(seedPlayers(m));
+    setPhase(m === 1 ? PHASE.TRANSPORT : PHASE.PLAYERS);
   };
 
   const handlePlayersNext = () => {
@@ -203,10 +259,41 @@ export default function ClockedSetupScreen({ navigation }) {
 
   const handleStartRound = async () => {
     const config = await fetchClockedConfig();
-    let holeDataSlice = buildHoleDataSlice();
+
+    // Remember for next time — pre-selects this transport on the next setup.
+    AsyncStorage.setItem(CLOCKED_LAST_TRANSPORT_KEY, transport).catch(() => {});
+
+    if (tournament) {
+      navigation.navigate('ClockedRound', {
+        course: EVENT_COURSE,
+        holes: String(EVENT_PLAY.holes),
+        transport,
+        difficulty: EVENT_PLAY.difficulty,
+        mode,
+        players,
+        selectedTee: null,
+        selectedNine: 'front',
+        holeData: Array.from({ length: EVENT_PLAY.holes }, () => ({ par: EVENT_PLAY.par, yardage: null })),
+        configSnapshot: config,
+        officialTimePars: {},
+        defaultPar: EVENT_PLAY.par,
+        tournament: {
+          slug: EVENT.slug, name: EVENT.name, level: EVENT_PLAY.level,
+          par: EVENT_PLAY.par, timeParSeconds: EVENT_PLAY.timeParSeconds,
+        },
+      });
+      return;
+    }
+
+    // Hole data from the tee, or the pars the player just set by hand.
+    let holeDataSlice = manualPar
+      ? Array.from({ length: holeCount }, (_, i) => ({
+          par: manualParFor(i),
+          yardage: certData?.holeInfo?.[i + 1 + holeOffset]?.yardage ?? null,
+        }))
+      : buildHoleDataSlice();
 
     // Remap certified data: for back 9, DB hole 10 → round hole 1
-    const holeOffset = (holes === '9' && selectedNine === 'back') ? 9 : 0;
     let officialTimePars = {};
     if (certData?.timePars) {
       officialTimePars = Object.fromEntries(
@@ -214,8 +301,9 @@ export default function ClockedSetupScreen({ navigation }) {
       );
     }
 
-    // Seed holeData with certified par/yardage where available
-    if (certData?.holeInfo && holeDataSlice) {
+    // Seed holeData with certified par/yardage where available (a par set by
+    // hand already started from the certified one and wins over it)
+    if (certData?.holeInfo && holeDataSlice && !manualPar) {
       holeDataSlice = holeDataSlice.map((h, i) => {
         const dbHole = i + 1 + holeOffset;
         const cert = certData.holeInfo[dbHole];
@@ -227,9 +315,6 @@ export default function ClockedSetupScreen({ navigation }) {
         };
       });
     }
-
-    // Remember for next time — pre-selects this transport on the next setup.
-    AsyncStorage.setItem(CLOCKED_LAST_TRANSPORT_KEY, transport).catch(() => {});
 
     navigation.navigate('ClockedRound', {
       course,
@@ -266,8 +351,26 @@ export default function ClockedSetupScreen({ navigation }) {
       setPhase((courseTees?.length ?? 0) > 0 ? PHASE.TEE : PHASE.COURSE);
       return;
     }
-    if (phase === PHASE.PLAYERS) { setPhase(PHASE.MODE); return; }
+    if (phase === PHASE.PLAYERS) {
+      if (tournament) {
+        // Came straight in from the Tournament screen: back leaves setup.
+        if (startInEvent) { navigation.goBack(); return; }
+        setTournament(false);
+        setCourse(null);
+        setPhase(PHASE.COURSE);
+        return;
+      }
+      setPhase(PHASE.MODE);
+      return;
+    }
     if (phase === PHASE.TRANSPORT) {
+      // A tournament round has no mode step: back always returns to the team.
+      // (Solo practice gave up the partner's seat, so it is seeded again.)
+      if (tournament) {
+        if (mode === 1) handleModeSelected(EVENT_PLAY.players);
+        else setPhase(PHASE.PLAYERS);
+        return;
+      }
       setPhase(mode === 1 ? PHASE.MODE : PHASE.PLAYERS);
       return;
     }
@@ -285,7 +388,7 @@ export default function ClockedSetupScreen({ navigation }) {
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={handleBack} style={s.backBtn} accessibilityLabel="Go back" accessibilityRole="button">
-          <Ionicons name={phase === PHASE.COURSE ? 'close' : 'arrow-back'} size={20} color={COLOR.gold} />
+          <Ionicons name={phase === PHASE.COURSE || (startInEvent && tournament && phase === PHASE.PLAYERS) ? 'close' : 'arrow-back'} size={20} color={COLOR.gold} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>CLOCKED</Text>
         <TouchableOpacity onPress={() => navigation.navigate('RulesScreen')} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }} activeOpacity={0.7}>
@@ -298,8 +401,8 @@ export default function ClockedSetupScreen({ navigation }) {
         const visibleSteps = [
           PHASE.COURSE,
           (courseTees?.length ?? 0) > 0 ? PHASE.TEE : null,
-          PHASE.MODE,
-          mode > 1 ? PHASE.PLAYERS : null,
+          tournament ? null : PHASE.MODE,
+          mode > 1 || tournament ? PHASE.PLAYERS : null,
           PHASE.TRANSPORT,
         ].filter(p => p != null);
         const at = Math.max(0, visibleSteps.indexOf(phase));
@@ -321,6 +424,27 @@ export default function ClockedSetupScreen({ navigation }) {
         {/* ── COURSE ── */}
         {phase === PHASE.COURSE && (
           <View style={{ flex: 1 }}>
+            {eventPlayOpen() && (
+              <TouchableOpacity
+                style={s.eventCard}
+                onPress={startTournament}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Play the tournament round, ${EVENT.name}`}
+              >
+                <View style={s.eventIcon}>
+                  <Ionicons name="trophy" size={20} color={COLOR.bg} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.eventKicker}>TOURNAMENT</Text>
+                  <Text style={s.eventTitle}>{EVENT.name}</Text>
+                  <Text style={s.eventSub}>
+                    {EVENT.venue} {'\u00B7'} {EVENT_PLAY.holes} holes {'\u00B7'} every hole par {EVENT_PLAY.par} {'\u00B7'} {formatSeconds(EVENT_PLAY.timeParSeconds)} a hole
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={COLOR.gold} />
+              </TouchableOpacity>
+            )}
             <Text style={s.stepTitle}>Which course?</Text>
             <TextInput
               style={s.searchInput}
@@ -328,9 +452,9 @@ export default function ClockedSetupScreen({ navigation }) {
               placeholderTextColor="#B8A88266"
               value={query}
               onChangeText={t => { setQuery(t); setCourse(null); }}
-              autoFocus
               autoCapitalize="none"
               autoCorrect={false}
+              returnKeyType="search"
             />
             {/* Results sit directly under the field so they are above the keyboard. */}
             {results.map(c => (
@@ -357,17 +481,23 @@ export default function ClockedSetupScreen({ navigation }) {
             )}
             {searchState === 'done' && results.length === 0 && (
               <View style={s.searchStatus}>
-                <Text style={s.searchStatusText}>No course found for “{query.trim()}”. Try the club name or the city, or skip and set par yourself.</Text>
+                <Text style={s.searchStatusText}>No course found for “{query.trim()}”. Try the club name or the city, or set par yourself below.</Text>
               </View>
             )}
-            {/* Quick-play: skip course selection */}
+            {/* No course, or it is not in the search: set par by hand */}
             <TouchableOpacity
-              style={s.skipCourseBtn}
-              onPress={() => { setCourse(null); setPhase(PHASE.MODE); }}
-              activeOpacity={0.7}
+              style={s.arcadeCard}
+              onPress={startManual}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Set par yourself"
             >
-              <Ionicons name="flash-outline" size={14} color="#E8CC6E88" />
-              <Text style={s.skipCourseText}>Skip. I'll set par manually</Text>
+              <Ionicons name="create-outline" size={20} color={COLOR.gold} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.arcadeTitle}>Can't find it? Set par yourself</Text>
+                <Text style={s.arcadeSub}>Pick par 3, 4 or 5 for each hole and choose your level.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={COLOR.dim} />
             </TouchableOpacity>
             {/* Not at a course — play the arcade on the same rules */}
             <TouchableOpacity
@@ -472,8 +602,12 @@ export default function ClockedSetupScreen({ navigation }) {
         {/* ── PLAYERS ── */}
         {phase === PHASE.PLAYERS && (
           <View>
-            <Text style={s.stepTitle}>Your group</Text>
-            <Text style={s.stepSub}>Link teammates by username so they get credit, or enter a name for guests.</Text>
+            <Text style={s.stepTitle}>{tournament ? 'Your team' : 'Your group'}</Text>
+            <Text style={s.stepSub}>
+              {tournament
+                ? `Teams of ${EVENT_PLAY.players}. Link your partner by username so they get credit, or enter their name.`
+                : 'Link teammates by username so they get credit, or enter a name for guests.'}
+            </Text>
             {players.map((pl, i) => (
               <View key={i}>
                 <View style={s.playerRow}>
@@ -577,21 +711,51 @@ export default function ClockedSetupScreen({ navigation }) {
             >
               <Text style={s.primaryBtnText}>CONTINUE</Text>
             </TouchableOpacity>
+            {tournament && (
+              <TouchableOpacity
+                style={s.soloLink}
+                onPress={() => handleModeSelected(1)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+              >
+                <Text style={s.soloLinkText}>Practising on your own? Play it solo</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
         {/* ── TRANSPORT ── */}
         {phase === PHASE.TRANSPORT && (
           <View>
-            <Text style={s.stepTitle}>Set up the round</Text>
-            <Text style={s.stepSub}>Holes, how you're getting around, and the clock. Walking earns more time per hole.</Text>
+            <Text style={s.stepTitle}>{tournament ? 'Tournament round' : 'Set up the round'}</Text>
+            <Text style={s.stepSub}>
+              {tournament
+                ? `${EVENT.name}. Every team plays the same holes on the same clock.`
+                : "Holes, how you're getting around, and the clock."}
+            </Text>
             <View style={s.summaryStrip}>
-              <Text style={s.summaryMain} numberOfLines={1}>{course?.name ?? 'No course · manual par'}</Text>
+              <Text style={s.summaryMain} numberOfLines={1}>{course?.name ?? 'No course · par set by you'}</Text>
               <Text style={s.summaryMeta} numberOfLines={1}>
                 {mode === 1 ? 'Solo' : `${mode} players · ${players.map(p => p.name || '—').join(', ')}`}
                 {selectedTee ? ` · ${selectedTee.tee_name} tees` : ''}
               </Text>
             </View>
+            {tournament ? (
+              <View style={s.factGrid}>
+                {[
+                  { label: 'HOLES',    value: String(EVENT_PLAY.holes) },
+                  { label: 'PAR',      value: `${EVENT_PLAY.par} on every hole` },
+                  { label: 'CLOCK',    value: `${formatSeconds(EVENT_PLAY.timeParSeconds)} a hole` },
+                  { label: 'LEVEL',    value: EVENT_PLAY.level },
+                ].map(f => (
+                  <View key={f.label} style={s.factCell}>
+                    <Text style={s.factLabel}>{f.label}</Text>
+                    <Text style={s.factValue}>{f.value}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <>
             <Text style={s.sectionQ}>HOLES</Text>
             <View style={s.btnGroup}>
               {[{ label: '9 Holes', v: '9' }, { label: '18 Holes', v: '18' }].map(({ label, v }) => (
@@ -605,6 +769,58 @@ export default function ClockedSetupScreen({ navigation }) {
                 </TouchableOpacity>
               ))}
             </View>
+              </>
+            )}
+            {/* Par by hand: every hole gets a par 3, 4 or 5 */}
+            {manualPar && (
+              <View>
+                <Text style={[s.sectionQ, { marginTop: 24 }]}>PAR ON EACH HOLE</Text>
+                <Text style={s.parHint}>
+                  {course ? 'This course has no hole-by-hole data yet.' : 'No course selected.'} Set the par for each hole. You can still change it during the round.
+                </Text>
+                <View style={s.btnGroup}>
+                  {[3, 4, 5].map(par => {
+                    const on = manualAllSame(par);
+                    return (
+                      <TouchableOpacity
+                        key={par}
+                        style={[s.groupBtn, s.groupBtnWide, s.allParBtn, on && s.groupBtnOn]}
+                        onPress={() => setAllManualPars(par)}
+                        activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Set every hole to par ${par}`}
+                      >
+                        <Text style={[s.allParTxt, on && s.groupBtnTxtOn]}>ALL PAR {par}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <View style={s.parGrid}>
+                  {Array.from({ length: holeCount }, (_, i) => {
+                    const cur = manualParFor(i);
+                    return (
+                      <View key={i} style={s.parCell}>
+                        <Text style={s.parHole}>{i + 1}</Text>
+                        {[3, 4, 5].map(par => (
+                          <TouchableOpacity
+                            key={par}
+                            style={[s.parPill, cur === par && s.parPillOn]}
+                            onPress={() => setManualPar(i, par)}
+                            activeOpacity={0.8}
+                            hitSlop={{ top: 4, bottom: 4 }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Hole ${i + 1} par ${par}`}
+                            accessibilityState={{ selected: cur === par }}
+                          >
+                            <Text style={[s.parPillTxt, cur === par && s.parPillTxtOn]}>{par}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
             <Text style={[s.sectionQ, { marginTop: 24 }]}>GETTING AROUND</Text>
             <View style={s.btnGroup}>
               {['Walking', 'Cart'].map(t => (
@@ -624,29 +840,68 @@ export default function ClockedSetupScreen({ navigation }) {
                 </TouchableOpacity>
               ))}
             </View>
-            {/* Difficulty picker */}
-            <Text style={[s.sectionQ, { marginTop: 24 }]}>SHOT CLOCK DIFFICULTY</Text>
-            <View style={s.difficultyRow}>
-              {[
-                { key: 'beginner',     label: 'BEGINNER', sub: '~4:30 round', color: COLOR.green },
-                { key: 'intermediate', label: 'INTER.',   sub: '~3:30 round', color: COLOR.amber },
-                { key: 'pro',          label: 'PRO',      sub: '~3:00 round', color: COLOR.red },
-              ].map(d => (
-                <TouchableOpacity
-                  key={d.key}
-                  style={[s.diffBtn, difficulty === d.key && s.diffBtnActive]}
-                  onPress={() => setDifficulty(d.key)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[s.diffDot, { backgroundColor: d.color }]} />
-                  <Text style={[s.diffLabel, difficulty === d.key && s.diffLabelActive]}>{d.label}</Text>
-                  <Text style={s.diffSub}>{d.sub}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Level picker: each level shows its clock for a par 3, 4 and 5 */}
+            {!tournament && (
+              <>
+                <Text style={[s.sectionQ, { marginTop: 24 }]}>LEVEL</Text>
+                <View style={s.difficultyRow}>
+                  {LEVELS.map(d => {
+                    const on = difficulty === d.key;
+                    return (
+                      <TouchableOpacity
+                        key={d.key}
+                        style={[s.diffBtn, on && s.diffBtnActive]}
+                        onPress={() => setDifficulty(d.key)}
+                        activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${DIFFICULTY_LABEL[d.key]} level`}
+                        accessibilityState={{ selected: on }}
+                      >
+                        <View style={[s.diffDot, { backgroundColor: d.color }]} />
+                        <Text style={[s.diffLabel, on && s.diffLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                          {DIFFICULTY_LABEL[d.key]}
+                        </Text>
+                        {hasCertifiedClock ? (
+                          <Text style={s.diffSub}>
+                            {d.key === 'beginner' ? 'More time' : d.key === 'pro' ? 'Less time' : 'Course time'}
+                          </Text>
+                        ) : (
+                          <View style={s.diffTimes}>
+                            {[3, 4, 5].map(par => (
+                              <View key={par} style={s.diffTimeRow}>
+                                <Text style={s.diffTimePar}>PAR {par}</Text>
+                                <Text style={[s.diffTimeVal, on && s.diffTimeValOn]}>
+                                  {formatSeconds(computeTimePar(null, par, clockPlayers, transport, d.key))}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={s.parHint}>
+                  {hasCertifiedClock
+                    ? 'This course has its own certified time for each hole. Your level scales it.'
+                    : `Time on the clock per hole for ${clockPlayers === 1 ? 'a solo player' : `${clockPlayers} players`}.`}
+                </Text>
+              </>
+            )}
 
-            <Button label="START ROUND" icon="timer-outline" size="lg" onPress={handleStartRound} disabled={!transport} style={{ marginTop: 28 }} />
-            <Text style={s.startSub}>Your shot clock begins on hole 1</Text>
+            <Button
+              label={tournament ? 'START TOURNAMENT ROUND' : 'START ROUND'}
+              icon={tournament ? 'trophy-outline' : 'timer-outline'}
+              size="lg"
+              onPress={handleStartRound}
+              disabled={!transport}
+              style={{ marginTop: 28 }}
+            />
+            <Text style={s.startSub}>
+              {tournament
+                ? `${formatSeconds(EVENT_PLAY.timeParSeconds)} on the clock for every hole, starting on hole 1`
+                : 'Your shot clock begins on hole 1'}
+            </Text>
           </View>
         )}
 
@@ -673,8 +928,6 @@ const s = StyleSheet.create({
   sectionQ:    { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 8, marginTop: 12 },
 
   searchInput: { backgroundColor: COLOR.surface, borderWidth: 1, borderColor: '#7DC87A33', borderRadius: RADIUS.md, padding: 14, color: COLOR.cream, fontSize: 15, marginBottom: 12 },
-  skipCourseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, marginBottom: 12 },
-  skipCourseText:{ fontSize: 12, color: '#E8CC6E88', fontWeight: '500' },
   searchStatus:  { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 4, marginBottom: 6 },
   searchStatusText: { flex: 1, fontSize: 13, color: COLOR.dim, lineHeight: 18 },
   arcadeCard:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#E8CC6E33', paddingVertical: 12, paddingHorizontal: 14, marginBottom: 14 },
@@ -728,7 +981,37 @@ const s = StyleSheet.create({
   searchResultHandle: { fontSize: 10, color: COLOR.muted },
   hcpWarning:  { fontSize: 11, color: '#D4844A', marginTop: 8, fontStyle: 'italic' },
 
+  // Tournament card (course step) and locked facts (final step)
+  eventCard:   { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#E8CC6E12', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLOR.gold, paddingVertical: 14, paddingHorizontal: 14, marginTop: 8, marginBottom: 10 },
+  eventIcon:   { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: COLOR.gold, alignItems: 'center', justifyContent: 'center' },
+  eventKicker: { fontSize: 9, fontWeight: '700', color: COLOR.gold, letterSpacing: 2, marginBottom: 2 },
+  eventTitle:  { fontSize: 16, fontWeight: '600', color: COLOR.cream },
+  eventSub:    { fontSize: 11, color: COLOR.muted, marginTop: 3, lineHeight: 16 },
+  soloLink:    { paddingVertical: 16, alignItems: 'center' },
+  soloLinkText:{ fontSize: 13, color: COLOR.gold, fontWeight: '500' },
+  factGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
+  factCell:    { flexGrow: 1, flexBasis: '45%', backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#E8CC6E33', paddingVertical: 12, paddingHorizontal: 14 },
+  factLabel:   { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 2, marginBottom: 4 },
+  factValue:   { fontSize: 15, fontWeight: '600', color: COLOR.cream },
+
+  // Par by hand
+  parHint:     { fontSize: 12, color: COLOR.dim, lineHeight: 17, marginBottom: 10, marginTop: 2 },
+  allParBtn:   { paddingHorizontal: 6 },
+  allParTxt:   { fontSize: 11, fontWeight: '700', color: COLOR.muted, letterSpacing: 1 },
+  parGrid:     { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, marginTop: 12 },
+  parCell:     { width: '48.5%', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 6, paddingHorizontal: 8 },
+  parHole:     { width: 22, fontSize: 13, fontWeight: '700', color: COLOR.gold, textAlign: 'center' },
+  parPill:     { flex: 1, height: 36, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: '#7DC87A33', alignItems: 'center', justifyContent: 'center' },
+  parPillOn:   { backgroundColor: COLOR.gold, borderColor: COLOR.gold },
+  parPillTxt:  { fontSize: 15, fontWeight: '600', color: COLOR.muted },
+  parPillTxtOn:{ color: COLOR.bg, fontWeight: '700' },
+
   // Difficulty picker
+  diffTimes:      { alignSelf: 'stretch', paddingHorizontal: 10, marginTop: 4, gap: 2 },
+  diffTimeRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  diffTimePar:    { fontSize: 9, fontWeight: '700', color: COLOR.dim, letterSpacing: 1 },
+  diffTimeVal:    { fontSize: 13, fontWeight: '600', color: COLOR.muted, fontVariant: ['tabular-nums'] },
+  diffTimeValOn:  { color: COLOR.gold },
   difficultyRow:  { flexDirection: 'row', gap: 10 },
   diffBtn:        { flex: 1, backgroundColor: COLOR.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#7DC87A22', paddingVertical: 14, alignItems: 'center', gap: 4 },
   diffBtnActive:  { borderColor: COLOR.gold, backgroundColor: '#E8CC6E0F' },

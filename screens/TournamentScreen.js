@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLOR, SPACING, RADIUS } from '../lib/theme';
 import ScreenHeader from '../components/ScreenHeader';
 import Button from '../components/Button';
-import { EVENT, EVENT_ENTRY_NOTE, EVENT_TEST_RUN_NOTE } from '../lib/event';
+import { EVENT, EVENT_PLAY, EVENT_ENTRY_NOTE, EVENT_TEST_RUN_NOTE, eventPlayOpen } from '../lib/event';
+import { formatSeconds } from '../lib/clockedSport';
 
 const FACTS = [
   { label: 'WHEN',  value: `${EVENT.dateLabel} · ${EVENT.timeLabel} · under the lights` },
@@ -18,12 +19,12 @@ const FACTS = [
 const FORMAT_ITEMS = [
   { label: 'FORMAT',     value: 'Clocked Golf. A time par on every hole, points for every score.' },
   { label: 'TEAMS',      value: 'Two-player teams. Apply together.' },
-  { label: 'SHOT CLOCK', value: 'Starts on the first shot of the hole, stops when the last player holes out. Over time par costs points.' },
+  { label: 'SHOT CLOCK', value: `${formatSeconds(EVENT_PLAY.timeParSeconds)} on every hole, every hole a par ${EVENT_PLAY.par}. Starts on the first shot, stops when the last player holes out. Over the clock costs points.` },
   { label: 'SCORING',    value: 'Scored in the Clocked Golf app, the same way every round is.', highlight: true },
 ];
 
 const HOW_IT_WORKS = [
-  { n: '1', title: 'Apply with your partner', body: 'One application per team. Tell us who you both are and what you played.' },
+  { n: '1', title: 'Apply with your partner', body: 'One application per team. A team name, then a name, email and phone number for each of you.' },
   { n: '2', title: 'We pick the field',         body: `We read every application and hand-pick ${EVENT.teamCap}. Everyone else goes on the waitlist, in order.` },
   { n: '3', title: 'Pay to lock your spot',     body: EVENT_ENTRY_NOTE },
   { n: '4', title: 'Play on the clock',         body: `Nine holes under the lights at ${EVENT.venue}. The cash prize is set by the size of the field and announced before the first tee.` },
@@ -128,6 +129,18 @@ export default function TournamentScreen({ navigation }) {
           <Button label="APPLY WITH YOUR PARTNER" icon="arrow-forward" size="lg" onPress={() => navigation.navigate('TournamentApply')} style={{ marginTop: 8 }} />
           <Text style={s.closing}>The game is yours. The clock is running.</Text>
         </View>
+
+        {/* Play the tournament round: the event format, ready in Play */}
+        {eventPlayOpen() && (
+          <View style={s.applySection}>
+            <Text style={s.eyebrow}>PLAY THE FORMAT</Text>
+            <Text style={s.sectionTitle}>The tournament round is in the app.</Text>
+            <Text style={s.body}>
+              {EVENT_PLAY.holes} holes at {EVENT.venue}, every hole a par {EVENT_PLAY.par}, {formatSeconds(EVENT_PLAY.timeParSeconds)} on the clock for each. It is the round you play on the night, and you can run it beforehand to get a feel for the clock.
+            </Text>
+            <Button label="PLAY THE ROUND" icon="trophy-outline" variant="secondary" size="lg" onPress={() => navigation.navigate('ClockedSetup', { tournament: true })} style={{ marginTop: 8 }} />
+          </View>
+        )}
 
       </ScrollView>
     </SafeAreaView>

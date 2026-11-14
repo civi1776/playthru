@@ -96,9 +96,25 @@ today's top real score; sloppy = 3s hesitation, loose meter):
 - [x] **Sign-up on the homepage** — 13 Nov, ahead of the promo. Gold strip under the header, hero button, and the full team application at `clocked.golf/#apply` (same `event_application` form as /tournaments, success block `#apply-done`). Stylesheet stamp `20261113a`. Draft deploy checked; production deploy is the user's to run.
 - [x] **Sign-up fields cut down** — 13 Nov. The website form asks for exactly: team name, and for each player a full name, email and phone, with a social tag optional. Handicap, sport, the written answer and the consent checkbox are gone; entry terms sit as text above the submit button. Player 1's email and phone are `contact_email` / `contact_phone`; player 2 uses new `player2_email` / `player2_phone`. Admin card shows both players' contacts. Stylesheet stamp `20261113b`.
 - [x] **Field change shipped 13 Nov** (migration applied, `website-forms` v6, site live; done in this order) — migration `20261113120000_event_player_contacts.sql`, then `npx supabase functions deploy website-forms`, then the Netlify production deploy. The function and the site must go out back to back: the old form fails against the new function and the new form fails against the old one.
-- [ ] **App apply screen still asks for the old fields** — `TournamentApplyScreen` and `tournament-apply` are unchanged (handicap, sport, written answer) and do not collect player 2's email or phone. Align them in the next build.
-- [ ] **Send one test application before the promo** — `tournament_applications` had zero rows on 13 Nov, so the path has never stored a real application from the site or the app. Confirm the row and the hello@clocked.golf email, then delete the test row.
+- [x] **App apply screen matches the website** — 13 Nov, in 1.10.0. See the tournament pass below.
+- [ ] **Send one test application** (still open; the 13 Nov test from the site was dropped, see below) — `tournament_applications` had zero rows on 13 Nov, so the path has never stored a real application from the site or the app. Confirm the row and the hello@clocked.golf email, then delete the test row.
 - [ ] **Take the event content off the homepage after 19 Nov** — strip, hero button, `#apply` section and the meta description are all event-specific. Pre-event homepage is in `clocked html - backup 2026-11-13`.
+
+## TOURNAMENT PASS — 13 Nov (1.10.0, not built yet)
+
+- [x] **The 13 Nov test team was never stored.** `tournament_applications` still had 0 rows afterwards. The `website-forms` bot filter answered `200 { ok: true }` without saving whenever the hidden `company_website` field had a value (browser autofill fills a field with that name) or the form went in under 2 seconds, so the page showed success. Fixed in code: the trap field is now `hp_token` on all four pages, and a tripped filter returns a visible 400.
+- [x] **Confirmation email to every player.** `supabase/functions/_shared/eventEmail.ts` is the one template, used by `website-forms` and `tournament-apply`: thanks for applying, further details upon entry. Sent from hello@clocked.golf through Resend to both players' addresses (one email if they share an address), paused past 40 applications an hour. Both functions return `{ ok, id, emailed, confirmed }`.
+- [x] **App sign-up asks for the website's inputs.** `TournamentApplyScreen`: team name, then full name, email and phone for each player, social tag optional. `tournament-apply` takes `form_version: 2` and still accepts the 1.9.0 payload so the store build keeps working.
+- [x] **Play: pick a course or set par yourself.** Course search no longer steals focus; under it sits "Can't find it? Set par yourself": name, 9 or 18, a 3/4/5 pill per hole, ALL PAR 3/4/5.
+- [x] **Levels are BEGINNER / INTERMEDIATE / EXPERT** in Play, with the clock for par 3, 4 and 5 shown on each (solo: 6:00 / 7:30 / 9:00, 4:00 / 5:00 / 6:00, 2:30 / 3:30 / 4:30). Stored values are unchanged (`pro` is Expert). Ranks, Arcade, Settings, Onboarding and Share still say PRO.
+- [x] **Tournament round.** A Tournament card at the top of Play (and PLAY THE ROUND on the event page) starts Palm Beach Par 3, 9 holes, every hole par 3, 3:00 a hole, level TOURNAMENT, teams of two with a solo practice link. Facts live in `EVENT_PLAY` in `lib/event.js`; the card hides at 6 AM the morning after the event. The round is saved as `difficulty: 'pro'` with `active_game.event`, `level: 'tournament'` and `timeParSeconds: 180`. Par is locked in the hole editor.
+- [x] **Abandoning a Clocked round closes its play session** (it was left open before).
+- [x] Tested: 12-check function harness (both payload shapes, filter, limits, mail failures), unit checks on the clock tables and the fixed 3:00, and on the simulator: manual par, levels, course search, the tournament round through hole 2 and the scorecard, the event page entry, the apply form. Nothing was submitted or saved from the simulator.
+- [ ] **Deploy, in this order:** `website-forms`, `tournament-apply`, then the site (Netlify production). The live form is dropping autofilled applications until the first one is out. `search-courses` too: the deployed version took over 8 s on one search on 13 Nov; the repo version caps the outside lookup at 5 s.
+- [ ] **Build 1.10.0 and get it through review before Thursday 19 Nov.** Confirm the version number in App Store Connect first.
+- [ ] **Send a real test application after the deploy** and confirm the row, the hello@ notification and both confirmation emails. Delivery to outside addresses has not been seen yet.
+- [ ] **Event-night limits in the database.** A player can save 3 rounds in 12 hours (`check_round_rate_limit`). A nine finished in under 20 minutes is stored as practice and stays off the board; nine holes at 3:00 is 27 minutes at the limit, so a quick team could fall under it. The `tournaments` row has `application_deadline` 16 Nov and `field_limit` 13.
+- [ ] One open `play_sessions` row from testing: `4cedc412-a66b-4502-b80a-97cb94b4690e` (billycivi, 13 Nov, Palm Beach Par 3, never finished).
 
 ## CLOCK — 5 Nov, lock-screen alarms
 
@@ -149,6 +165,7 @@ Decisions and data left for Billy:
 
 ## RELEASES
 
+- **1.10.0** version set in `app.json` 13 Nov for the tournament pass (and the 9 Nov audit pass). Not built yet.
 - **1.9.0 (build 62)** live on the App Store 8 Nov (store lookup shows the 1.9.0 release notes; version string reads `63`). Train closed. The 9 Nov audit pass is not in any build yet.
 
 - **1.7.0 (build 54)** approved and live on the App Store, 4 Nov: Today tab, course records, head-to-head profiles, course crests, arcade qualifying board.

@@ -1,10 +1,10 @@
-// ─── Tournament Apply — team application for Clocked at the Par 3 ───────────
-// Two-player team application (the website's /tournaments page posts the same
-// team form through the website-forms function; both land in admin review). Player 1
-// is always the signed-in user (name/handicap prefilled from their profile,
-// editable) since applying in-app requires an account. Submits to the shared
-// tournament-apply edge function — the same backend the website form posts
-// to — so every application lands in one place for review.
+// ─── Tournament Apply — team sign-up for Clocked at the Par 3 ───────────────
+// The same inputs as the sign-up form on clocked.golf: a team name, and for
+// each of the two players a full name, email and phone. Social tags are
+// optional. Player 1 is the signed-in user (name and email prefilled from the
+// profile, editable). Submits to the tournament-apply edge function, which
+// writes the same table the website form writes and sends the same emails:
+// a confirmation to each player and a notification to hello@clocked.golf.
 import { useState } from 'react';
 import {
   ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -28,58 +28,78 @@ function Field({ label, children, note }) {
   );
 }
 
+const PLACEHOLDER = '#3A5C3C';
+const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+// A phone number is anything with at least seven digits in it; the format is
+// the player's own (spaces, dashes, a country code).
+const isPhone = (v) => (v.match(/\d/g) ?? []).length >= 7;
+
+// supabase-js reports a non-2xx reply as an error whose `context` is the raw
+// Response. The function's own message ("Enter a valid email address for
+// player 2.") is in that body, and it is the one worth showing.
+async function serverMessage(error) {
+  try {
+    const body = await error?.context?.json?.();
+    if (body?.error) return String(body.error);
+  } catch { /* not JSON: fall through to the generic line */ }
+  return null;
+}
+
 export default function TournamentApplyScreen({ navigation }) {
   const { user, profile } = useAuth();
 
   const [teamName, setTeamName]       = useState('');
-  const [email, setEmail]             = useState(profile?.email || user?.email || '');
   const [p1Name, setP1Name]           = useState(profile?.full_name || '');
-  const [p1Handicap, setP1Handicap]   = useState(profile?.handicap_index != null ? String(profile.handicap_index) : '');
-  const [p1Sport, setP1Sport]         = useState('');
+  const [p1Email, setP1Email]         = useState(profile?.email || user?.email || '');
+  const [p1Phone, setP1Phone]         = useState('');
   const [p1Instagram, setP1Instagram] = useState('');
   const [p2Name, setP2Name]           = useState('');
-  const [p2Handicap, setP2Handicap]   = useState('');
-  const [p2Sport, setP2Sport]         = useState('');
+  const [p2Email, setP2Email]         = useState('');
+  const [p2Phone, setP2Phone]         = useState('');
   const [p2Instagram, setP2Instagram] = useState('');
-  const [p2Username, setP2Username]   = useState('');
-  const [whyCompete, setWhyCompete]   = useState('');
-  const [ackEntry, setAckEntry]       = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted]   = useState(false);
   const [errorMsg, setErrorMsg]     = useState(null);
 
-  const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  const canSubmit = teamName.trim() && isEmail(email.trim()) && p1Name.trim() && p1Sport.trim() && p2Name.trim() && p2Sport.trim() && whyCompete.trim() && ackEntry && !submitting;
+  // The first thing still missing, in form order, or null when it is complete.
+  const missing = (() => {
+    if (!teamName.trim())          return 'Add a team name.';
+    if (!p1Name.trim())            return "Add player 1's full name.";
+    if (!isEmail(p1Email.trim()))  return 'Enter a valid email address for player 1.';
+    if (!isPhone(p1Phone))         return 'Enter a phone number for player 1.';
+    if (!p2Name.trim())            return "Add player 2's full name.";
+    if (!isEmail(p2Email.trim()))  return 'Enter a valid email address for player 2.';
+    if (!isPhone(p2Phone))         return 'Enter a phone number for player 2.';
+    return null;
+  })();
+  const canSubmit = !missing && !submitting;
 
   const handleSubmit = async () => {
-    if (!canSubmit) {
-      Alert.alert('Missing info', 'Team name, email, both player names, the sport each player played, why your team should compete, and the entry acknowledgement are required.');
-      return;
-    }
+    if (submitting) return;
+    if (missing) { Alert.alert('Almost there', missing); return; }
     setSubmitting(true);
     setErrorMsg(null);
     try {
       const { data, error } = await supabase.functions.invoke('tournament-apply', {
         body: {
+          form_version: 2,
           source: 'app',
           tournament_slug: EVENT.slug,
           team_name: teamName.trim(),
-          contact_email: email.trim(),
+          // Player 1 is the team's contact, as on the website form.
+          contact_email: p1Email.trim(),
+          contact_phone: p1Phone.trim(),
           player1_name: p1Name.trim(),
-          player1_handicap: p1Handicap.trim(),
-          player1_sport: p1Sport.trim(),
           player1_instagram: p1Instagram.trim(),
           player1_username: profile?.username || null,
           player2_name: p2Name.trim(),
-          player2_handicap: p2Handicap.trim(),
-          player2_sport: p2Sport.trim(),
+          player2_email: p2Email.trim(),
+          player2_phone: p2Phone.trim(),
           player2_instagram: p2Instagram.trim(),
-          player2_username: p2Username.trim(),
-          why_compete: whyCompete.trim(),
         },
       });
-      if (error) throw error;
+      if (error) throw new Error((await serverMessage(error)) || 'Could not submit your application. Check your connection and try again.');
       if (data?.error) throw new Error(data.error);
       setSubmitted(true);
     } catch (e) {
@@ -94,9 +114,9 @@ export default function TournamentApplyScreen({ navigation }) {
       <SafeAreaView style={s.container}>
         <View style={s.successWrap}>
           <Ionicons name="checkmark-circle" size={48} color={COLOR.green} style={{ marginBottom: 20 }} />
-          <Text style={s.successTitle}>Application in.</Text>
+          <Text style={s.successTitle}>Thanks for applying.</Text>
           <Text style={s.successBody}>
-            We read every one and hand-pick the field. You'll hear from us either way: a spot with payment details, or a place on the waitlist with your number in line. Nobody pays until they're in.
+            A confirmation is on its way to each player's email. We read every application and hand-pick the field. If your team is in, we'll send further details upon entry. Nobody pays until they're in.
           </Text>
           <Text style={s.successClosing}>The game is yours. The clock is running.</Text>
           <TouchableOpacity style={s.doneBtn} onPress={() => navigation.popTo('Main')} activeOpacity={0.85}>
@@ -115,72 +135,52 @@ export default function TournamentApplyScreen({ navigation }) {
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
           <Text style={s.eyebrow}>{EVENT.dateLabel.toUpperCase()} {'\u00B7'} {EVENT.venue.toUpperCase()}</Text>
-          <Text style={s.title}>Apply with your partner.</Text>
-          <Text style={s.subtitle}>One application per two-player team. {EVENT.teamCap}, hand-picked, with a waitlist. Tell us who you both are, what you played, and why you want to be in the first field.</Text>
+          <Text style={s.title}>Sign up with your partner.</Text>
+          <Text style={s.subtitle}>One sign-up per two-player team. {EVENT.teamCap}, hand-picked, with a waitlist. Each player gets a confirmation by email.</Text>
 
           <Field label="TEAM NAME">
-            <TextInput style={s.input} value={teamName} onChangeText={setTeamName} placeholder="Your team name" placeholderTextColor="#3A5C3C" />
-          </Field>
-
-          <Field label="CONTACT EMAIL">
-            <TextInput style={s.input} value={email} onChangeText={setEmail} placeholder="your@email.com" placeholderTextColor="#3A5C3C" autoCapitalize="none" keyboardType="email-address" />
+            <TextInput style={s.input} value={teamName} onChangeText={setTeamName} placeholder="Your team name" placeholderTextColor={PLACEHOLDER} maxLength={120} returnKeyType="next" />
           </Field>
 
           <Text style={s.groupHeader}>PLAYER 1 · YOU</Text>
           <Field label="FULL NAME">
-            <TextInput style={s.input} value={p1Name} onChangeText={setP1Name} placeholder="Full name" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
+            <TextInput style={s.input} value={p1Name} onChangeText={setP1Name} placeholder="Full name" placeholderTextColor={PLACEHOLDER} autoCapitalize="words" textContentType="name" maxLength={120} />
           </Field>
-          <Field label="HANDICAP">
-            <TextInput style={s.input} value={p1Handicap} onChangeText={setP1Handicap} placeholder="e.g. 4.2" placeholderTextColor="#3A5C3C" keyboardType="numbers-and-punctuation" />
+          <Field label="EMAIL">
+            <TextInput style={s.input} value={p1Email} onChangeText={setP1Email} placeholder="you@email.com" placeholderTextColor={PLACEHOLDER} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" textContentType="emailAddress" maxLength={254} />
           </Field>
-          <Field label="SPORT YOU PLAYED" note="Any sport, any level. High school, college, club, rec league, or pro.">
-            <TextInput style={s.input} value={p1Sport} onChangeText={setP1Sport} placeholder="Lacrosse, college" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
+          <Field label="PHONE NUMBER">
+            <TextInput style={s.input} value={p1Phone} onChangeText={setP1Phone} placeholder="(561) 555-0100" placeholderTextColor={PLACEHOLDER} keyboardType="phone-pad" textContentType="telephoneNumber" maxLength={40} />
           </Field>
-          <Field label="INSTAGRAM (OPTIONAL)">
-            <TextInput style={s.input} value={p1Instagram} onChangeText={setP1Instagram} placeholder="@handle" placeholderTextColor="#3A5C3C" autoCapitalize="none" />
+          <Field label="INSTAGRAM OR SOCIAL TAG (OPTIONAL)">
+            <TextInput style={s.input} value={p1Instagram} onChangeText={setP1Instagram} placeholder="@handle" placeholderTextColor={PLACEHOLDER} autoCapitalize="none" autoCorrect={false} maxLength={80} />
           </Field>
 
           <Text style={s.groupHeader}>PLAYER 2 · YOUR PARTNER</Text>
           <Field label="FULL NAME">
-            <TextInput style={s.input} value={p2Name} onChangeText={setP2Name} placeholder="Full name" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
+            <TextInput style={s.input} value={p2Name} onChangeText={setP2Name} placeholder="Full name" placeholderTextColor={PLACEHOLDER} autoCapitalize="words" maxLength={120} />
           </Field>
-          <Field label="HANDICAP">
-            <TextInput style={s.input} value={p2Handicap} onChangeText={setP2Handicap} placeholder="e.g. 8.7" placeholderTextColor="#3A5C3C" keyboardType="numbers-and-punctuation" />
+          <Field label="EMAIL">
+            <TextInput style={s.input} value={p2Email} onChangeText={setP2Email} placeholder="partner@email.com" placeholderTextColor={PLACEHOLDER} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" maxLength={254} />
           </Field>
-          <Field label="SPORT THEY PLAYED" note="Any sport, any level.">
-            <TextInput style={s.input} value={p2Sport} onChangeText={setP2Sport} placeholder="Soccer, high school" placeholderTextColor="#3A5C3C" autoCapitalize="words" />
+          <Field label="PHONE NUMBER">
+            <TextInput style={s.input} value={p2Phone} onChangeText={setP2Phone} placeholder="(561) 555-0101" placeholderTextColor={PLACEHOLDER} keyboardType="phone-pad" maxLength={40} />
           </Field>
-          <Field label="INSTAGRAM (OPTIONAL)">
-            <TextInput style={s.input} value={p2Instagram} onChangeText={setP2Instagram} placeholder="@handle" placeholderTextColor="#3A5C3C" autoCapitalize="none" />
-          </Field>
-          <Field label="CLOCKED GOLF USERNAME (OPTIONAL)" note="If your partner has the app.">
-            <TextInput style={s.input} value={p2Username} onChangeText={setP2Username} placeholder="username" placeholderTextColor="#3A5C3C" autoCapitalize="none" />
+          <Field label="INSTAGRAM OR SOCIAL TAG (OPTIONAL)">
+            <TextInput style={s.input} value={p2Instagram} onChangeText={setP2Instagram} placeholder="@handle" placeholderTextColor={PLACEHOLDER} autoCapitalize="none" autoCorrect={false} maxLength={80} />
           </Field>
 
-          <Field label="WHY SHOULD YOUR TEAM COMPETE?">
-            <TextInput
-              style={[s.input, s.inputMulti]}
-              value={whyCompete}
-              onChangeText={setWhyCompete}
-              placeholder="Tell us about your background, your game, and why you belong in this field."
-              placeholderTextColor="#3A5C3C"
-              multiline
-              numberOfLines={4}
-            />
-          </Field>
-
-          <TouchableOpacity style={s.ack} onPress={() => setAckEntry(v => !v)} activeOpacity={0.8} accessibilityRole="checkbox" accessibilityState={{ checked: ackEntry }}>
-            <Ionicons name={ackEntry ? 'checkbox' : 'square-outline'} size={22} color={ackEntry ? COLOR.gold : COLOR.dim} />
-            <Text style={s.ackText}>{EVENT_ENTRY_NOTE} Applying does not guarantee a spot.</Text>
-          </TouchableOpacity>
+          <Text style={s.entryNote}>{EVENT_ENTRY_NOTE} Applying does not guarantee a spot.</Text>
 
           {errorMsg && <Text style={s.errorText}>{errorMsg}</Text>}
 
           <TouchableOpacity
             style={[s.submitBtn, !canSubmit && s.submitBtnDisabled]}
             onPress={handleSubmit}
-            disabled={!canSubmit}
+            disabled={submitting}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canSubmit }}
           >
             {submitting
               ? <ActivityIndicator color={COLOR.bg} />
@@ -208,10 +208,8 @@ const s = StyleSheet.create({
   fieldLabel:   { fontSize: 10, fontWeight: '700', color: COLOR.dim, letterSpacing: 1.5, marginBottom: 8 },
   fieldNote:    { fontSize: 11, color: '#5A5344', marginTop: 6 },
   input:        { backgroundColor: '#0F2312', borderWidth: 1, borderColor: '#1E3320', borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, color: '#E8DCC8', fontSize: 15 },
-  inputMulti:   { minHeight: 100, textAlignVertical: 'top' },
 
-  ack:          { flexDirection: 'row', gap: 12, alignItems: 'flex-start', marginBottom: 20, paddingVertical: 4 },
-  ackText:      { flex: 1, fontSize: 13, color: COLOR.muted, lineHeight: 19 },
+  entryNote:    { fontSize: 13, color: COLOR.muted, lineHeight: 19, marginBottom: 20 },
 
   errorText:    { fontSize: 13, color: COLOR.red, marginBottom: 16, lineHeight: 19 },
 

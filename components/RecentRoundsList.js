@@ -51,7 +51,8 @@ function resultLabel(round) {
 
 function formatLabel(round) {
   const d = round.difficulty;
-  if (d === 'pro') return 'PRO';
+  if (round.active_game?.level === 'tournament') return 'TOURNAMENT';
+  if (d === 'pro') return 'EXPERT';
   if (d === 'beginner') return 'BEGINNER';
   return 'INTER.';
 }

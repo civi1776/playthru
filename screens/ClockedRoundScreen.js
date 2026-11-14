@@ -15,7 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   scoreHole, summarizeRound, computeTimePar, officialTimeParFor,
   formatSeconds, formatSecondsLong, formatBadge, grossCapForHole,
-  timePenalty,
+  timePenalty, difficultyLabel,
   DEFAULT_SCORING_SCALE, DEFAULT_CLOCK_COEFFICIENTS, DEFAULT_PENALTY_PARAMS,
 } from '../lib/clockedSport';
 import { CLOCKED_ROUND_STATE_KEY } from '../lib/clockedRoundConstants';
@@ -213,6 +213,14 @@ export default function ClockedRoundScreen({ navigation, route }) {
 
   const playerDefs       = resumeState?.playerDefs ?? params.players;
   const playerCount      = playerDefs.length;
+  // Tournament round: { slug, name, level, par, timeParSeconds }. Par is
+  // locked and every hole runs on the one fixed clock.
+  const tournament   = resumeState?.tournament ?? params.tournament ?? null;
+  const fixedTimePar = Number(tournament?.timeParSeconds) > 0 ? Math.round(Number(tournament.timeParSeconds)) : null;
+  // The clock for a hole: the tournament's fixed time, else the certified
+  // time par for this course, else the level table.
+  const timeParOf = (yardage, par, officialSec) =>
+    fixedTimePar ?? computeTimePar(yardage, par, playerCount, transport, difficulty, officialSec, clockCoeffs);
   const [officialTimePars, setOfficialTimePars] = useState(
     () => resumeState?.officialTimePars ?? params.officialTimePars ?? {}
   );
@@ -382,14 +390,14 @@ export default function ClockedRoundScreen({ navigation, route }) {
   const holeIdx     = currentHole - 1;
   const curHoleData = holeDataState[holeIdx] ?? { par: defaultPar, yardage: null, handicap: 18 };
   const curOfficialSeconds = officialTimeParFor(officialTimePars?.[currentHole], transport, playerCount);
-  const curTimePar  = computeTimePar(curHoleData.yardage, curHoleData.par, playerCount, transport, difficulty, curOfficialSeconds, clockCoeffs);
+  const curTimePar  = timeParOf(curHoleData.yardage, curHoleData.par, curOfficialSeconds);
 
   // ── Persistence ──
   const buildRoundState = (overrides = {}) => ({
     roundStartTs, course, holeCount, transport, difficulty, mode,
     holeDataState, playerDefs, configSnap, currentHole, holeResults,
     playerStrokes, clockRunning, clockStartedAt, holeFrozenTime, officialTimePars,
-    defaultPar, playSessionId, savedAt: Date.now(), ...overrides,
+    defaultPar, playSessionId, tournament, savedAt: Date.now(), ...overrides,
   });
   const persistRound = (overrides) =>
     AsyncStorage.setItem(CLOCKED_ROUND_STATE_KEY, JSON.stringify(buildRoundState(overrides))).catch(() => {});
@@ -426,7 +434,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       const h  = resumeState.currentHole ?? 1;
       const hd = (resumeState.holeDataState ?? [])[h - 1] ?? { par: defaultPar, yardage: null };
       const offSec = officialTimeParFor((resumeState.officialTimePars ?? officialTimePars)?.[h], transport, playerCount);
-      const tp = computeTimePar(hd.yardage, hd.par, playerCount, transport, difficulty, offSec, clockCoeffs);
+      const tp = timeParOf(hd.yardage, hd.par, offSec);
       scheduleClockAlarms(h, tp, resumeState.clockStartedAt);
     }
 
@@ -450,7 +458,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
             const finalElapsed = Math.max(0, Math.floor((pending.timestamp - resumeState.clockStartedAt) / 1000));
             const hd = (resumeState.holeDataState ?? [])[resumedHole - 1] ?? { par: defaultPar, yardage: null };
             const offSec = officialTimeParFor((resumeState.officialTimePars ?? officialTimePars)?.[resumedHole], transport, playerCount);
-            const resumedTimePar = computeTimePar(hd.yardage, hd.par, playerCount, transport, difficulty, offSec, clockCoeffs);
+            const resumedTimePar = timeParOf(hd.yardage, hd.par, offSec);
             setDisplayElapsed(finalElapsed);
             setHoleFrozenTime(finalElapsed);
             setClockRunning(false);
@@ -569,7 +577,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
     if (clockRunning && clockStartedAt) {
       try {
         const newOfficialSec = officialTimeParFor(officialTimePars?.[currentHole], transport, playerCount);
-        const newTP = computeTimePar(curHoleData.yardage, newPar, playerCount, transport, difficulty, newOfficialSec, clockCoeffs);
+        const newTP = timeParOf(curHoleData.yardage, newPar, newOfficialSec);
         const elapsedNow = Math.floor((Date.now() - clockStartedAt) / 1000);
         updateActivity(currentHole, newPar, Date.now() + (newTP - elapsedNow) * 1000).catch(() => {});
       } catch {}
@@ -597,7 +605,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       name: p.name,
       grossStrokes: playerStrokes[i],
     }));
-    const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount, difficulty, officialTimePars, holeNumber: currentHole };
+    const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount, difficulty, officialTimePars, holeNumber: currentHole, fixedTimeParSeconds: fixedTimePar };
     const result = scoreHole(playersForScoring, elapsed, curHoleData, config);
     // Store by hole number (index = hole - 1), never by completion order —
     // the hole picker lets players jump around (shotgun starts, joining a
@@ -665,7 +673,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
       name: p.name,
       grossStrokes: newStrokes[i],
     }));
-    const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount, difficulty, officialTimePars, holeNumber: idx + 1 };
+    const config = { scoringScale, clockCoefficients: clockCoeffs, penaltyParams, transport, playerCount, difficulty, officialTimePars, holeNumber: idx + 1, fixedTimeParSeconds: fixedTimePar };
     const result = scoreHole(playersForScoring, newElapsed, updatedHoleData[idx], config);
 
     const newResults = [...holeResults];
@@ -707,6 +715,9 @@ export default function ClockedRoundScreen({ navigation, route }) {
       format: 'clocked', mode: mode === 1 ? 'solo' : String(mode), transport,
       tee: params.selectedTee ? { tee_name: params.selectedTee.tee_name, total_yards: params.selectedTee.total_yards } : null,
       nine: params.selectedNine, coefficientsSnapshot: configSnap,
+      // Event rounds carry the event they were played in, so the field's
+      // scores can be pulled out of the rounds table afterwards.
+      ...(tournament ? { event: tournament.slug ?? null, level: 'tournament', timeParSeconds: fixedTimePar } : {}),
       summary: { totalScore: summary.totalScore, totalTimePar: summary.totalTimePar,
         totalElapsed: summary.totalElapsed, totalPenalty: summary.totalPenalty, playerTotals: summary.playerTotals },
     };
@@ -929,6 +940,8 @@ export default function ClockedRoundScreen({ navigation, route }) {
         cancelInteractionLadder().catch(() => {});
         endActivity().catch(() => {});
         cancelClockAlarms();
+        // Close the play session so PLAY DATA counts this as an abandoned start.
+        endPlaySession(playSessionId, { outcome: 'abandoned', holesCompleted: holeResults.length });
         await AsyncStorage.removeItem(CLOCKED_ROUND_STATE_KEY);
         navigation.popTo('Main');
       }},
@@ -1058,7 +1071,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
         {!!course?.name && <Text style={[st.chip, st.chipCourse]} numberOfLines={1}>{course.name}</Text>}
         <Text style={st.chip}>{formatBadge(playerCount)}</Text>
         <Text style={st.chip}>{String(transport ?? '').toUpperCase()}</Text>
-        <Text style={st.chip}>{String(difficulty ?? '').toUpperCase()}</Text>
+        <Text style={[st.chip, tournament && st.chipTournament]}>{tournament ? (tournament.level ?? 'TOURNAMENT') : difficultyLabel(difficulty)}</Text>
       </View>
 
       {/* ── Scorecard overlay ── */}
@@ -1231,7 +1244,12 @@ export default function ClockedRoundScreen({ navigation, route }) {
             </TouchableOpacity>
           )}
 
-          {/* ── Par selector ── */}
+          {/* ── Par selector (locked in a tournament: every hole is the same par) ── */}
+          {tournament ? (
+            <View style={st.parSelectorWrap}>
+              <Text style={st.parSelectorLabel}>PAR {curHoleData.par} {'\u00B7'} {formatSeconds(curTimePar)} ON EVERY HOLE</Text>
+            </View>
+          ) : (
           <View style={st.parSelectorWrap}>
             <Text style={st.parSelectorLabel}>PAR</Text>
             <View style={st.parSelectorRow}>
@@ -1247,6 +1265,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
               ))}
             </View>
           </View>
+          )}
 
           {/* ── Stroke entry (per player) ── */}
           <View style={st.strokeSection}>
@@ -1362,6 +1381,7 @@ export default function ClockedRoundScreen({ navigation, route }) {
         holeResult={editHoleIdx != null ? holeResults[editHoleIdx] : null}
         holeNumber={(editHoleIdx ?? 0) + 1}
         playerDefs={playerDefs}
+        parLocked={!!tournament}
         onSave={(newPar, newStrokes, newElapsed) => {
           rescoreHole(editHoleIdx, newPar, newStrokes, newElapsed);
           setEditHoleIdx(null);
@@ -1444,7 +1464,7 @@ const hp = StyleSheet.create({
 });
 
 // ─── Edit Past Hole Modal ────────────────────────────────────────────────────
-function EditHoleModal({ visible, holeResult, holeNumber, playerDefs, onSave, onClose }) {
+function EditHoleModal({ visible, holeResult, holeNumber, playerDefs, parLocked = false, onSave, onClose }) {
   const [par, setPar]           = useState(4);
   const [strokes, setStrokes]   = useState([]);
   const [timeStr, setTimeStr]   = useState('');
@@ -1475,15 +1495,19 @@ function EditHoleModal({ visible, holeResult, holeNumber, playerDefs, onSave, on
             <TouchableOpacity onPress={onClose} style={em.closeBtn}><Ionicons name="close" size={20} color={MUTED} /></TouchableOpacity>
           </View>
 
-          {/* Par */}
-          <Text style={em.label}>PAR</Text>
-          <View style={em.pillRow}>
-            {[3, 4, 5].map(p => (
-              <TouchableOpacity key={p} style={[em.pill, par === p && em.pillOn]} onPress={() => setPar(p)} activeOpacity={0.8}>
-                <Text style={[em.pillTxt, par === p && em.pillTxtOn]}>{p}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {/* Par (fixed in a tournament round) */}
+          {!parLocked && (
+            <>
+              <Text style={em.label}>PAR</Text>
+              <View style={em.pillRow}>
+                {[3, 4, 5].map(p => (
+                  <TouchableOpacity key={p} style={[em.pill, par === p && em.pillOn]} onPress={() => setPar(p)} activeOpacity={0.8}>
+                    <Text style={[em.pillTxt, par === p && em.pillTxtOn]}>{p}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
           {/* Strokes per player */}
           <Text style={em.label}>STROKES</Text>
@@ -1621,6 +1645,7 @@ const st = StyleSheet.create({
   chipRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 16, paddingBottom: 6, justifyContent: 'center' },
   chip:          { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, color: MUTED, borderWidth: 1, borderColor: BORDER, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, overflow: 'hidden' },
   chipCourse:    { color: CREAM, maxWidth: 180 },
+  chipTournament: { color: GOLD, borderColor: GOLD },
   bottomText:    { fontSize: 9, fontWeight: '700', color: DIM, letterSpacing: 1.5 },
 
   // Scorecard
