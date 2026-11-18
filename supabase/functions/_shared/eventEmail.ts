@@ -18,7 +18,7 @@ export const EVENTS: Record<string, { name: string; when: string; where: string 
   'par3-2026-11-19': {
     name:  'Clocked at the Par 3',
     when:  'Thursday, November 19 · 6:00 PM',
-    where: 'Palm Beach Par 3 · Palm Beach, FL',
+    where: 'The Park West Palm · West Palm Beach, FL',
   },
 };
 export const DEFAULT_EVENT_SLUG = 'par3-2026-11-19';
