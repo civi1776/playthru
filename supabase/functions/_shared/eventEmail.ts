@@ -17,8 +17,8 @@ export const FROM  = 'Clocked Golf <hello@clocked.golf>';
 export const EVENTS: Record<string, { name: string; when: string; where: string }> = {
   'par3-2026-11-19': {
     name:  'Clocked at the Par 3',
-    when:  'Thursday, November 19 · 6:00 PM',
-    where: 'The Park West Palm · West Palm Beach, FL',
+    when:  'The week after Thanksgiving · date to be announced',
+    where: 'To be announced',
   },
 };
 export const DEFAULT_EVENT_SLUG = 'par3-2026-11-19';
